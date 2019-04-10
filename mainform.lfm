@@ -1,0 +1,110 @@
+object Form1: TForm1
+  Left = 357
+  Height = 484
+  Top = 185
+  Width = 586
+  Caption = 'Form1'
+  ClientHeight = 484
+  ClientWidth = 586
+  OnCreate = FormCreate
+  LCLVersion = '2.0.0.4'
+  object Agg2DControl1: TAgg2DControl
+    Left = 0
+    Height = 424
+    Top = 0
+    Width = 586
+    Align = alClient
+    OnMouseDown = Agg2DControl1MouseDown
+    OnMouseMove = Agg2DControl1MouseMove
+    OnMouseWheel = FormMouseWheel
+  end
+  object panBottom: TPanel
+    Left = 0
+    Height = 60
+    Top = 424
+    Width = 586
+    Align = alBottom
+    ClientHeight = 60
+    ClientWidth = 586
+    TabOrder = 1
+    object seMagLevel: TSpinEdit
+      Left = 224
+      Height = 23
+      Top = 8
+      Width = 50
+      MaxValue = 20
+      TabOrder = 0
+      Value = 14
+    end
+    object btnStart: TButton
+      Left = 11
+      Height = 25
+      Top = 8
+      Width = 75
+      Anchors = [akLeft, akBottom]
+      Caption = 'Start'
+      OnClick = btnStartClick
+      TabOrder = 1
+    end
+    object btnShow: TButton
+      Left = 104
+      Height = 25
+      Top = 8
+      Width = 75
+      Anchors = [akLeft, akBottom]
+      Caption = 'Show'
+      Enabled = False
+      OnClick = btnShowClick
+      TabOrder = 2
+    end
+    object fseLat: TFloatSpinEdit
+      Left = 312
+      Height = 23
+      Top = 8
+      Width = 114
+      DecimalPlaces = 5
+      Increment = 0.001
+      MaxValue = 90
+      MinValue = -90
+      TabOrder = 3
+      Value = 53.89579
+    end
+    object fseLon: TFloatSpinEdit
+      Left = 444
+      Height = 23
+      Top = 8
+      Width = 114
+      DecimalPlaces = 5
+      Increment = 0.001
+      MaxValue = 180
+      MinValue = -180
+      TabOrder = 4
+      Value = 27.54783
+    end
+    object lbState: TLabel
+      Left = 227
+      Height = 15
+      Top = 37
+      Width = 36
+      Caption = 'Статус'
+      Font.Color = clBlue
+      ParentColor = False
+      ParentFont = False
+    end
+    object btnTest: TButton
+      Left = 11
+      Height = 25
+      Top = 32
+      Width = 75
+      Caption = 'btnTest'
+      OnClick = btnTestClick
+      TabOrder = 5
+    end
+  end
+  object Timer100ms: TTimer
+    Interval = 100
+    OnTimer = Timer100msTimer
+    left = 301
+    top = 188
+  end
+end

@@ -1,0 +1,537 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="11"/>
+    <BuildModes Active="Default"/>
+    <Units Count="61">
+      <Unit0>
+        <Filename Value="osmscout_test.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="41" Y="10"/>
+        <UsageCount Value="216"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="mainform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="Form1"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="MainForm"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="79"/>
+        <CursorPos X="32" Y="91"/>
+        <UsageCount Value="216"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="osmappainter.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapPainter"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1760"/>
+        <CursorPos Y="1769"/>
+        <UsageCount Value="216"/>
+        <Bookmarks Count="2">
+          <Item0 Y="991"/>
+          <Item1 Y="1445" ID="2"/>
+        </Bookmarks>
+      </Unit2>
+      <Unit3>
+        <Filename Value="osmaptypes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapTypes"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="230"/>
+        <CursorPos X="3" Y="275"/>
+        <UsageCount Value="216"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="osmapstyles.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapStyles"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="364"/>
+        <CursorPos X="34" Y="380"/>
+        <UsageCount Value="216"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="osmapgeometry.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapGeometry"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="52" Y="308"/>
+        <UsageCount Value="216"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="osmapobjects.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapObjects"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="448"/>
+        <CursorPos X="15" Y="457"/>
+        <UsageCount Value="215"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="osmapparameters.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapParameters"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="223"/>
+        <CursorPos X="17" Y="234"/>
+        <UsageCount Value="201"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="osmapobjtypes.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapObjTypes"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="989"/>
+        <CursorPos Y="1004"/>
+        <UsageCount Value="200"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="osmaptags.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapTags"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="172"/>
+        <CursorPos X="90" Y="187"/>
+        <UsageCount Value="200"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="osmapfiles.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapFiles"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="26" Y="1142"/>
+        <UsageCount Value="203"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="osmaputils.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapUtils"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="316"/>
+        <CursorPos Y="337"/>
+        <UsageCount Value="203"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="osmapobjfeatures.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapObjFeatures"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="385"/>
+        <CursorPos X="36" Y="403"/>
+        <UsageCount Value="200"/>
+      </Unit12>
+      <Unit13>
+        <Filename Value="osmapstyleconfig.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapStyleConfig"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="571"/>
+        <CursorPos X="41" Y="592"/>
+        <UsageCount Value="193"/>
+      </Unit13>
+      <Unit14>
+        <Filename Value="osmaplabels.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapLabels"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1152"/>
+        <CursorPos X="42" Y="1170"/>
+        <UsageCount Value="175"/>
+      </Unit14>
+      <Unit15>
+        <Filename Value="osmaptransform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapTransform"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1445"/>
+        <CursorPos Y="1464"/>
+        <UsageCount Value="115"/>
+        <Bookmarks Count="1">
+          <Item0 X="15" Y="973" ID="1"/>
+        </Bookmarks>
+      </Unit15>
+      <Unit16>
+        <Filename Value="osmappainteragg.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapPainterAgg"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="609"/>
+        <CursorPos Y="632"/>
+        <UsageCount Value="103"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="osmapprojection.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapProjection"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="260"/>
+        <CursorPos Y="352"/>
+        <UsageCount Value="88"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="osmapmanager.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapManager"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="280"/>
+        <CursorPos X="56" Y="294"/>
+        <UsageCount Value="87"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="osmapformatmp.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapFormatMp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="163"/>
+        <CursorPos X="8" Y="373"/>
+        <UsageCount Value="86"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="osmapfeatures.pas"/>
+        <UnitName Value="OsMapFeatures"/>
+        <EditorIndex Value="-1"/>
+        <UsageCount Value="200"/>
+      </Unit20>
+      <Unit21>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\objpas\math.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="2043"/>
+        <CursorPos X="3" Y="2046"/>
+        <UsageCount Value="11"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\objpas\objpas.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="24"/>
+        <CursorPos X="24" Y="33"/>
+        <UsageCount Value="5"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\systemh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="552"/>
+        <CursorPos X="3" Y="576"/>
+        <UsageCount Value="5"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\objpas\fgl.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1416"/>
+        <CursorPos X="3" Y="1419"/>
+        <UsageCount Value="17"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\objpas\classes\classesh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1826"/>
+        <CursorPos X="17" Y="1840"/>
+        <UsageCount Value="6"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\mathh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="74"/>
+        <CursorPos X="14" Y="89"/>
+        <UsageCount Value="6"/>
+      </Unit26>
+      <Unit27>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\objpas\sysutils\datih.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="140"/>
+        <CursorPos X="107" Y="166"/>
+        <UsageCount Value="3"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggFontWin32TrueType.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="837"/>
+        <CursorPos X="32" Y="849"/>
+        <UsageCount Value="2"/>
+      </Unit28>
+      <Unit29>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\win\wininc\struct.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="5701"/>
+        <CursorPos X="6" Y="5716"/>
+        <UsageCount Value="2"/>
+      </Unit29>
+      <Unit30>
+        <Filename Value="C:\pas-components\AggPasMod\Source\Agg2D.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="833"/>
+        <CursorPos X="28" Y="843"/>
+        <UsageCount Value="9"/>
+      </Unit30>
+      <Unit31>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggGlyphRasterBin.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="14"/>
+        <CursorPos X="6" Y="44"/>
+        <UsageCount Value="3"/>
+      </Unit31>
+      <Unit32>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggFontCacheManager.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="94"/>
+        <CursorPos X="8" Y="100"/>
+        <UsageCount Value="3"/>
+      </Unit32>
+      <Unit33>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggRendererBase.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="19"/>
+        <CursorPos X="19" Y="36"/>
+        <UsageCount Value="3"/>
+      </Unit33>
+      <Unit34>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\packages\fcl-base\src\syncobjs.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="16"/>
+        <CursorPos X="35" Y="35"/>
+        <UsageCount Value="2"/>
+      </Unit34>
+      <Unit35>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggColor.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="112"/>
+        <CursorPos X="5" Y="106"/>
+        <UsageCount Value="3"/>
+      </Unit35>
+      <Unit36>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggBasics.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="175"/>
+        <CursorPos X="31" Y="194"/>
+        <UsageCount Value="3"/>
+      </Unit36>
+      <Unit37>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggPathStorage.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="583"/>
+        <CursorPos X="16" Y="593"/>
+        <UsageCount Value="3"/>
+      </Unit37>
+      <Unit38>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggVertexSource.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="27"/>
+        <CursorPos X="3" Y="48"/>
+        <UsageCount Value="3"/>
+      </Unit38>
+      <Unit39>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\objpash.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="188"/>
+        <CursorPos X="25" Y="194"/>
+        <UsageCount Value="7"/>
+      </Unit39>
+      <Unit40>
+        <Filename Value="C:\Users\s.bodrov\AppData\Local\Temp\Temp1_tagg2d_example02.zip\TAgg2D_Example02\ex02_form.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="27"/>
+        <CursorPos X="57" Y="43"/>
+        <UsageCount Value="4"/>
+      </Unit40>
+      <Unit41>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggCompiler.inc"/>
+        <EditorIndex Value="-1"/>
+        <UsageCount Value="4"/>
+      </Unit41>
+      <Unit42>
+        <Filename Value="C:\pas-components\AggPasMod\Source\Agg2DGraphics.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="22"/>
+        <CursorPos Y="49"/>
+        <UsageCount Value="5"/>
+      </Unit42>
+      <Unit43>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\packages\rtl-objpas\src\inc\strutils.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1495"/>
+        <CursorPos Y="1505"/>
+        <UsageCount Value="11"/>
+      </Unit43>
+      <Unit44>
+        <Filename Value="C:\lazarus\lcl\lclclasses.pp"/>
+        <UnitName Value="LCLClasses"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="25" Y="42"/>
+        <UsageCount Value="8"/>
+      </Unit44>
+      <Unit45>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\threadh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="147"/>
+        <CursorPos X="30" Y="160"/>
+        <UsageCount Value="8"/>
+      </Unit45>
+      <Unit46>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\thread.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="215"/>
+        <CursorPos X="3" Y="218"/>
+        <UsageCount Value="8"/>
+      </Unit46>
+      <Unit47>
+        <Filename Value="C:\lazarus\fpc\3.0.4\source\rtl\inc\objpas.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="275"/>
+        <CursorPos X="31" Y="294"/>
+        <UsageCount Value="6"/>
+      </Unit47>
+      <Unit48>
+        <Filename Value="C:\lazarus\lcl\controls.pp"/>
+        <UnitName Value="Controls"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1636"/>
+        <CursorPos X="15" Y="1649"/>
+        <UsageCount Value="6"/>
+      </Unit48>
+      <Unit49>
+        <Filename Value="C:\pas-components\AggPasMod\Source\Design Time\AggDesignTimeRegistration.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="22"/>
+        <CursorPos X="8" Y="45"/>
+        <UsageCount Value="6"/>
+      </Unit49>
+      <Unit50>
+        <Filename Value="C:\pas-components\AggPasMod\Source\Controls\Agg2DControl.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="52"/>
+        <CursorPos X="35" Y="74"/>
+        <UsageCount Value="6"/>
+      </Unit50>
+      <Unit51>
+        <Filename Value="C:\lazarus\lcl\graphics.pp"/>
+        <UnitName Value="Graphics"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="844"/>
+        <CursorPos X="20" Y="854"/>
+        <UsageCount Value="6"/>
+      </Unit51>
+      <Unit52>
+        <Filename Value="C:\lazarus\lcl\include\picture.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="403"/>
+        <CursorPos X="3" Y="407"/>
+        <UsageCount Value="6"/>
+      </Unit52>
+      <Unit53>
+        <Filename Value="C:\pas-components\AggPasMod\Source\AggRenderingBuffer.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="52"/>
+        <CursorPos X="15" Y="66"/>
+        <UsageCount Value="6"/>
+      </Unit53>
+      <Unit54>
+        <Filename Value="C:\fpcupdeluxe\fpcsrc\rtl\objpas\fgl.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="866"/>
+        <CursorPos Y="873"/>
+        <UsageCount Value="9"/>
+      </Unit54>
+      <Unit55>
+        <Filename Value="..\acs\packages\laz_acs.pas"/>
+        <EditorIndex Value="-1"/>
+        <CursorPos X="3" Y="11"/>
+        <UsageCount Value="7"/>
+      </Unit55>
+      <Unit56>
+        <Filename Value="C:\fpcupdeluxe\fpcsrc\rtl\win\sysutils.pp"/>
+        <UnitName Value="SysUtils"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="401"/>
+        <CursorPos X="28" Y="416"/>
+        <UsageCount Value="7"/>
+      </Unit56>
+      <Unit57>
+        <Filename Value="C:\fpcupdeluxe\fpcsrc\rtl\win64\system.pp"/>
+        <UnitName Value="System"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="22"/>
+        <CursorPos X="46" Y="33"/>
+        <UsageCount Value="11"/>
+      </Unit57>
+      <Unit58>
+        <Filename Value="C:\fpcupdeluxe\fpcsrc\rtl\inc\systemh.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1288"/>
+        <CursorPos X="41" Y="1320"/>
+        <UsageCount Value="8"/>
+      </Unit58>
+      <Unit59>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\AggFontCacheManager.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="2"/>
+        <CursorPos X="8" Y="54"/>
+        <UsageCount Value="13"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit59>
+      <Unit60>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\Agg2D.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="2341"/>
+        <CursorPos X="3" Y="2311"/>
+        <UsageCount Value="16"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit60>
+    </Units>
+    <JumpHistory HistoryIndex="-1"/>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes Count="0" ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints Count="6">
+      <Item1>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="C:\lazarus\fpc\3.0.4\source\packages\rtl-objpas\src\inc\strutils.pp"/>
+        <Line Value="1454"/>
+      </Item1>
+      <Item2>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmappainteragg.pas"/>
+        <Line Value="346"/>
+      </Item2>
+      <Item3>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmappainteragg.pas"/>
+        <Line Value="365"/>
+      </Item3>
+      <Item4>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmappainter.pas"/>
+        <Line Value="1634"/>
+      </Item4>
+      <Item5>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmappainteragg.pas"/>
+        <Line Value="632"/>
+      </Item5>
+      <Item6>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmaptransform.pas"/>
+        <Line Value="1256"/>
+      </Item6>
+    </BreakPoints>
+  </Debugging>
+</CONFIG>
