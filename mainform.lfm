@@ -1,16 +1,16 @@
 object Form1: TForm1
   Left = 357
-  Height = 484
+  Height = 483
   Top = 185
   Width = 586
   Caption = 'Form1'
-  ClientHeight = 484
+  ClientHeight = 483
   ClientWidth = 586
   OnCreate = FormCreate
-  LCLVersion = '2.0.0.4'
+  LCLVersion = '2.0.2.0'
   object Agg2DControl1: TAgg2DControl
     Left = 0
-    Height = 424
+    Height = 423
     Top = 0
     Width = 586
     Align = alClient
@@ -21,7 +21,7 @@ object Form1: TForm1
   object panBottom: TPanel
     Left = 0
     Height = 60
-    Top = 424
+    Top = 423
     Width = 586
     Align = alBottom
     ClientHeight = 60
@@ -99,6 +99,14 @@ object Form1: TForm1
       Caption = 'btnTest'
       OnClick = btnTestClick
       TabOrder = 5
+    end
+    object edSearch: TEdit
+      Left = 104
+      Height = 23
+      Top = 34
+      Width = 108
+      TabOrder = 6
+      Text = 'Матусе'
     end
   end
   object Timer100ms: TTimer

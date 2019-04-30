@@ -28,7 +28,7 @@ interface
 uses
   Classes, SysUtils,
   OsMapPainter, OsMapProjection, OsMapStyleConfig, OsMapTypes, OsMapObjTypes,
-  OsMapParameters, OsMapStyles;
+  OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder;
 
 type
   TMapManager = class;
@@ -54,6 +54,7 @@ type
     FMapTypeConfig: TTypeConfig;
     FMapStyleConfig: TStyleConfig;
     FMapRenderThread: TMapRenderThread;
+    FMapGeocoder: TMapGeocoder;
     // assigned
     FMapPainter: TMapPainter;
   public
@@ -69,6 +70,7 @@ type
     property MapParameter: TMapParameter read FMapParameter;
     property MapTypeConfig: TTypeConfig read FMapTypeConfig;
     property MapStyleConfig: TStyleConfig read FMapStyleConfig;
+    property MapGeocoder: TMapGeocoder read FMapGeocoder;
 
     property MapPainter: TMapPainter read FMapPainter write FMapPainter;
   end;
@@ -88,6 +90,10 @@ begin
   FMapStyleConfig := TStyleConfig.Create(FMapTypeConfig);
   FMapData := TMapData.Create();
   FMapRenderThread := TMapRenderThread.Create(True);
+  FMapGeocoder := TMapGeocoder.Create();
+  FMapGeocoder.MapData := FMapData;
+  FMapGeocoder.ValStorage := GlobalFeatureValueStorage();
+
   //FMapPainter := TMapPainterAgg.Create(FMapStyleConfig);
 
   InitTypes();
@@ -95,6 +101,7 @@ end;
 
 procedure TMapManager.BeforeDestruction;
 begin
+  FreeAndNil(FMapGeocoder);
   FreeAndNil(FMapRenderThread);
   FreeAndNil(FMapData);
   FreeAndNil(FMapStyleConfig);
@@ -274,6 +281,7 @@ begin
   TmpType := TTypeInfo.Create('building');
   TmpType.CanBeArea := True;
   TmpType.AddFeature(MapTypeConfig.GetFeature(ftName));
+  TmpType.AddFeature(MapTypeConfig.GetFeature(ftAddress));
   MapTypeConfig.RegisterType(TmpType);
 
   TmpStyle := TFillStyle.Create();
@@ -301,6 +309,7 @@ begin
   TmpType := TTypeInfo.Create('building_apartments');
   TmpType.CanBeArea := True;
   TmpType.AddFeature(MapTypeConfig.GetFeature(ftName));
+  TmpType.AddFeature(MapTypeConfig.GetFeature(ftAddress));
   MapTypeConfig.RegisterType(TmpType);
 
   TmpStyle := TFillStyle.Create();

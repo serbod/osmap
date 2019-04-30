@@ -158,6 +158,24 @@ begin
   if AKey = 'Label' then
   begin
     ParseLabel(AValue);
+  end
+  else
+  if AKey = 'HouseNumber' then
+  begin
+    if IsArea and Assigned(TmpArea) then
+    begin
+      // номер дома
+      TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftName, AValue);
+    end
+  end
+  else
+  if AKey = 'StreetDesc' then
+  begin
+    if IsArea and Assigned(TmpArea) then
+    begin
+      // номер дома
+      TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftAddress, AValue);
+    end
   end;
 end;
 
@@ -363,12 +381,14 @@ procedure TMpFileImporter.ParseLabel(const AValue: string);
 begin
   if IsArea and Assigned(TmpArea) then
   begin
+    // номер дома, название участка
     //TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftName, UTF8ToSys(AValue));
     TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftName, AValue);
   end
   else
   if IsWay and Assigned(TmpWay) then
   begin
+    // название дороги / реки
     //TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftName, UTF8ToSys(AValue));
     TmpWay.FeatureValueBuffer.SetFeatureValue(ftName, AValue);
   end;

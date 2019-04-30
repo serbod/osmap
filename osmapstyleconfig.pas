@@ -517,6 +517,7 @@ begin
     // create default style
     Result := TPathShieldStyle.Create();
     Result.Name := s;
+    Result.ShieldStyle.FeatureType := ftName;
     Result.ShieldStyle.BgColor.InitRandom();
     Result.ShieldStyle.BorderColor.InitRandom();
     Result.ShieldStyle.TextColor.InitRandom();
@@ -797,7 +798,7 @@ begin
   inherited Create();
   FTypeConfig := ATypeConfig;
   FFeatureReaderMap := TStringToIntegerMap.Create();
-  FAccessReader.Init(ATypeConfig, FeatureNames[ftAccess]);
+  FAccessReader.Init(ATypeConfig, ftAccess);
 end;
 
 destructor TStyleResolveContext.Destroy;
@@ -814,7 +815,7 @@ begin
   begin
     n := Length(FFeatureReaders);
     SetLength(FFeatureReaders, n+1);
-    FFeatureReaders[n].Init(FTypeConfig, AFeature.GetName());
+    FFeatureReaders[n].Init(FTypeConfig, AFeature.FeatureType);
 
     FFeatureReaderMap.AddOrSetData(AFeature.GetName(), n);
   end;

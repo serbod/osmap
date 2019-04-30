@@ -7,6 +7,7 @@ interface
 uses
   Classes, SysUtils, OsMapPainter, OsMapLabels, OsMapParameters, OsMapStyles,
   OsMapTypes, OsMapTransform, OsMapGeometry, OsMapStyleConfig, OsMapProjection,
+  OsMapObjects,
   Agg2D, AggFontCacheManager, AggPathStorage, AggColor, AggBasics, AggTransAffine;
 
 type
@@ -204,6 +205,7 @@ begin
   //s := UTF8ToSys(AText);
   //s := UTF8ToConsole(AText);
   ws := UTF8ToUTF16(AText);
+  FAgg2D.FlipText := True;
   FAgg2D.Text(X, Y, ws);
 end;
 
@@ -248,6 +250,7 @@ begin
                           *renderer_aa);   }
 
     FAgg2D.TextAngle := layoutGlyph.Angle;
+    FAgg2D.FlipText := True;
     FAgg2D.Text(layoutGlyph.Position.X,
       layoutGlyph.Position.Y,
       layoutGlyph.TextChar);
@@ -464,6 +467,7 @@ begin
 
     end;
     FAgg2D.FontHeight := ALabel.FontSize;
+    FAgg2D.FlipText := True;
     FAgg2D.Text(X, Y, UTF8ToUTF16(AMapLabel.Text));
 
     {DrawGlyphVector(labelRectangle.x,
@@ -523,11 +527,6 @@ begin
     end
     else
     begin
-      {if FTransBuffer.Buffer[i].DistanceTo(Pixel) > 500 then
-      begin
-        FAgg2D.ResetPath();
-        Exit;
-      end;}
       Pixel := FTransBuffer.Buffer[i];
       FAgg2D.LineTo(Pixel.X, Pixel.Y);
     end;
@@ -600,12 +599,6 @@ begin
 
   for i := AAreaData.TransStart+1 to AAreaData.TransEnd do
   begin
-    {if FTransBuffer.Buffer.Buffer[i].DistanceTo(Pixel) > 20 then
-    begin
-      //Assert(false);
-      FAgg2D.ResetPath();
-      Exit;
-    end; }
     Pixel := FTransBuffer.Buffer[i];
     FAgg2D.LineTo(Pixel.X, Pixel.Y);
   end;

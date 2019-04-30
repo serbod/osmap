@@ -58,39 +58,6 @@ type
     rsPostrender      // Implementation specific final step
   );
 
-  { This is the data structure holding all to be rendered data. }
-  TMapData = class
-  private
-    FNodeList: TMapNodeList;
-    FAreaList: TMapAreaList;
-    FWayList: TMapWayList;
-    FPoiNodeList: TMapNodeList;
-    FPoiAreaList: TMapAreaList;
-    FPoiWayList: TMapWayList;
-    FGroundTileList: TGroundTileList;
-  public
-    procedure AfterConstruction(); override;
-    procedure BeforeDestruction(); override;
-
-    procedure ClearDbData();
-    // Nodes as retrieved from database
-    property NodeList: TMapNodeList read FNodeList;
-    // Areas as retrieved from database
-    property AreaList: TMapAreaList read FAreaList;
-    // Ways as retrieved from database
-    property WayList: TMapWayList read FWayList;
-    // List of manually added nodes (not managed or changed by the database)
-    property PoiNodeList: TMapNodeList read FPoiNodeList;
-    // List of manually added areas (not managed or changed by the database)
-    property PoiAreaList: TMapAreaList read FPoiAreaList;
-    // List of manually added ways (not managed or changed by the database)
-    property PoiWayList: TMapWayList read FPoiWayList;
-    // List of ground tiles (optional)
-    property GroundTileList: TGroundTileList read FGroundTileList;
-  end;
-
-  TMapDataList = specialize TFPGList<TMapData>;
-
   { Structure used for internal statistic collection }
   TDataStatistic = record
     InfoType: Integer;  // Type
@@ -857,42 +824,6 @@ begin
   end;
 end;
 
-{ TMapData }
-
-procedure TMapData.AfterConstruction();
-begin
-  inherited AfterConstruction();
-  FNodeList := TMapNodeList.Create();
-  FAreaList := TMapAreaList.Create();
-  FWayList := TMapWayList.Create();
-  FPoiNodeList := TMapNodeList.Create();
-  FPoiAreaList := TMapAreaList.Create();
-  FPoiWayList := TMapWayList.Create();
-  //FGroundTileList := TGroundTileList.Create();
-end;
-
-procedure TMapData.BeforeDestruction();
-begin
-  //FreeAndNil(FGroundTileList);
-  FreeAndNil(FPoiWayList);
-  FreeAndNil(FPoiAreaList);
-  FreeAndNil(FPoiNodeList);
-  FreeAndNil(FWayList);
-  FreeAndNil(FAreaList);
-  FreeAndNil(FNodeList);
-  inherited BeforeDestruction();
-end;
-
-procedure TMapData.ClearDbData();
-begin
-  FNodeList.Clear();
-  FAreaList.Clear();
-  FWayList.Clear();
-  FPoiNodeList.Clear();
-  FPoiAreaList.Clear();
-  FPoiWayList.Clear();
-end;
-
 { TContourLabelHelper }
 
 function TContourLabelHelper.Init(APathLength: Double; ATextWidth: Double
@@ -1542,7 +1473,7 @@ var
   LbData: TLabelData;
   i: Integer;
   TextStyle: TTextStyle;
-  sLabel: string;
+  s, sLabel: string;
   dFactor: Double;
   dHeight, dAlpha, dMaxHeight, dMinAlpha, dNormHeight: Double;
 begin
@@ -1586,7 +1517,12 @@ begin
   for TextStyle in ATextStyles do
   begin
     //sLabel := GetLabelText(TextStyle.FeatureType, AParameter, ABuffer);
-    sLabel := GetLabelText(ftName, AParameter, ABuffer);
+    sLabel := GetLabelText(ftAddress, AParameter, ABuffer);
+    s := GetLabelText(ftName, AParameter, ABuffer);
+    if (sLabel <> '') and (s <> '') then
+      sLabel := sLabel + ' ' + s
+    else
+      slabel := sLabel + s;
 
     if (sLabel = '') then
       Continue;
@@ -2729,14 +2665,14 @@ begin
 
   FStyleConfig := AStyleConfig;
   FTransBuffer.Init();
-  FNameReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftName]);
-  FNameAltReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftNameAlt]);
-  FRefReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftRef]);
-  FLayerReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftLayer]);
-  FWidthReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftWidth]);
-  FAddressReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftAddress]);
-  FLanesReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftLanes]);
-  FAccessReader.Init(AStyleConfig.TypeConfig, FeatureNames[ftAccess]);
+  FNameReader.Init(AStyleConfig.TypeConfig, ftName);
+  FNameAltReader.Init(AStyleConfig.TypeConfig, ftNameAlt);
+  FRefReader.Init(AStyleConfig.TypeConfig, ftRef);
+  FLayerReader.Init(AStyleConfig.TypeConfig, ftLayer);
+  FWidthReader.Init(AStyleConfig.TypeConfig, ftWidth);
+  FAddressReader.Init(AStyleConfig.TypeConfig, ftAddress);
+  FLanesReader.Init(AStyleConfig.TypeConfig, ftLanes);
+  FAccessReader.Init(AStyleConfig.TypeConfig, ftAccess);
 
   //_LogDebug('TMapPainter.Create()');
 

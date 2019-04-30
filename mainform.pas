@@ -19,6 +19,7 @@ type
     btnShow: TButton;
     Agg2DControl1: TAgg2DControl;
     btnTest: TButton;
+    edSearch: TEdit;
     fseLat: TFloatSpinEdit;
     fseLon: TFloatSpinEdit;
     lbState: TLabel;
@@ -76,7 +77,9 @@ procedure TForm1.btnTestClick(Sender: TObject);
 var
   vg: TAgg2D;
   x, y: Double;
+  pt: TGeoPoint;
 begin
+  {
   vg := Agg2DControl1.Agg2D;
 
   // init font
@@ -105,7 +108,15 @@ begin
   vg.TextAngle := degtorad(30);
   vg.Text(x, y, 'T');
 
-  Agg2DControl1.Invalidate();
+  Agg2DControl1.Invalidate();  }
+
+
+  if FMapManager.MapGeocoder.GetStreetStart(edSearch.Text, pt) then
+  begin
+    fseLat.Value := pt.Lat;
+    fseLon.Value := pt.Lon;
+    btnShowClick(nil);
+  end;
 end;
 
 procedure TForm1.FormCreate(Sender: TObject);
@@ -116,7 +127,7 @@ begin
   FMapManager.MapPainter := FMapPainter;
 
   Agg2DControl1.DoubleBuffered := True;
-  //btnStartClick(nil);
+  btnStartClick(nil);
 end;
 
 procedure TForm1.FormMouseWheel(Sender: TObject; Shift: TShiftState;

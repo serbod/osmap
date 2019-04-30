@@ -260,9 +260,10 @@ type
   TFeatureReader = object
   private
     FFeatureName: string;
+    { Index - TTypeInfo.Index; Value - feature index for type }
     FLookupTable: array of Integer;
   public
-    procedure Init(ATypeConfig: TTypeConfig; AFeatureName: string);
+    procedure Init(ATypeConfig: TTypeConfig; AFeatureType: TFeatureType);
 
     { Returns the index of the Feature/FeatureValue within the given FeatureValueBuffer. }
     function GetIndex(const ABuffer: TFeatureValueBuffer; out AIndex: Integer): Boolean;
@@ -336,18 +337,18 @@ end;
 
 { TFeatureReader }
 
-procedure TFeatureReader.Init(ATypeConfig: TTypeConfig; AFeatureName: string);
+procedure TFeatureReader.Init(ATypeConfig: TTypeConfig; AFeatureType: TFeatureType);
 var
-  TmpFeature: TFeature;
   i, n: Integer;
+  TmpType: TTypeInfo;
 begin
-  FFeatureName := AFeatureName;
-  TmpFeature := ATypeConfig.GetFeatureByName(AFeatureName);
+  FFeatureName := FeatureNames[AFeatureType];
 
   SetLength(FLookupTable, ATypeConfig.Types.Count);
   for i := 0 to ATypeConfig.Types.Count-1 do
   begin
-    if ATypeConfig.Types[i].FindFeature(AFeatureName, n) then
+    TmpType := ATypeConfig.Types[i];
+    if TmpType.FindFeature(AFeatureType, n) then
       FLookupTable[i] := n
     else
       FLookupTable[i] := -1;
@@ -402,7 +403,7 @@ begin
   i := FLookupTable[ABuffer.TypeInfo.Index];
   if (i <> -1) and ABuffer.HasFeatureValue(i) then
   begin
-    AValue := StrTointDef(ABuffer.GetValue(i), 0);
+    AValue := StrToIntDef(ABuffer.GetValue(i), 0);
     Result := True;
   end
   else

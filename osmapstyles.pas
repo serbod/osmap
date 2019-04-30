@@ -165,7 +165,7 @@ type
   { Base class for all attribute metadata }
 
   { TStyleAttributeDescriptor }
-
+  { not used }
   TStyleAttributeDescriptor = class
   private
     FAttrType: TStyleAttributeType; // Type of the attribute
@@ -194,7 +194,7 @@ type
     to a given style object. }
 
   { TStyleDescriptor }
-
+  { not used }
   TStyleDescriptor = class
   private
     FAttributeMap: TAttributeMap;

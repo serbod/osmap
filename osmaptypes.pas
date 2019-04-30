@@ -79,35 +79,37 @@ type
   TFileOffset = Int64;
   // Type for describing a type of an way, area or node.
   TTypeId = Word;
+  // Feature value ID (string ID)
+  TFeatureValueId = Integer;
 
   TFeatureValue = string;
-  TFeatureValueList = array of TFeatureValue;
+  TFeatureValueList = array of TFeatureValueId;
 
   TFeatureType = (
     ftNone,
-    ftName,
-    ftNameAlt,
-    ftRef,
-    ftLocation,
-    ftAddress,
+    ftName,               // name, label
+    ftNameAlt,            // alternative name
+    ftRef,                // tags: ref
+    ftLocation,           // tags: addr:housenumber, addr:street, addr:place
+    ftAddress,            // tags: addr:housenumber, addr:street, addr:place
     ftAccess,
     ftAccessRestricted,
-    ftLayer,
-    ftWidth,
-    ftMaxSpeed,
-    ftGrade,
-    ftAdminLevel,
-    ftPostalCode,
-    ftBridge,
-    ftTunnel,
-    ftEmbankment,
-    ftRoundabout,
-    ftEle,
-    ftDestination,
-    ftBuilding,
-    ftWebsite,
-    ftPhone,
-    ftIsIn,
+    ftLayer,              // tags: layer
+    ftWidth,              // tags: width
+    ftMaxSpeed,           // tags: maxspeed
+    ftGrade,              // tags: surface, tracktype
+    ftAdminLevel,         // tags: admin_level, is_in
+    ftPostalCode,         // tags: postal_code, addr:postcode
+    ftBridge,             // tags: bridge
+    ftTunnel,             // tags: tunnel
+    ftEmbankment,         // tags: embankment
+    ftRoundabout,         // tags: junction
+    ftEle,                // tags: ele
+    ftDestination,        // tags: destination, destination:ref, destination:forward
+    ftBuilding,           // tags: building (yes, residential, hospital, etc..)
+    ftWebsite,            // tags: website
+    ftPhone,              // tags: phone
+    ftIsIn,               // tags: is_in
     ftConstructionYear,
     ftSideway,
     ftLanes

@@ -35,6 +35,9 @@ Way:
 GroundTile:
   GroundTile -> TGroundTile
   GroundTileCoord -> TGroundTileCoord
+
+MapPainter:
+  MapData - TMapData
 *)
 unit OsMapObjects;
 
@@ -294,6 +297,39 @@ type
   //TGroundTileList = specialize TFPGList<TGroundTile>;
   TGroundTileList = array of TGroundTile;
 
+  { This is the data structure holding all to be rendered data. }
+  TMapData = class
+  private
+    FNodeList: TMapNodeList;
+    FAreaList: TMapAreaList;
+    FWayList: TMapWayList;
+    FPoiNodeList: TMapNodeList;
+    FPoiAreaList: TMapAreaList;
+    FPoiWayList: TMapWayList;
+    FGroundTileList: TGroundTileList;
+  public
+    procedure AfterConstruction(); override;
+    procedure BeforeDestruction(); override;
+
+    procedure ClearDbData();
+    // Nodes as retrieved from database
+    property NodeList: TMapNodeList read FNodeList;
+    // Areas as retrieved from database
+    property AreaList: TMapAreaList read FAreaList;
+    // Ways as retrieved from database
+    property WayList: TMapWayList read FWayList;
+    // List of manually added nodes (not managed or changed by the database)
+    property PoiNodeList: TMapNodeList read FPoiNodeList;
+    // List of manually added areas (not managed or changed by the database)
+    property PoiAreaList: TMapAreaList read FPoiAreaList;
+    // List of manually added ways (not managed or changed by the database)
+    property PoiWayList: TMapWayList read FPoiWayList;
+    // List of ground tiles (optional)
+    property GroundTileList: TGroundTileList read FGroundTileList;
+  end;
+
+  TMapDataList = specialize TFPGList<TMapData>;
+
 //function MapNode();
 
 implementation
@@ -362,124 +398,93 @@ begin
   Coord.WriteToStream(AWriter.Stream);
 end;
 
-{ TGroundTileCoord }
+{ TMapAreaRing }
 
-procedure TGroundTileCoord.SetValue(AX, AY: Word; AIsCoast: Boolean);
+procedure TMapAreaRing.Init();
 begin
-  X := AX;
-  Y := AY;
-  IsCoast := AIsCoast;
+  Ring := OUTER_RING_ID;
+  BBox.Invalidate();
 end;
 
-function TGroundTileCoord.IsEqual(const AValue: TGroundTileCoord): Boolean;
+function TMapAreaRing.GetType(): TTypeInfo;
 begin
-  Result := (X = AValue.X) and (Y = AValue.Y) and (IsCoast = AValue.IsCoast);
+  Result := FeatureValueBuffer.GetType()
 end;
 
-{ TMapWay }
-
-function TMapWay.GetObjectFileRef(): TObjectFileRef;
+procedure TMapAreaRing.SetType(const AValue: TTypeInfo);
 begin
-  Result.Offset := FileOffset;
-  Result.RefType := refWay;
+  FeatureValueBuffer.SetType(AValue);
 end;
 
-function TMapWay.GetType(): TTypeInfo;
+function TMapAreaRing.HasAnyFeaturesSet(): Boolean;
+var
+  i: Integer;
 begin
-  Result := FeatureValueBuffer.GetType();
+  for i := 0 to FeatureValueBuffer.FeatureCount do
+  begin
+    if (FeatureValueBuffer.HasFeatureValue(i)) then
+    begin
+      Result := True;
+      Exit;
+    end;
+  end;
+  Result := False;
 end;
 
-function TMapWay.GetFeatureCount(): Integer;
+function TMapAreaRing.IsMasterRing(): Boolean;
 begin
-  Result := FeatureValueBuffer.TypeInfo.FeatureCount;
+  Result := (Ring = MASTER_RING_ID);
 end;
 
-function TMapWay.HasFeature(AIndex: Integer): Boolean;
+function TMapAreaRing.IsOuterRing(): Boolean;
 begin
-  Result := FeatureValueBuffer.HasFeatureValue(AIndex);
+  Result := (Ring = OUTER_RING_ID);
 end;
 
-function TMapWay.GetFeature(AIndex: Integer): TFeatureInfo;
+function TMapAreaRing.GetNodeIndexByNodeId(const AId: TId; var AIndex: Integer): Boolean;
+var
+  i: Integer;
 begin
-  Result := FeatureValueBuffer.TypeInfo.GetFeatureInfo(AIndex);
+  for i := 0 to Length(Nodes)-1 do
+  begin
+    if (Nodes[i].GetId() = AId) then
+    begin
+      AIndex := i;
+      Result := True;
+      Exit;
+    end;
+  end;
+  Result := False;
 end;
 
-procedure TMapWay.UnsetFeature(AIndex: Integer);
-begin
-  FeatureValueBuffer.FreeValue(AIndex);
-end;
-
-function TMapWay.IsCircular(): Boolean;
-begin
-  Result := (GetBackId() <> 0) and (GetBackId() = GetFrontId());
-end;
-
-function TMapWay.GetSerial(AIndex: Integer): TId;
-begin
-  //Result := Nodes[AIndex].Serial;
-  Result := 0;
-end;
-
-function TMapWay.GetId(AIndex: Integer): TId;
-begin
-  Result := Nodes[AIndex].GetId();
-end;
-
-function TMapWay.GetFrontId(): TId;
-begin
-  if Length(Nodes) > 0 then
-    Result := Nodes[0].GetId()
-  else
-    Result := 0;
-end;
-
-function TMapWay.GetBackId(): TId;
-begin
-  if Length(Nodes) > 0 then
-    Result := Nodes[Length(Nodes)-1].GetId()
-  else
-    Result := 0;
-end;
-
-{function TMapWay.GetPoint(AIndex: Integer): TGeoPoint;
-begin
-  Result := Nodes[AIndex];
-end; }
-
-function TMapWay.GetCoord(AIndex: Integer): TGeoPoint;
-begin
-  Result := Nodes[AIndex];
-end;
-
-function TMapWay.GetBoundingBox(): TGeoBox;
-begin
-  if (not FBBox.Valid) and (Length(Nodes) <> 0) then
-    FBBox.InitForPoints(Nodes);
-  Result.Assign(FBBox)
-end;
-
-function TMapWay.Intersects(const ABoundingBox: TGeoBox): Boolean;
-begin
-  Result := GetBoundingBox().IsIntersects(ABoundingBox);
-end;
-
-function TMapWay.GetCenter(var ACenter: TGeoPoint): Boolean;
+function TMapAreaRing.GetCenter(var ACenter: TGeoPoint): Boolean;
 var
   MinCoord, MaxCoord: TGeoPoint;
+  IsStart: Boolean;
   i: Integer;
 begin
   Result := False;
-  if Length(Nodes) = 0 then
-    Exit;
+  MinCoord.Init(0.0, 0.0);
+  MaxCoord.Init(0.0, 0.0);
+  IsStart := True;
 
-  MinCoord.Assign(Nodes[0]);
-  MaxCoord.Assign(Nodes[0]);
-
-  for i := 1 to Length(Nodes)-1 do
+  for i := 0 to Length(Nodes)-1 do
   begin
-    MinCoord.AssignMin(Nodes[i]);
-    MaxCoord.AssignMax(Nodes[i]);
+    if IsStart then
+    begin
+      MinCoord.Assign(Nodes[i]);
+      MaxCoord.Assign(Nodes[i]);
+      IsStart := False;
+    end
+    else
+    begin
+      MinCoord.AssignMin(Nodes[i]);
+      MaxCoord.AssignMax(Nodes[i]);
+    end;
   end;
+
+  if IsStart then
+    Exit;
 
   ACenter.Init(MinCoord.Lat + (MaxCoord.Lat - MinCoord.Lat) / 2,
                MinCoord.Lon + (MaxCoord.Lon - MinCoord.Lon) / 2);
@@ -487,80 +492,33 @@ begin
   Result := True;
 end;
 
-function TMapWay.GetNodeIndexByNodeId(AId: TId; out AIndex: Integer): Boolean;
+procedure TMapAreaRing.FillBoundingBox(out ABoundingBox: TGeoBox);
 var
   i: Integer;
+  MinCoord, MaxCoord: TGeoPoint;
 begin
-  Result := False;
-  for i := 0 to Length(Nodes)-1 do
+  Assert(Length(Nodes) <> 0);
+  if BBox.Valid then
   begin
-    if Nodes[i].GetId() = AId then
-    begin
-      AIndex := i;
-      Result := True;
-      Break;
-    end;
-  end;
-end;
-
-procedure TMapWay.SetType(const AValue: TTypeInfo);
-begin
-  FeatureValueBuffer.SetType(AValue);
-end;
-
-procedure TMapWay.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
-  ADataMode: TNodeDataMode);
-var
-  TypeId: TTypeId;
-  TypeInfo: TTypeInfo;
-  IsUseIds: Boolean;
-begin
-  FileOffset := AScanner.Stream.Position;
-  AScanner.ReadTypeId(TypeId, ATypeConfig.WayTypeIdBytes);
-  TypeInfo := ATypeConfig.GetWayTypeInfo(TypeId);
-  FeatureValueBuffer.SetType(TypeInfo);
-  FeatureValueBuffer.Read(AScanner);
-
-  case ADataMode of
-    ndmAuto: IsUseIds := (TypeInfo.CanRoute or TypeInfo.OptimizeLowZoom);
-    ndmAll:  IsUseIds := True;
-    ndmNone: IsUseIds := False;
+    ABoundingBox.Assign(BBox);
+    Exit;
   end;
 
-  AScanner.ReadMapPoints(Nodes, Segments, FBBox, IsUseIds);
+  MinCoord.Assign(Nodes[0]);
+  MaxCoord.Assign(MinCoord);
 
-  NextFileOffset := AScanner.Stream.Position;
-end;
-
-procedure TMapWay.ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
-begin
-  Read(ATypeConfig, AScanner, ndmNone);
-end;
-
-procedure TMapWay.Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
-  ADataMode: TNodeDataMode);
-var
-  IsUseIds: Boolean;
-begin
-  Assert(Length(Nodes) > 0);
-
-  AWriter.WriteTypeId(FeatureValueBuffer.TypeInfo.WayId,
-                      ATypeConfig.WayTypeIdBytes);
-
-  FeatureValueBuffer.Write(AWriter);
-
-  case ADataMode of
-    ndmAuto: IsUseIds := (FeatureValueBuffer.TypeInfo.CanRoute or FeatureValueBuffer.TypeInfo.OptimizeLowZoom);
-    ndmAll:  IsUseIds := True;
-    ndmNone: IsUseIds := False;
+  for i := 1 to Length(Nodes)-1 do
+  begin
+    MinCoord.AssignMin(Nodes[i]);
+    MaxCoord.AssignMax(Nodes[i]);
   end;
 
-  AWriter.WriteMapPoints(Nodes, IsUseIds);
+  ABoundingBox.SetValue(MinCoord, MaxCoord);
 end;
 
-procedure TMapWay.WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
+function TMapAreaRing.GetBoundingBox(): TGeoBox;
 begin
-  Write(ATypeConfig, AWriter, ndmNone);
+  FillBoundingBox(Result);
 end;
 
 { TMapArea }
@@ -810,114 +768,104 @@ begin
   Write(ATypeConfig, AWriter, ndmNone);
 end;
 
-{ TMapAreaRing }
+{ TMapWay }
 
-procedure TMapAreaRing.Init();
+function TMapWay.GetObjectFileRef(): TObjectFileRef;
 begin
-  Ring := OUTER_RING_ID;
-  BBox.Invalidate();
+  Result.Offset := FileOffset;
+  Result.RefType := refWay;
 end;
 
-function TMapAreaRing.GetType(): TTypeInfo;
+function TMapWay.GetType(): TTypeInfo;
 begin
-  Result := FeatureValueBuffer.GetType()
+  Result := FeatureValueBuffer.GetType();
 end;
 
-procedure TMapAreaRing.SetType(const AValue: TTypeInfo);
+function TMapWay.GetFeatureCount(): Integer;
 begin
-  FeatureValueBuffer.SetType(AValue);
+  Result := FeatureValueBuffer.TypeInfo.FeatureCount;
 end;
 
-function TMapAreaRing.HasAnyFeaturesSet(): Boolean;
-var
-  i: Integer;
+function TMapWay.HasFeature(AIndex: Integer): Boolean;
 begin
-  for i := 0 to FeatureValueBuffer.FeatureCount do
-  begin
-    if (FeatureValueBuffer.HasFeatureValue(i)) then
-    begin
-      Result := True;
-      Exit;
-    end;
-  end;
-  Result := False;
+  Result := FeatureValueBuffer.HasFeatureValue(AIndex);
 end;
 
-function TMapAreaRing.IsMasterRing(): Boolean;
+function TMapWay.GetFeature(AIndex: Integer): TFeatureInfo;
 begin
-  Result := (Ring = MASTER_RING_ID);
+  Result := FeatureValueBuffer.TypeInfo.GetFeatureInfo(AIndex);
 end;
 
-function TMapAreaRing.IsOuterRing(): Boolean;
+procedure TMapWay.UnsetFeature(AIndex: Integer);
 begin
-  Result := (Ring = OUTER_RING_ID);
+  FeatureValueBuffer.FreeValue(AIndex);
 end;
 
-function TMapAreaRing.GetNodeIndexByNodeId(const AId: TId; var AIndex: Integer): Boolean;
-var
-  i: Integer;
+function TMapWay.IsCircular(): Boolean;
 begin
-  for i := 0 to Length(Nodes)-1 do
-  begin
-    if (Nodes[i].GetId() = AId) then
-    begin
-      AIndex := i;
-      Result := True;
-      Exit;
-    end;
-  end;
-  Result := False;
+  Result := (GetBackId() <> 0) and (GetBackId() = GetFrontId());
 end;
 
-function TMapAreaRing.GetCenter(var ACenter: TGeoPoint): Boolean;
+function TMapWay.GetSerial(AIndex: Integer): TId;
+begin
+  //Result := Nodes[AIndex].Serial;
+  Result := 0;
+end;
+
+function TMapWay.GetId(AIndex: Integer): TId;
+begin
+  Result := Nodes[AIndex].GetId();
+end;
+
+function TMapWay.GetFrontId(): TId;
+begin
+  if Length(Nodes) > 0 then
+    Result := Nodes[0].GetId()
+  else
+    Result := 0;
+end;
+
+function TMapWay.GetBackId(): TId;
+begin
+  if Length(Nodes) > 0 then
+    Result := Nodes[Length(Nodes)-1].GetId()
+  else
+    Result := 0;
+end;
+
+{function TMapWay.GetPoint(AIndex: Integer): TGeoPoint;
+begin
+  Result := Nodes[AIndex];
+end; }
+
+function TMapWay.GetCoord(AIndex: Integer): TGeoPoint;
+begin
+  Result := Nodes[AIndex];
+end;
+
+function TMapWay.GetBoundingBox(): TGeoBox;
+begin
+  if (not FBBox.Valid) and (Length(Nodes) <> 0) then
+    FBBox.InitForPoints(Nodes);
+  Result.Assign(FBBox)
+end;
+
+function TMapWay.Intersects(const ABoundingBox: TGeoBox): Boolean;
+begin
+  Result := GetBoundingBox().IsIntersects(ABoundingBox);
+end;
+
+function TMapWay.GetCenter(var ACenter: TGeoPoint): Boolean;
 var
   MinCoord, MaxCoord: TGeoPoint;
-  IsStart: Boolean;
   i: Integer;
 begin
   Result := False;
-  MinCoord.Init(0.0, 0.0);
-  MaxCoord.Init(0.0, 0.0);
-  IsStart := True;
-
-  for i := 0 to Length(Nodes)-1 do
-  begin
-    if IsStart then
-    begin
-      MinCoord.Assign(Nodes[i]);
-      MaxCoord.Assign(Nodes[i]);
-      IsStart := False;
-    end
-    else
-    begin
-      MinCoord.AssignMin(Nodes[i]);
-      MaxCoord.AssignMax(Nodes[i]);
-    end;
-  end;
-
-  if IsStart then
+  if Length(Nodes) = 0 then
     Exit;
-
-  ACenter.Init(MinCoord.Lat + (MaxCoord.Lat - MinCoord.Lat) / 2,
-               MinCoord.Lon + (MaxCoord.Lon - MinCoord.Lon) / 2);
-
-  Result := True;
-end;
-
-procedure TMapAreaRing.FillBoundingBox(out ABoundingBox: TGeoBox);
-var
-  i: Integer;
-  MinCoord, MaxCoord: TGeoPoint;
-begin
-  Assert(Length(Nodes) <> 0);
-  if BBox.Valid then
-  begin
-    ABoundingBox.Assign(BBox);
-    Exit;
-  end;
 
   MinCoord.Assign(Nodes[0]);
-  MaxCoord.Assign(MinCoord);
+  MaxCoord.Assign(Nodes[0]);
 
   for i := 1 to Length(Nodes)-1 do
   begin
@@ -925,13 +873,138 @@ begin
     MaxCoord.AssignMax(Nodes[i]);
   end;
 
-  ABoundingBox.SetValue(MinCoord, MaxCoord);
+  ACenter.Init(MinCoord.Lat + (MaxCoord.Lat - MinCoord.Lat) / 2,
+               MinCoord.Lon + (MaxCoord.Lon - MinCoord.Lon) / 2);
+
+  Result := True;
 end;
 
-function TMapAreaRing.GetBoundingBox(): TGeoBox;
+function TMapWay.GetNodeIndexByNodeId(AId: TId; out AIndex: Integer): Boolean;
+var
+  i: Integer;
 begin
-  FillBoundingBox(Result);
+  Result := False;
+  for i := 0 to Length(Nodes)-1 do
+  begin
+    if Nodes[i].GetId() = AId then
+    begin
+      AIndex := i;
+      Result := True;
+      Break;
+    end;
+  end;
 end;
+
+procedure TMapWay.SetType(const AValue: TTypeInfo);
+begin
+  FeatureValueBuffer.SetType(AValue);
+end;
+
+procedure TMapWay.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
+  ADataMode: TNodeDataMode);
+var
+  TypeId: TTypeId;
+  TypeInfo: TTypeInfo;
+  IsUseIds: Boolean;
+begin
+  FileOffset := AScanner.Stream.Position;
+  AScanner.ReadTypeId(TypeId, ATypeConfig.WayTypeIdBytes);
+  TypeInfo := ATypeConfig.GetWayTypeInfo(TypeId);
+  FeatureValueBuffer.SetType(TypeInfo);
+  FeatureValueBuffer.Read(AScanner);
+
+  case ADataMode of
+    ndmAuto: IsUseIds := (TypeInfo.CanRoute or TypeInfo.OptimizeLowZoom);
+    ndmAll:  IsUseIds := True;
+    ndmNone: IsUseIds := False;
+  end;
+
+  AScanner.ReadMapPoints(Nodes, Segments, FBBox, IsUseIds);
+
+  NextFileOffset := AScanner.Stream.Position;
+end;
+
+procedure TMapWay.ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
+begin
+  Read(ATypeConfig, AScanner, ndmNone);
+end;
+
+procedure TMapWay.Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
+  ADataMode: TNodeDataMode);
+var
+  IsUseIds: Boolean;
+begin
+  Assert(Length(Nodes) > 0);
+
+  AWriter.WriteTypeId(FeatureValueBuffer.TypeInfo.WayId,
+                      ATypeConfig.WayTypeIdBytes);
+
+  FeatureValueBuffer.Write(AWriter);
+
+  case ADataMode of
+    ndmAuto: IsUseIds := (FeatureValueBuffer.TypeInfo.CanRoute or FeatureValueBuffer.TypeInfo.OptimizeLowZoom);
+    ndmAll:  IsUseIds := True;
+    ndmNone: IsUseIds := False;
+  end;
+
+  AWriter.WriteMapPoints(Nodes, IsUseIds);
+end;
+
+procedure TMapWay.WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
+begin
+  Write(ATypeConfig, AWriter, ndmNone);
+end;
+
+{ TGroundTileCoord }
+
+procedure TGroundTileCoord.SetValue(AX, AY: Word; AIsCoast: Boolean);
+begin
+  X := AX;
+  Y := AY;
+  IsCoast := AIsCoast;
+end;
+
+function TGroundTileCoord.IsEqual(const AValue: TGroundTileCoord): Boolean;
+begin
+  Result := (X = AValue.X) and (Y = AValue.Y) and (IsCoast = AValue.IsCoast);
+end;
+
+{ TMapData }
+
+procedure TMapData.AfterConstruction();
+begin
+  inherited AfterConstruction();
+  FNodeList := TMapNodeList.Create();
+  FAreaList := TMapAreaList.Create();
+  FWayList := TMapWayList.Create();
+  FPoiNodeList := TMapNodeList.Create();
+  FPoiAreaList := TMapAreaList.Create();
+  FPoiWayList := TMapWayList.Create();
+  //FGroundTileList := TGroundTileList.Create();
+end;
+
+procedure TMapData.BeforeDestruction();
+begin
+  //FreeAndNil(FGroundTileList);
+  FreeAndNil(FPoiWayList);
+  FreeAndNil(FPoiAreaList);
+  FreeAndNil(FPoiNodeList);
+  FreeAndNil(FWayList);
+  FreeAndNil(FAreaList);
+  FreeAndNil(FNodeList);
+  inherited BeforeDestruction();
+end;
+
+procedure TMapData.ClearDbData();
+begin
+  FNodeList.Clear();
+  FAreaList.Clear();
+  FWayList.Clear();
+  FPoiNodeList.Clear();
+  FPoiAreaList.Clear();
+  FPoiWayList.Clear();
+end;
+
 
 end.
 

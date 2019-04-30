@@ -43,7 +43,7 @@ unit OsMapObjTypes;
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapTypes, OsMapTags, OsMapFiles;
+  Classes, SysUtils, fgl, OsMapUtils, OsMapTypes, OsMapTags, OsMapFiles;
 
 const
   ObjTypeIgnore   = 0;
@@ -77,6 +77,27 @@ type
   TFeatureLabelsMap = specialize TFPGMap<string, Integer>;
   TFeatureFlagsMap = specialize TFPGMap<string, Integer>;
   TDescriptionsMap = specialize TFPGMap<string, string>;
+
+  { TFeatureValueStorage }
+  { When value added to storage, it get SID (string ID) and can be retrieved by
+    that SID }
+  TFeatureValueStorage = class
+  private
+    FStrList: TStringList;
+    FStrHash: TStringHash;
+  public
+    procedure AfterConstruction(); override;
+    procedure BeforeDestruction(); override;
+
+    procedure ClearHash();
+
+    { Add string to dictionary, return it SID }
+    function AddStr(const AValue: string): Integer;
+    { Get sring value by SID, return empty string if SID not exists }
+    function GetStr(ASID: Integer): string;
+
+    property StrList: TStringList read FStrList;
+  end;
 
   TTypeInfo = class;
   //TFeatureValueBuffer = class;
@@ -118,6 +139,9 @@ type
     // used only with AllocateValue()
     //function GetValueAndAllocateBuffer(AIndex: Integer): TFeatureValue;
   public
+    // assigned from outside
+    FeatureValueStorage: TFeatureValueStorage;
+
     { Deletes the current feature values and assign the type and values
      of the passed featur evalue buffer. }
     procedure Assign(const AValue: TFeatureValueBuffer);
@@ -144,12 +168,14 @@ type
     function HasFeatureValue(AIndex: Integer): Boolean;
     { Return a feature value }
     function GetValue(AIndex: Integer): TFeatureValue;
-    { Set a feature value }
+    { Set a feature value, AIndex - index of feature in TypeInfo }
     procedure SetValue(AIndex: Integer; const AValue: TFeatureValue);
     { Set feature value for specified feature type }
     procedure SetFeatureValue(AFeatureType: TFeatureType; const AValue: TFeatureValue);
     { Return feature value for specified feature type }
     function GetFeatureValue(AFeatureType: TFeatureType): string;
+    { Return feature value ID for specified feature type, -1 if not found }
+    function GetFeatureValueId(AFeatureType: TFeatureType): TFeatureValueId;
     { Return feature label for specified feature type }
     function GetFeatureLabel(AFeatureType: TFeatureType): string;
 
@@ -303,7 +329,6 @@ type
   private
     // created
     FConditions: TTypeConditionList;   // One of this conditions must be fulfilled for a object to match this type
-    FNameToFeatureMap: TNameToFeatureMap;
     FGroups: TStringList;              // Set of idents that server as categorizing groups
     FDescriptions: TDescriptionsMap;   // Map of descriptions for given language codes
 
@@ -320,7 +345,7 @@ type
     FSpecialFeatureMaskBytes: Integer; // Size of the feature bitmask in bytes
     //FFeatureValueBufferSize: Integer;  // Size of the value buffer holding values for all feature of the type
     FFeatureValueCount: Integer;       // feature values count
-    FFeatureIndexArray: TFeatureTypeIndexArray; // array of features indexes
+    FFeatureIndexMap: TFeatureTypeIndexArray; // array of features indexes
 
     FCanBeNode: Boolean;               // Type can be a node
     FCanBeWay: Boolean;                // Type can be a way
@@ -370,9 +395,13 @@ type
     function HasFeatures(): Boolean;
     { Returns true, if the feature with the given name has already been
       assigned to this type. }
-    function HasFeature(const AFeatureName: string): Boolean;
+    //function HasFeature(const AFeatureName: string): Boolean;
+    function HasFeature(AFeatureType: TFeatureType): Boolean;
     { Return the feature with the given name }
-    function FindFeature(const AFeatureName: string; var AIndex: Integer): Boolean;
+    //function FindFeature(const AFeatureName: string; var AIndex: Integer): Boolean;
+
+    { Return the feature with the given type }
+    function FindFeature(AFeatureType: TFeatureType; var AIndex: Integer): Boolean;
     { Return TFeature at given index }
     function GetFeature(AIndex: Integer): TFeature;
     { Return the feature at the given index }
@@ -486,11 +515,19 @@ type
     { Map of descriptions for given language codes }
     property Descriptions: TDescriptionsMap read FDescriptions;
     { Feature index for feature type, -1 if not defined }
-    property FeatureIndexArray: TFeatureTypeIndexArray read FFeatureIndexArray;
+    property FeatureIndexMap: TFeatureTypeIndexArray read FFeatureIndexMap;
   end;
 
-  TTypeInfoList = specialize TFPGList<TTypeInfo>;
+  //TTypeInfoList = specialize TFPGList<TTypeInfo>;
   TNameToTypeMap = specialize TFPGMap<string, TTypeInfo>;
+
+  TTypeInfoList = class(TList)
+  private
+    function GetItem(Index: Integer): TTypeInfo;
+    procedure PutItem(Index: Integer; AValue: TTypeInfo);
+  public
+    property Items[Index: Integer]: TTypeInfo read GetItem write PutItem; default;
+  end;
 
   { The TypeConfig class holds information about object types
     defined by a database instance. }
@@ -519,7 +556,8 @@ type
 
     FFeatures: TFeatureList;
     // pair of Name and Index in FFeatures
-    FNameToFeatureMap: TNameToFeatureMap;
+    //FNameToFeatureMap: TNameToFeatureMap;
+    FFeatureIndexMap: TFeatureTypeIndexArray;
 
     FFeatureName: TFeature;
     FFeatureAltName: TFeature;
@@ -662,15 +700,28 @@ function FeatureInstance(AFeature: TFeature;
                          AFeatureBit: Integer;
                          AIndex: Integer): TFeatureInfo;
 
+function GlobalFeatureValueStorage(): TFeatureValueStorage;
+
 implementation
 
-uses OsMapUtils, OsMapObjFeatures;
+uses OsMapObjFeatures;
 
 const
   FILE_FORMAT_VERSION = 19;
   FILE_TYPES_DAT = 'types.dat';
   MIN_FORMAT_VERSION = FILE_FORMAT_VERSION;
   MAX_FORMAT_VERSION = FILE_FORMAT_VERSION;
+
+var
+  FeatureValueStorage: TFeatureValueStorage;
+
+function GlobalFeatureValueStorage(): TFeatureValueStorage;
+begin
+  if not Assigned(FeatureValueStorage) then
+    FeatureValueStorage := TFeatureValueStorage.Create();
+
+  Result := FeatureValueStorage;
+end;
 
 function FeatureInstance(AFeature: TFeature;
                          ATypeInfo: TTypeInfo;
@@ -703,6 +754,7 @@ var
   BitIndex: Integer;
 begin
   BitIndex := GetFeatureInfo(AIndex).FeatureBit;
+  //Assert(BitIndex >= 0);
   Assert(BitIndex < Sizeof(FFeatureMask));
   FFeatureMask := FFeatureMask or (1 shl BitIndex );
 end;
@@ -747,7 +799,8 @@ end;
 procedure TFeatureValueBuffer.CopyMissingValue(const AValue: TFeatureValueBuffer);
 var
   i, n: Integer;
-  sName: string;
+  //sName: string;
+  ft: TFeatureType;
 begin
   for i := 0 to AValue.GetFeatureCount()-1 do
   begin
@@ -755,9 +808,9 @@ begin
     if not AValue.HasFeatureValue(i) then
       Continue;
 
-    sName := AValue.GetFeature(i).GetName();
+    ft := AValue.GetFeature(i).FeatureType;
     // Does our type has this feature, too?
-    if not TypeInfo.FindFeature(sName, n) then
+    if not TypeInfo.FindFeature(ft, n) then
       Continue;
 
     // We do not overwrite existing feature values
@@ -775,7 +828,7 @@ var
 begin
   for i := 0 to Length(FFeatureValueList)-1 do
   begin
-    FFeatureValueList[i] := '';
+    FFeatureValueList[i] := -1;
   end;
 end;
 
@@ -785,6 +838,7 @@ begin
   begin
     DeleteData();
     FTypeInfo := AType;
+    FeatureValueStorage := GlobalFeatureValueStorage();
   end;
 end;
 
@@ -829,7 +883,7 @@ begin
   n := TypeInfo.Features[AIndex].Index;
   if (n < Length(FFeatureValueList)) then
     // ! assigned by reference
-    Result := FFeatureValueList[n]
+    Result := FeatureValueStorage.GetStr(FFeatureValueList[n])
   else
     Result := '';
 end;
@@ -840,13 +894,13 @@ var
   n: Integer;
 begin
   SetFeatureBit(AIndex);
-  if TypeInfo.Features[AIndex].Feature.HasValue() then
+  //if TypeInfo.Features[AIndex].Feature.HasValue() then
   begin
     AllocateValueBufferLazy();
     n := TypeInfo.Features[AIndex].Index;
     Assert(n < Length(FFeatureValueList));
     // ! assigned by reference
-    FFeatureValueList[n] := AValue;
+    FFeatureValueList[n] := FeatureValueStorage.AddStr(AValue);
   end;
 end;
 
@@ -855,7 +909,7 @@ procedure TFeatureValueBuffer.SetFeatureValue(AFeatureType: TFeatureType;
 var
   n: Integer;
 begin
-  n := TypeInfo.FeatureIndexArray[AFeatureType];
+  n := TypeInfo.FeatureIndexMap[AFeatureType];
   if n <> -1 then
   begin
     SetValue(n, AValue);
@@ -866,18 +920,35 @@ function TFeatureValueBuffer.GetFeatureValue(AFeatureType: TFeatureType): string
 var
   n: Integer;
 begin
-  n := TypeInfo.FeatureIndexArray[AFeatureType];
+  n := TypeInfo.FeatureIndexMap[AFeatureType];
   if n <> -1 then
     Result := GetValue(n)
   else
     Result := '';
 end;
 
+function TFeatureValueBuffer.GetFeatureValueId(AFeatureType: TFeatureType): TFeatureValueId;
+var
+  n, nn: Integer;
+begin
+  n := TypeInfo.FeatureIndexMap[AFeatureType];
+  if n <> -1 then
+  begin
+    nn := TypeInfo.Features[n].Index;
+    if (nn < Length(FFeatureValueList)) then
+      Result := FFeatureValueList[nn]
+    else
+      Result := -1;
+  end
+  else
+    Result := -1;
+end;
+
 function TFeatureValueBuffer.GetFeatureLabel(AFeatureType: TFeatureType): string;
 var
   n: Integer;
 begin
-  n := TypeInfo.FeatureIndexArray[AFeatureType];
+  n := TypeInfo.FeatureIndexMap[AFeatureType];
   if n <> -1 then
     //Result := GetValue(n)
     Result := TypeInfo.Features[n].Feature.GetLabel(GetValue(n))
@@ -888,7 +959,7 @@ end;
 procedure TFeatureValueBuffer.FreeValue(AIndex: Integer);
 begin
   Assert(AIndex < Length(FFeatureValueList));
-  FFeatureValueList[AIndex] := '';
+  FFeatureValueList[AIndex] := -1;
 end;
 
 procedure TFeatureValueBuffer.Parse(AErrorReporter: TTagErrorReporter;
@@ -1474,14 +1545,14 @@ var
 begin
   inherited Create();
   FConditions := TTypeConditionList.Create();
-  FNameToFeatureMap := TNameToFeatureMap.Create();
-  FNameToFeatureMap.Sorted := True;
+  //FNameToFeatureMap := TNameToFeatureMap.Create();
+  //FNameToFeatureMap.Sorted := True;
   FGroups := TStringList.Create();
   FDescriptions := TDescriptionsMap.Create();
   FDescriptions.Sorted := True;
 
   for ft := Low(TFeatureType) to High(TFeatureType) do
-    FFeatureIndexArray[ft] := -1;
+    FFeatureIndexMap[ft] := -1;
 
   FLanes := 1;
   FOnewayLanes := 1;
@@ -1492,7 +1563,7 @@ destructor TTypeInfo.Destroy();
 begin
   FreeAndNil(FDescriptions);
   FreeAndNil(FGroups);
-  FreeAndNil(FNameToFeatureMap);
+  //FreeAndNil(FNameToFeatureMap);
   FreeAndNil(FConditions);
   inherited Destroy();
 end;
@@ -1514,30 +1585,27 @@ end;
 function TTypeInfo.AddFeature(AFeature: TFeature): TTypeInfo;
 var
   n: Integer;
-  FeatureBit, FeatureBitCount: Integer;
+  FeatureBitIndex, FeatureBitCount: Integer;
 begin
-  FNameToFeatureMap.Sorted := True;
   Assert(Assigned(AFeature));
-  Assert(not FNameToFeatureMap.Find(AFeature.GetName(), n));
+  Assert(FFeatureIndexMap[AFeature.FeatureType] = -1);
 
-  FeatureBit := 0;
+  FeatureBitIndex := 0;
 
   n := Length(FFeatureInfoArray) - 1; // last item index
   if (n >= 0) then
   begin
-    FeatureBit := FFeatureInfoArray[n].FeatureBit + 1 + AFeature.GetFeatureBitCount();
+    FeatureBitIndex := FFeatureInfoArray[n].FeatureBit + FFeatureInfoArray[n].Feature.GetFeatureBitCount() + 1;
   end;
 
   Inc(n);
   SetLength(FFeatureInfoArray, n+1);
   FFeatureInfoArray[n].Feature := AFeature;
   FFeatureInfoArray[n].TypeInfo := Self;
-  FFeatureInfoArray[n].FeatureBit := FeatureBit;
+  FFeatureInfoArray[n].FeatureBit := FeatureBitIndex;
   FFeatureInfoArray[n].Index := n;
   //FFeatures[n].Offset := Offset;
-  FFeatureIndexArray[AFeature.FeatureType] := n;
-
-  FNameToFeatureMap.AddOrSetData(AFeature.GetName(), n);
+  FFeatureIndexMap[AFeature.FeatureType] := n;
 
   FeatureBitCount := FFeatureInfoArray[n].FeatureBit + AFeature.GetFeatureBitCount() + 1;
 
@@ -1569,18 +1637,23 @@ begin
   Result := (Length(FFeatureInfoArray) <> 0);
 end;
 
-function TTypeInfo.HasFeature(const AFeatureName: string): Boolean;
+{function TTypeInfo.HasFeature(const AFeatureName: string): Boolean;
 var
   n: Integer;
 begin
-  FNameToFeatureMap.Sorted := True;
-  Result := FNameToFeatureMap.Find(AFeatureName, n);
+  //FNameToFeatureMap.Sorted := True;
+  //Result := FNameToFeatureMap.Find(AFeatureName, n);
+end; }
+
+function TTypeInfo.HasFeature(AFeatureType: TFeatureType): Boolean;
+begin
+  Result := (FFeatureIndexMap[AFeatureType] <> -1)
 end;
 
-function TTypeInfo.FindFeature(const AFeatureName: string; var AIndex: Integer): Boolean;
+function TTypeInfo.FindFeature(AFeatureType: TFeatureType; var AIndex: Integer): Boolean;
 begin
-  FNameToFeatureMap.Sorted := True;
-  Result := FNameToFeatureMap.Find(AFeatureName, AIndex);
+  AIndex := FFeatureIndexMap[AFeatureType];
+  Result := (AIndex <> -1);
 end;
 
 function TTypeInfo.GetFeature(AIndex: Integer): TFeature;
@@ -1694,6 +1767,8 @@ begin
 end;
 
 procedure TTypeConfig.AfterConstruction();
+var
+  ft: TFeatureType;
 begin
   inherited AfterConstruction();
   FNodeTypeIdBytes := 1;
@@ -1710,7 +1785,9 @@ begin
   FAreaTypes := TTypeInfoList.Create();
 
   FNameToTypeMap := TNameToTypeMap.Create();
-  FNameToFeatureMap := TNameToFeatureMap.Create();
+  //FNameToFeatureMap := TNameToFeatureMap.Create();
+  for ft := Low(TFeatureType) to High(TFeatureType) do
+    FFeatureIndexMap[ft] := -1;
 
   //_LogDebug('TTypeConfig.AfterConstruction()');
   FFeatureName := CreateRegisterFeature(ftName);
@@ -1809,7 +1886,7 @@ end;
 procedure TTypeConfig.BeforeDestruction();
 begin
   { TODO : cleanup }
-  FreeAndNil(FNameToFeatureMap);
+  //FreeAndNil(FNameToFeatureMap);
   FreeAndNil(FNameToTypeMap);
 
   FreeAndNil(FAreaTypes);
@@ -1843,7 +1920,7 @@ function TTypeConfig.RegisterType(const ATypeInfo: TTypeInfo): TTypeInfo;
 { Add feature to type if it not exists }
 procedure _AddFeatureToTypeInfo(AFeature: TFeature);
 begin
-  if not ATypeInfo.HasFeature(AFeature.GetName()) then
+  if not ATypeInfo.HasFeature(AFeature.FeatureType) then
     ATypeInfo.AddFeature(AFeature);
 end;
 
@@ -1894,14 +1971,14 @@ begin
   end;
 
   // All ways with a name have a postal code and a location
-  if ATypeInfo.CanBeWay and ATypeInfo.HasFeature(FeatureNames[ftName]) then
+  if ATypeInfo.CanBeWay and ATypeInfo.HasFeature(ftName) then
   begin
     _AddFeatureToTypeInfo(FFeaturePostalCode);
   end;
 
   // Something that has a name and is a POI automatically gets the
   // postal code, location, address, website and phone features, too.
-  if ATypeInfo.HasFeature(FeatureNames[ftName]) and ATypeInfo.IndexAsPOI then
+  if ATypeInfo.HasFeature(ftName) and ATypeInfo.IndexAsPOI then
   begin
     _AddFeatureToTypeInfo(FFeaturePostalCode);
     _AddFeatureToTypeInfo(FFeatureLocation);
@@ -2130,11 +2207,11 @@ begin
   Assert(Assigned(AFeature));
   Assert(AFeature.GetName() <> '');
 
-  FNameToFeatureMap.Sorted := True;;
-  if not FNameToFeatureMap.Find(AFeature.GetName(), n) then
+
+  if FFeatureIndexMap[AFeature.FeatureType] = -1 then
   begin
     n := FFeatures.Add(AFeature);
-    FNameToFeatureMap.AddOrSetData(AFeature.GetName(), n);
+    FFeatureIndexMap[AFeature.FeatureType] := n;
 
     AFeature.Initialize(FTagRegistry);
   end;
@@ -2142,18 +2219,27 @@ end;
 
 function TTypeConfig.GetFeatureByName(const AName: string): TFeature;
 var
-  n: Integer;
+  i: Integer;
 begin
-  FNameToFeatureMap.Sorted := True;
-  if FNameToFeatureMap.Find(AName, n) then
-    Result := FFeatures[FNameToFeatureMap.Data[n]]
-  else
-    Result := nil;
+  for i := 0 to FFeatures.Count-1 do
+  begin
+    Result := FFeatures[i];
+    if Result.GetName() = AName then
+      Exit;
+  end;
+  Result := nil;
 end;
 
 function TTypeConfig.GetFeature(AFeatureType: TFeatureType): TFeature;
+var
+  n: Integer;
 begin
-  Result := GetFeatureByName(FeatureNames[AFeatureType]);
+  //Result := GetFeatureByName(FeatureNames[AFeatureType]);
+  n := FFeatureIndexMap[AFeatureType];
+  if n <> -1 then
+    Result := FFeatures[n]
+  else
+    Result := nil;
 end;
 
 function TTypeConfig.LoadFromOSTFile(const AFilename: string): Boolean;
@@ -2364,6 +2450,72 @@ begin
   finally
   end;
 end;
+
+{ TFeatureValueStorage }
+
+procedure TFeatureValueStorage.AfterConstruction();
+begin
+  inherited AfterConstruction();
+  FStrList := TStringList.Create();
+  FStrHash := TStringHash.Create();
+end;
+
+procedure TFeatureValueStorage.BeforeDestruction();
+begin
+  ClearHash();
+  FreeAndNil(FStrList);
+  inherited BeforeDestruction();
+end;
+
+procedure TFeatureValueStorage.ClearHash();
+begin
+  if Assigned(FStrHash) then
+    FreeAndNil(FStrHash);
+end;
+
+function TFeatureValueStorage.AddStr(const AValue: string): Integer;
+begin
+  if Assigned(FStrHash) then
+  begin
+    Result := FStrHash.ValueOf(AValue);
+    if Result <> -1 then
+      Exit;
+
+    Result := FStrList.Add(AValue);
+    FStrHash.Add(AValue, Result);
+  end
+  else
+  begin
+    Result := FStrList.IndexOf(AValue);
+    if Result = -1 then
+      Result := FStrList.Add(AValue);
+  end;
+end;
+
+function TFeatureValueStorage.GetStr(ASID: Integer): string;
+begin
+  if (ASID >= 0) and (ASID < FStrList.Count) then
+    Result := FStrList[ASID]
+  else
+    Result := '';
+end;
+
+{ TTypeInfoList }
+
+function TTypeInfoList.GetItem(Index: Integer): TTypeInfo;
+begin
+  Result := TTypeInfo(Get(Index));
+end;
+
+procedure TTypeInfoList.PutItem(Index: Integer; AValue: TTypeInfo);
+begin
+  Put(Index, AValue);
+end;
+
+finalization
+
+if Assigned(FeatureValueStorage) then
+  FreeAndNil(FeatureValueStorage);
 
 end.
 
