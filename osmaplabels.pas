@@ -176,6 +176,8 @@ type
     TextChar: Char;
     NativeGlyph: Pointer; // TNativeGlyph;
     Position: TVertex2D;  // glyph baseline position
+    Width: Double;        // width before rotation
+    Height: Double;       // height before rotation
     Angle: Double;        // clock-wise rotation in radian
 
     TrPosition: TVertex2D; // top-left position after rotation
@@ -194,11 +196,12 @@ type
     Height: Double;
     FontSize: Double;  // Resulting font size
     Text: string;      // The label text
+    Glyphs: TMapGlyphArray;
 
     procedure Init();
     { Implementation have to be provided by backend.
       Glyph positions should be relative to label baseline. }
-    function ToGlyphs(): TMapGlyphArray;
+    //function ToGlyphs(): TMapGlyphArray;
   end;
 
   { TLabelInstanceElement }
@@ -261,11 +264,13 @@ type
   { for low level text layouting }
 
   { glyph bounding box relative to its base point }
-  TOnGlyphBoundingBox = procedure(const AGlyph: TMapGlyph; out ARect: TDoubleRectangle) of object;
+  //TOnGlyphBoundingBox = procedure(const AGlyph: TMapGlyph; out ARect: TDoubleRectangle) of object;
 
   { Adjust text label layout for area object
     AFontSize - font size (height) in pixels
-    AObjectWidth - width in pixels of drawable object (area)  }
+    AObjectWidth - width in pixels of drawable object (area)
+    AEnableWrapping - wrap text to multiple lines if it not fit to AObjectWidth
+    AContourLabel - if True then fill position and size for every glyph (character of text) }
   TOnTextLayout = procedure(out ALabel: TMapLabel; AProjection: TProjection;
       AParameter: TMapParameter;
       const AText: string;
@@ -308,7 +313,7 @@ type
     FLayoutViewport: TDoubleRectangle;
     FLayoutOverlap: Double;  // overlap ratio used for label layouting
 
-    FOnGlyphBoundingBox: TOnGlyphBoundingBox;
+    //FOnGlyphBoundingBox: TOnGlyphBoundingBox;
     FOnTextLayout: TOnTextLayout;
     FOnDrawSymbol: TOnDrawSymbol;
     FOnDrawIcon: TOnDrawIcon;
@@ -353,7 +358,7 @@ type
     property Labels: TLabelInstanceList read FLabelInstances;
     property ContourLabels: TContourLabelList read FContourLabelInstances;
 
-    property OnGlyphBoundingBox: TOnGlyphBoundingBox read FOnGlyphBoundingBox write FOnGlyphBoundingBox;
+    //property OnGlyphBoundingBox: TOnGlyphBoundingBox read FOnGlyphBoundingBox write FOnGlyphBoundingBox;
     property OnTextLayout: TOnTextLayout read FOnTextLayout write FOnTextLayout;
     property OnDrawSymbol: TOnDrawSymbol read FOnDrawSymbol write FOnDrawSymbol;
     property OnDrawIcon: TOnDrawIcon read FOnDrawIcon write FOnDrawIcon;
@@ -619,10 +624,10 @@ begin
   Text := '';
 end;
 
-function TMapLabel.ToGlyphs(): TMapGlyphArray;
+{function TMapLabel.ToGlyphs(): TMapGlyphArray;
 begin
   SetLength(Result, 0);
-end;
+end;}
 
 { TMapMask }
 
@@ -1143,13 +1148,12 @@ procedure TLabelLayouter.RegisterContourLabel(AProjection: TProjection;
 var
   TmpLabel: TMapLabel;
   textBaselineOffset, PathLength, offset, initialAngle: Double;
-  glyphs: TMapGlyphArray;
   glyph, glyphCopy: TMapGlyph;
   ContLabel: TContourLabel;
   IsUpwards: Boolean;
   glyphOffset, w, h: Double;
   point: TVertex2D;  // glyph point
-  textBoundingBox, GlyphRect: TDoubleRectangle;
+  GlyphRect: TDoubleRectangle;
   tl: TVertex2D; // glyph top left
   angle: Double; // glyph angle in radians
   diagonal, FontHeight: Double;
@@ -1171,8 +1175,6 @@ begin
   // text should be rendered with 0x0 coordinate as left baseline
   // we want to move label little bit bottom, near to line center
   textBaselineOffset := TmpLabel.Height * 0.25;
-
-  glyphs := TmpLabel.ToGlyphs();
 
   PathLength := ALabelPath.GetLength();
   offset := ALabelData.ContourLabelOffset;
@@ -1200,10 +1202,10 @@ begin
     initialAngle := abs(ALabelPath.AngleAtLengthDeg(offset));
     IsUpwards := (initialAngle > 90) and (initialAngle < 270);
 
-    SetLength(ContLabel.Glyphs, Length(glyphs));
+    SetLength(ContLabel.Glyphs, Length(TmpLabel.Glyphs));
     GlyphIndex := -1;
 
-    for glyph in glyphs do
+    for glyph in TmpLabel.Glyphs do
     begin
       if IsUpwards then
         glyphOffset := offset - glyph.Position.X + TmpLabel.Width
@@ -1212,10 +1214,10 @@ begin
 
       point := ALabelPath.PointAtLength(glyphOffset);
 
-      OnGlyphBoundingBox(glyph, textBoundingBox);
-      w := textBoundingBox.Width;
-      h := textBoundingBox.Height;
-      tl.SetValue(textBoundingBox.X, textBoundingBox.Y);
+      //OnGlyphBoundingBox(glyph, textBoundingBox);
+      w := glyph.Width;
+      h := glyph.Height;
+      tl.Assign(glyph.Position);
 
       // glyph angle in radians
       if IsUpwards then

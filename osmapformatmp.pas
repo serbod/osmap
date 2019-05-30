@@ -173,7 +173,7 @@ begin
   begin
     if IsArea and Assigned(TmpArea) then
     begin
-      // номер дома
+      // улица
       TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftAddress, AValue);
     end
   end;

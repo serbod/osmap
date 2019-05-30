@@ -28,7 +28,7 @@ interface
 uses
   Classes, SysUtils,
   OsMapPainter, OsMapProjection, OsMapStyleConfig, OsMapTypes, OsMapObjTypes,
-  OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder;
+  OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder, IniFiles;
 
 type
   TMapManager = class;
@@ -62,6 +62,7 @@ type
     procedure BeforeDestruction; override;
 
     procedure InitTypes();
+    procedure InitTypesFromIni(AFileName: string);
 
     procedure Render();
 
@@ -96,7 +97,7 @@ begin
 
   //FMapPainter := TMapPainterAgg.Create(FMapStyleConfig);
 
-  InitTypes();
+  //InitTypes();
 end;
 
 procedure TMapManager.BeforeDestruction;
@@ -370,6 +371,167 @@ begin
   MapStyleConfig.AddStyle(TmpType, TmpStyle);
 
 
+end;
+
+procedure TMapManager.InitTypesFromIni(AFileName: string);
+var
+  ini: TMemIniFile;
+
+procedure _ReadColor(ASect, AName: string; var AMapColor: TMapColor);
+var
+  i: Integer;
+  RGBA: array [0..3] of Byte;
+  s, ss: string;
+begin
+  ss := ini.ReadString(ASect, AName, '');
+  if ss = '' then
+    Exit;
+
+  if Copy(ss, 1, 1) = '#' then
+    AMapColor.FromHexString(ss)
+  else
+  begin
+    for i := 0 to 3 do
+    begin
+      s := Trim(Fetch(ss, ','));
+      RGBA[i] := Byte(StrToIntDef(s, 0));
+    end;
+    AMapColor.InitFromBytes(RGBA[0], RGBA[1], RGBA[2], RGBA[3]);
+  end;
+end;
+
+procedure _ReadDash(ASect, AName: string; AStyle: TLineStyle);
+var
+  n1, n2: Double;
+  s, ss: string;
+begin
+  ss := ini.ReadString(ASect, AName, '');
+  repeat
+    s := Trim(Fetch(ss, ','));
+    n1 := StrToFloatDef(s, 0);
+    s := Trim(Fetch(ss, ','));
+    n2 := StrToFloatDef(s, 0);
+
+    if (n1 = 0) or (n2 = 0) then
+      Break;
+
+    AStyle.AddDash(n1, n2);
+  until s = '';
+end;
+
+var
+  slSections: TStringList;
+  i: Integer;
+  s, sSect, sValue: string;
+  TmpType: TTypeInfo;
+  TmpStyle: TStyle;
+  TmpFeature: TFeature;
+begin
+  if not FileExists(AFileName) then
+    Exit;
+  slSections := TStringList.Create();
+  ini := TMemIniFile.Create(AFileName);
+  try
+    ini.ReadSections(slSections);
+    for i := 0 to slSections.Count-1 do
+    begin
+      sSect := slSections[i];
+      // get type by name
+      TmpType := MapTypeConfig.GetTypeInfo(sSect);
+      if not Assigned(TmpType) or TmpType.IsIgnore then
+      begin
+        TmpType := TTypeInfo.Create(sSect);
+        TmpType.CanBeArea := ini.ReadBool(sSect, 'CanBeArea', False);
+        TmpType.CanBeWay := ini.ReadBool(sSect, 'CanBeWay', False);
+        TmpType.CanBeNode := ini.ReadBool(sSect, 'CanBeNode', False);
+        TmpType.CanBeRelation := ini.ReadBool(sSect, 'CanBeRelation', False);
+        sValue := ini.ReadString(sSect, 'Features', '');
+        repeat
+          s := Trim(Fetch(sValue, ','));
+          if s <> '' then
+          begin
+            TmpFeature := MapTypeConfig.GetFeatureByName(s);
+            if Assigned(TmpFeature) then
+              TmpType.AddFeature(TmpFeature);
+          end;
+        until s = '';
+        MapTypeConfig.RegisterType(TmpType);
+      end;
+
+      // TFillStyle
+      if ini.ValueExists(sSect, 'FillColor') then
+      begin
+        TmpStyle := TFillStyle.Create();
+        TmpStyle.Name := TmpType.TypeName + '_Fill';
+        _ReadColor(sSect, 'FillColor', (TmpStyle as TFillStyle).FillColor);
+        MapStyleConfig.AddStyle(TmpType, TmpStyle);
+      end;
+
+      // TBorderStyle
+      if ini.ValueExists(sSect, 'BorderColor') then
+      begin
+        TmpStyle := TBorderStyle.Create();
+        TmpStyle.Name := TmpType.TypeName + '_Border';
+        _ReadColor(sSect, 'BorderColor', (TmpStyle as TBorderStyle).Color);
+        _ReadColor(sSect, 'BorderGapColor', (TmpStyle as TBorderStyle).GapColor);
+        (TmpStyle as TBorderStyle).Width := ini.ReadFloat(sSect, 'BorderWidth', (TmpStyle as TBorderStyle).Width);
+        MapStyleConfig.AddStyle(TmpType, TmpStyle);
+      end;
+
+      // TTextStyle
+      if ini.ValueExists(sSect, 'TextColor')
+      or ini.ValueExists(sSect, 'TextSize')
+      then
+      begin
+        TmpStyle := TTextStyle.Create();
+        TmpStyle.Name := TmpType.TypeName + '_Text';
+        (TmpStyle as TTextStyle).FeatureType := ftName;
+        (TmpStyle as TTextStyle).Size := ini.ReadFloat(sSect, 'TextSize', (TmpStyle as TTextStyle).Size);
+        (TmpStyle as TTextStyle).ScaleAndFadeMagLevel := ini.ReadInteger(sSect, 'TextScaleAndFadeMagLevel', (TmpStyle as TTextStyle).ScaleAndFadeMagLevel);
+        (TmpStyle as TTextStyle).IsAutoSize := ini.ReadBool(sSect, 'TextAutoSize', (TmpStyle as TTextStyle).IsAutoSize);
+        _ReadColor(sSect, 'TextColor', (TmpStyle as TTextStyle).TextColor);
+        MapStyleConfig.AddStyle(TmpType, TmpStyle);
+      end;
+
+      // TLineStyle
+      if ini.ValueExists(sSect, 'LineColor')
+      or ini.ValueExists(sSect, 'LineWidth')
+      then
+      begin
+        TmpStyle := TLineStyle.Create();
+        TmpStyle.Name := TmpType.TypeName + '_Line';
+        _ReadColor(sSect, 'LineColor', (TmpStyle as TLineStyle).LineColor);
+        _ReadColor(sSect, 'LineGapColor', (TmpStyle as TLineStyle).GapColor);
+        (TmpStyle as TLineStyle).Width := ini.ReadFloat(sSect, 'LineWidth', (TmpStyle as TLineStyle).Width);
+        (TmpStyle as TLineStyle).DisplayWidth := ini.ReadFloat(sSect, 'LineDisplayWidth', (TmpStyle as TLineStyle).DisplayWidth);
+        (TmpStyle as TLineStyle).Priority := ini.ReadInteger(sSect, 'LinePriority', (TmpStyle as TLineStyle).Priority);
+        _ReadDash(sSect, 'LineDash', (TmpStyle as TLineStyle));
+        MapStyleConfig.AddStyle(TmpType, TmpStyle);
+      end;
+
+      // TPathTextStyle
+      if ini.ValueExists(sSect, 'PathTextColor')
+      or ini.ValueExists(sSect, 'PathTextSize')
+      then
+      begin
+        TmpStyle := TPathTextStyle.Create();
+        with (TmpStyle as TPathTextStyle) do
+        begin
+          Name := TmpType.TypeName + '_PathText';
+          FeatureType := ftName;
+          Size := ini.ReadFloat(sSect, 'PathTextSize', Size);
+          //ScaleAndFadeMagLevel := ini.ReadInteger(sSect, 'PathTextScaleAndFadeMagLevel', ScaleAndFadeMagLevel);
+          //IsAutoSize := ini.ReadBool(sSect, 'PathTextAutoSize', IsAutoSize);
+          _ReadColor(sSect, 'PathTextColor', TextColor);
+          Priority := ini.ReadInteger(sSect, 'PathTextPriority', Priority);
+        end;
+        MapStyleConfig.AddStyle(TmpType, TmpStyle);
+      end;
+    end;
+  finally
+    ini.Free();
+    slSections.Free();
+  end;
 end;
 
 procedure TMapManager.Render();

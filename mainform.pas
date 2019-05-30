@@ -122,6 +122,7 @@ end;
 procedure TForm1.FormCreate(Sender: TObject);
 begin
   FMapManager := TMapManager.Create(Self);
+  FMapManager.InitTypesFromIni('style.ini');
   FMapPainter := TMapPainterAgg.Create(FMapManager.MapStyleConfig);
   FMapPainter.Agg2D := Agg2DControl1.Agg2D;
   FMapManager.MapPainter := FMapPainter;

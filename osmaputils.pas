@@ -67,7 +67,7 @@ type
   end;
 
   { TStringHash }
-
+  { Simple string-to-integer hashtable }
   TStringHash = class
   private
     Buckets: array of PHashItem;
@@ -80,7 +80,9 @@ type
     procedure Add(const Key: string; Value: Integer);
     procedure Clear;
     function Modify(const Key: string; Value: Integer): Boolean;
+    { return -1 if no value for key, suitable for list index }
     function ValueOf(const Key: string): Integer;
+    function FindValue(const Key: string; out Value: Integer): Boolean;
   end;
 
 { Encode a signed number into the given buffer using some variable length encoding.
@@ -500,6 +502,16 @@ begin
     Result := P^.Value
   else
     Result := -1;
+end;
+
+function TStringHash.FindValue(const Key: string; out Value: Integer): Boolean;
+var
+  P: PHashItem;
+begin
+  P := Find(Key);
+  Result := (P <> nil);
+  if Result then
+    Value := P^.Value;
 end;
 
 end.

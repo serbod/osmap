@@ -611,6 +611,7 @@ type
     procedure RegisterSurfaceToGradeMapping(const ASurface: string; AGrade: Integer);
     procedure RegisterMaxSpeedAlias(const AAlias: string; AMaxSpeed: Byte);
 
+    { Add type. If type already exists, return that type info  }
     function RegisterType(const ATypeInfo: TTypeInfo): TTypeInfo;
 
     { Returns the number of types available. The index of a type is guaranteed
@@ -2072,7 +2073,7 @@ begin
     Result := FNameToTypeMap.Data[n]
   else
   begin
-    Assert(False, 'TTypeConfig.GetTypeInfo() Not found type: ' + AName);
+    //Assert(False, 'TTypeConfig.GetTypeInfo() Not found type: ' + AName);
     Result := FTypeInfoIgnore;
   end;
 end;

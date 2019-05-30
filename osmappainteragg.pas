@@ -21,10 +21,10 @@ type
 
   TNativeGlyphArray = array of TNativeGlyph;
 
-  TNativeLabel = record
+  {TNativeLabel = record
     Text: string;
     Glyphs: TNativeGlyphArray;
-  end;
+  end; }
 
   { TMapPainterAgg }
 
@@ -32,7 +32,6 @@ type
   private
     FAgg2D: TAgg2D;
     FLabelLayouter: TLabelLayouter;
-    FNativeLabel: TNativeLabel;
     FMutex: TRTLCriticalSection;
 
     FFontSize: Double;
@@ -131,7 +130,7 @@ type
       const AGlyphs: TNativeGlyphArray); }
 
     { glyph bounding box relative to its base point }
-    procedure OnGlyphBoundingBoxHandler(const AGlyph: TMapGlyph; out ARect: TDoubleRectangle);
+    //procedure OnGlyphBoundingBoxHandler(const AGlyph: TMapGlyph; out ARect: TDoubleRectangle);
 
     { layout text for label }
     procedure OnTextLayoutHandler(out ALabel: TMapLabel;
@@ -638,16 +637,21 @@ procedure TMapPainterAgg.DrawGlyphsNative(AProjection: TProjection;
   const AGlyphs: TNativeGlyphArray);
 begin
 
-end;  }
+end; }
 
+{
 procedure TMapPainterAgg.OnGlyphBoundingBoxHandler(const AGlyph: TMapGlyph;
   out ARect: TDoubleRectangle);
 begin
-  Assert(False);
-  //AGlyph.Position;
+  //Assert(False);
   //ARect.Init(AGlyph.AggGlyph.Bounds.X1, AGlyph.AggGlyph.Bounds.Y1,
   //            AGlyph.AggGlyph.Bounds.X2, AGlyph.AggGlyph.Bounds.Y2);
+  ARect.X := AGlyph.Position.X;
+  ARect.Y := AGlyph.Position.Y;
+  ARect.Width := AGlyph.Width;
+  ARect.Height := AGlyph.Height;
 end;
+}
 
 procedure TMapPainterAgg.OnTextLayoutHandler(out ALabel: TMapLabel;
   AProjection: TProjection; AParameter: TMapParameter; const AText: string;
@@ -659,7 +663,6 @@ var
   ws: WideString;
 begin
   //Assert(False, 'not needed');
-  FNativeLabel.Text := AText;
 
   //SetFont(AProjection, AParameter, AFontSize);
   FAgg2D.FontHeight := AFontSize;
@@ -678,16 +681,19 @@ begin
   ws := UTF8ToUTF16(AText);
   if AContourLabel then
   begin
-    SetLength(FNativeLabel.Glyphs, Length(ws));
+    SetLength(ALabel.Glyphs, Length(ws));
     for i := 1 to Length(ws) do
     begin
+      // get single character glyph bounds
       //const agg::glyph_cache *glyph = fontCacheManager->glyph(i);
       //fontCacheManager->add_kerning(&x, &y);
       //label.glyphs.emplace_back(std::move(MapPainterAgg::NativeGlyph{x, y, glyph}));
       cw := FAgg2D.TextWidth(ws[i]);
 
-      FNativeLabel.Glyphs[i-1].X := x;
-      FNativeLabel.Glyphs[i-1].Y := y;
+      ALabel.Glyphs[i-1].Position.X := x;
+      ALabel.Glyphs[i-1].Position.Y := y;
+      ALabel.Glyphs[i-1].Width := cw;
+      ALabel.Glyphs[i-1].Height := h;
 
       w := w + cw;
 
@@ -701,7 +707,8 @@ begin
     w := FAgg2D.TextWidth(ws);
   end;
 
-  ALabel.pLabel := Addr(FNativeLabel);
+  //ALabel.pLabel := Addr(FNativeLabel);
+  ALabel.pLabel := nil;
   ALabel.Height := h;
   ALabel.Width := w;
   ALabel.FontSize := AFontSize;
@@ -718,7 +725,7 @@ begin
   FLabelLayouter.OnDrawIcon := @DrawIcon;
   FLabelLayouter.OnDrawLabel := @DrawLabel;
   FLabelLayouter.OnDrawSymbol := @DrawSymbol;
-  FLabelLayouter.OnGlyphBoundingBox := @OnGlyphBoundingBoxHandler;
+  //FLabelLayouter.OnGlyphBoundingBox := @OnGlyphBoundingBoxHandler;
   FLabelLayouter.OnTextLayout := @OnTextLayoutHandler;
 
   InitCriticalSection(FMutex);
