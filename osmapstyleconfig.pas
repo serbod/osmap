@@ -396,11 +396,15 @@ end;
 function TStyleConfig.HasNodeTextStyles(ATypeInfo: TTypeInfo;
   const AMagnification: TMagnification): Boolean;
 var
-  Level: TMagnificationLevel;
-
+  s: string;
+  //Level: TMagnificationLevel;
+  n: Integer;
 begin
+  s := ATypeInfo.TypeName + '_Text';
+  Result := FNamedStyleMap.Find(s, n);
+  (*
   Level := AMagnification.Level;
-  {nodeTextStyleSelectors;
+  nodeTextStyleSelectors;
   for (const auto& nodeTextStyleSelector : nodeTextStyleSelectors) {
     if (level>=nodeTextStyleSelector[type->GetIndex()].size()) {
       level=static_cast<uint32_t>(nodeTextStyleSelector[type->GetIndex()].size()-1);
@@ -411,7 +415,8 @@ begin
     }
   }
 
-  return false;   }
+  return false;
+  *)
 end;
 
 procedure TStyleConfig.GetNodeTextStyles(const ABuffer: TFeatureValueBuffer;

@@ -38,7 +38,7 @@ type
     FIsAlienAgg: Boolean;
     FIsDrawingWayBorder: Boolean;
 
-    function GetAggRgba8(AColor: TMapColor): TAggRgba8;
+    function GetAggRgba8(const AColor: TMapColor): TAggRgba8;
     procedure SetAgg2d(AValue: TAgg2D);
 
     procedure SetFont(AProjection: TProjection; AParameter: TMapParameter;
@@ -55,7 +55,7 @@ type
     procedure DrawGlyphs(AProjection: TProjection;
       AParameter: TMapParameter;
       AStyle: TPathTextStyle;
-      AGlyphs: TMapGlyphArray);
+      const AGlyphs: TMapGlyphArray);
 
     { ex-DrawFill(), set fill and border style }
     procedure DrawFillStyle(AProjection: TProjection; AParameter: TMapParameter;
@@ -157,7 +157,7 @@ uses Math, LazUTF8;
 
 { TMapPainterAgg }
 
-function TMapPainterAgg.GetAggRgba8(AColor: TMapColor): TAggRgba8;
+function TMapPainterAgg.GetAggRgba8(const AColor: TMapColor): TAggRgba8;
 var
   AggColor: TAggColor;
 begin
@@ -220,17 +220,28 @@ begin
 end;
 
 procedure TMapPainterAgg.DrawGlyphs(AProjection: TProjection;
-  AParameter: TMapParameter; AStyle: TPathTextStyle; AGlyphs: TMapGlyphArray);
+  AParameter: TMapParameter;
+  AStyle: TPathTextStyle;
+  const AGlyphs: TMapGlyphArray);
 var
   //matrix: TAggTransAffine;
   layoutGlyph: TMapGlyph;
+  //i: Integer;
+  TextColor: TMapColor;
 begin
-  FAgg2D.LineColor := GetAggRgba8(AStyle.TextColor);
+  Assert(Assigned(AStyle));
+  TextColor.Init(0, 0, 0, 0);
+  //FAgg2D.FillColor := GetAggRgba8(AStyle.TextColor);
+  FAgg2D.FillColor := GetAggRgba8(TextColor);
+  FAgg2D.NoLine();
+  //FAgg2D.LineColor := GetAggRgba8(AStyle.TextColor);
 
   //matrix := TAggTransAffine.Create();
 
+  //for i := 0 to Length(AGlyphs)-1 do
   for layoutGlyph in AGlyphs do
   begin
+    //layoutGlyph := AGlyphs[i];
     // contour labels should always use outline rendering
     //Assert(TNativeGlyph(layoutGlyph.Glyph).AggGlyph.DataType = gdOutline);
 
@@ -261,7 +272,7 @@ procedure TMapPainterAgg.DrawFillStyle(AProjection: TProjection;
   AFillStyle: TFillStyle;
   ABorderStyle: TBorderStyle);
 var
-  borderWidth, X, Y: Double;
+  borderWidth: Double;
   i: Integer;
 begin
   if Assigned(AFillStyle) and AFillStyle.FillColor.IsVisible then
@@ -467,6 +478,7 @@ begin
     end;
     FAgg2D.FontHeight := ALabel.FontSize;
     FAgg2D.FlipText := True;
+    FAgg2D.TextAngle := 0;
     FAgg2D.Text(X, Y, UTF8ToUTF16(AMapLabel.Text));
 
     {DrawGlyphVector(labelRectangle.x,
@@ -694,6 +706,7 @@ begin
       ALabel.Glyphs[i-1].Position.Y := y;
       ALabel.Glyphs[i-1].Width := cw;
       ALabel.Glyphs[i-1].Height := h;
+      ALabel.Glyphs[i-1].TextChar := ws[i];
 
       w := w + cw;
 

@@ -1172,7 +1172,7 @@ procedure TMapPainter.PrepareArea(const AStyleConfig: TStyleConfig;
   const AArea: TMapArea);
 var
   td: array of TPolyData;
-  i, ii, j, n, idx: Integer;
+  i, ii, j, idx: Integer;
   pRing: ^TMapAreaRing;
   nodes: TGeoPointArray;
   Segment: TSegmentGeoBox;
@@ -1471,7 +1471,6 @@ procedure TMapPainter.LayoutPointLabels(const AProjection: TProjection;
 var
   LbLayoutData: TLabelDataList;
   LbData: TLabelData;
-  i: Integer;
   TextStyle: TTextStyle;
   s, sLabel: string;
   dFactor: Double;

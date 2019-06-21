@@ -85,6 +85,11 @@ type
     function FindValue(const Key: string; out Value: Integer): Boolean;
   end;
 
+  TCompareFunc = function (const elem1, elem2): Integer;
+
+{ Sort any array }
+procedure AnySort(var Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
+
 { Encode a signed number into the given buffer using some variable length encoding.
   The methods returns the number of bytes written.
 
@@ -512,6 +517,54 @@ begin
   Result := (P <> nil);
   if Result then
     Value := P^.Value;
+end;
+
+procedure AnyQuickSort(var Arr; idxL, idxH: Integer;
+  ItemSize: Integer; CompareFunc: TCompareFunc; var SwapBuf);
+var
+  ls, hs: Integer;
+  li, hi: Integer;
+  mi    : Integer;
+  ms    : Integer;
+  pb    : PByteArray;
+begin
+  pb := Addr(Arr);
+  li := idxL;
+  hi := idxH;
+  mi := (li+hi) div 2;
+  ls := li * ItemSize;
+  hs := hi * ItemSize;
+  ms := mi * ItemSize;
+  repeat
+    while CompareFunc( pb[ls], pb[ms] ) < 0 do
+    begin
+      Inc(ls, ItemSize);
+      Inc(li);
+    end;
+    while CompareFunc( pb[ms], pb[hs] ) < 0 do
+    begin
+      Dec(hs, ItemSize);
+      Dec(hi);
+    end;
+    if ls <= hs then
+    begin
+      Move(pb[ls], SwapBuf, ItemSize);
+      Move(pb[hs], pb[ls], ItemSize);
+      Move(SwapBuf, pb[hs], ItemSize);
+      Inc(ls, ItemSize); Inc(li);
+      Dec(hs, ItemSize); Dec(hi);
+    end;
+  until ls > hs;
+  if hi > idxL then AnyQuickSort(Arr, idxL, hi, ItemSize, CompareFunc, SwapBuf);
+  if li < idxH then AnyQuickSort(Arr, li, idxH, ItemSize, CompareFunc, SwapBuf);
+end;
+
+procedure AnySort(var Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
+var
+  buf: array of byte;
+begin
+  SetLength(buf, ItemSize);
+  AnyQuickSort(Arr, 0, Count-1, ItemSize, compareFunc, buf[0]);
 end;
 
 end.

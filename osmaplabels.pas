@@ -33,7 +33,8 @@ LabelLayouter:
   LabelData
   Glyph  -> TMapGlyph
   Label  -> TMapLabel
-  LabelInstance
+  LabelInstanceElement -> TTextLabelElement    (multi-line text label line )
+  LabelInstance -> TTextLabel                  (multi-line text label)
   ContourLabel
   Mask   -> TMapMask
   LabelLayouter  -> TLabelLayouter (not used)
@@ -41,6 +42,8 @@ LabelLayouter:
 unit OsMapLabels;
 
 {$mode objfpc}{$H+}
+
+{$define DEBUG_LABEL_TEXT}
 
 interface
 
@@ -173,7 +176,7 @@ type
   { TMapGlyph }
   TMapGlyph = object
   public
-    TextChar: Char;
+    TextChar: WideChar;   // Unicode char
     NativeGlyph: Pointer; // TNativeGlyph;
     Position: TVertex2D;  // glyph baseline position
     Width: Double;        // width before rotation
@@ -204,38 +207,49 @@ type
     //function ToGlyphs(): TMapGlyphArray;
   end;
 
-  { TLabelInstanceElement }
+  { TTextLabelElement }
   { Represent row for multi-line label }
-  TLabelInstanceElement = class
+  TTextLabelElement = object
   public
     LabelData: TLabelData;
     X: Double;             // Coordinate of the left, top edge of the text / icon / symbol
     Y: Double;             // Coordinate of the left, top edge of the text / icon / symbol
     MapLabel: TMapLabel;   // std::shared_ptr<Label<NativeGlyph, NativeLabel>>
 
-    procedure Assign(AOther: TLabelInstanceElement);
+    procedure Init();
+    procedure Assign(AOther: TTextLabelElement);
   end;
 
-  TLabelInstanceElementList = specialize TFPGObjectList<TLabelInstanceElement>;
-
-  { TLabelInstance }
-  {  }
-  TLabelInstance = class
+  { TTextLabelElementList }
+  TTextLabelElementList = object
   private
-    FElements: TLabelInstanceElementList;
+    function GetCount: Integer;
+  public
+    Items: array of TTextLabelElement;
+    procedure Clear();
+    function Add(const AItem: TTextLabelElement): Integer;
+
+    property Count: Integer read GetCount;
+  end;
+
+  { TTextLabel }
+  { multi-line text label }
+  TTextLabel = class
+  private
+    FElements: TTextLabelElementList;
   public
     Priority: Integer;
 
     constructor Create();
     destructor Destroy; override;
-    property Elements: TLabelInstanceElementList read FElements;
+    property Elements: TTextLabelElementList read FElements;
   end;
 
-  TLabelInstanceList = specialize TFPGObjectList<TLabelInstance>;
+  TTextLabelList = specialize TFPGObjectList<TTextLabel>;
 
   TContourLabel = class
   public
-    {$ifdef DEBUG_LABEL_LAYOUTER}
+    {$ifdef DEBUG_LABEL_TEXT}
     Text: string;
     {$endif}
     Priority: Integer;
@@ -298,16 +312,18 @@ type
   TOnDrawGlyphs = procedure(AProjection: TProjection;
       AParameter: TMapParameter;
       AStyle: TPathTextStyle;
-      AGlyphs: TMapGlyphArray) of object;
+      const AGlyphs: TMapGlyphArray) of object;
 
   { TLabelLayouter }
   { TextLayouter is built-in, and must be overriden in decent classes }
   TLabelLayouter = class
   private
-    FContourLabelInstances: TContourLabelList;
-    FLabelInstances: TLabelInstanceList;
-    FTextElements: TLabelInstanceElementList;
-    FOverlayElements: TLabelInstanceElementList;
+    FAllContourLabelList: TContourLabelList;
+    FAllTextLabelList: TTextLabelList;
+    FContourLabelList: TContourLabelList;
+    FTextLabelList: TTextLabelList;
+    FTextElements: TTextLabelElementList;
+    FOverlayElements: TTextLabelElementList;
 
     FVisibleViewport: TDoubleRectangle;
     FLayoutViewport: TDoubleRectangle;
@@ -355,8 +371,8 @@ type
       const ALabelData: TPathLabelData;
       const ALabelPath: TLabelPath);
 
-    property Labels: TLabelInstanceList read FLabelInstances;
-    property ContourLabels: TContourLabelList read FContourLabelInstances;
+    property TextLabels: TTextLabelList read FTextLabelList;
+    property ContourLabels: TContourLabelList read FContourLabelList;
 
     //property OnGlyphBoundingBox: TOnGlyphBoundingBox read FOnGlyphBoundingBox write FOnGlyphBoundingBox;
     property OnTextLayout: TOnTextLayout read FOnTextLayout write FOnTextLayout;
@@ -367,7 +383,7 @@ type
   end;
 
 
-  function LabelInstanceSorter(const A, B: TLabelInstance): Integer;
+  function LabelInstanceSorter(const A, B: TTextLabel): Integer;
 
   function ContourLabelSorter(const A, B: TContourLabel): Integer;
 
@@ -380,32 +396,40 @@ const
   M_PI   = 3.14159265358979323846;
   M_PI_4 = 0.785398163397448309616;
 
-function LabelInstanceSorter(const A, B: TLabelInstance): Integer;
+function LabelInstanceSorter(const A, B: TTextLabel): Integer;
 begin
-  Result := -1;
   if (A.Priority = B.Priority)  then
   begin
     Assert(A.Elements.Count <> 0);
     Assert(B.Elements.Count <> 0);
-    if A.Elements[0].X < B.Elements[0].X then
-      Result := 1;
+    if A.Elements.Items[0].X < B.Elements.Items[0].X then
+      Result := 1
+    else
+    if A.Elements.Items[0].X = B.Elements.Items[0].X then
+      Result := 0;
   end
   else if (A.Priority < B.Priority) then
-    Result := 1;
+    Result := 1
+  else
+    Result := -1;
 end;
 
 function ContourLabelSorter(const A, B: TContourLabel): Integer;
 begin
-  Result := -1;
   if (A.Priority = B.Priority)  then
   begin
     Assert(Length(A.Glyphs) <> 0);
     Assert(Length(B.Glyphs) <> 0);
     if A.Glyphs[0].TrPosition.X < B.Glyphs[0].TrPosition.X then
-      Result := 1;
+      Result := 1
+    else
+    if A.Glyphs[0].TrPosition.X = B.Glyphs[0].TrPosition.X then
+      Result := 0;
   end
   else if (A.Priority < B.Priority) then
-    Result := 1;
+    Result := 1
+  else
+    Result := -1;
 end;
 
 { TSegment }
@@ -702,10 +726,12 @@ end;
 constructor TLabelLayouter.Create();
 begin
   inherited Create();
-  FContourLabelInstances := TContourLabelList.Create();
-  FLabelInstances := TLabelInstanceList.Create();
-  FTextElements := TLabelInstanceElementList.Create(False);
-  FOverlayElements := TLabelInstanceElementList.Create(False);
+  FAllContourLabelList := TContourLabelList.Create();
+  FAllTextLabelList := TTextLabelList.Create();
+  FContourLabelList := TContourLabelList.Create();
+  FTextLabelList := TTextLabelList.Create();
+  //FTextElements := TTextLabelElementList.Create(False);
+  //FOverlayElements := TTextLabelElementList.Create(False);
 
   FVisibleViewport.Init(0, 0, 0, 0);
   FLayoutViewport.Init(0, 0, 0, 0);
@@ -714,8 +740,10 @@ end;
 
 destructor TLabelLayouter.Destroy;
 begin
-  FreeAndNil(FLabelInstances);
-  FreeAndNil(FContourLabelInstances);
+  FreeAndNil(FTextLabelList);
+  FreeAndNil(FContourLabelList);
+  FreeAndNil(FAllTextLabelList);
+  FreeAndNil(FAllContourLabelList);
   inherited Destroy;
 end;
 
@@ -739,8 +767,10 @@ end;
 
 procedure TLabelLayouter.Reset();
 begin
-  FContourLabelInstances.Clear();
-  FLabelInstances.Clear();
+  FContourLabelList.Clear();
+  FTextLabelList.Clear();
+  FAllContourLabelList.Clear();
+  FAllTextLabelList.Clear();
 end;
 
 function TLabelLayouter.CheckLabelCollision(const ACanvas: TQWordArray;
@@ -794,8 +824,6 @@ end;
 procedure TLabelLayouter.Layout(AProjection: TProjection;
   AParameter: TMapParameter);
 var
-  AllSortedContourLabels: TContourLabelList;
-  AllSortedLabels: TLabelInstanceList;
   iconPadding, labelPadding, shieldLabelPadding: Double;
   contourLabelPadding, overlayLabelPadding: Double;
   i, iLabel, iContour: Integer;
@@ -803,20 +831,20 @@ var
   iconCanvas: TQWordArray;
   labelCanvas: TQWordArray;
   overlayCanvas: TQWordArray;
-  currentLabel: TLabelInstance;
-  currentContourLabel: TContourLabel;
+  currentLabel: TTextLabel;
+  currentContourLabel, ContourLabelCopy: TContourLabel;
   //m: TMapMask;
   masks: array of TMapMask;
   canvases: array of ^TQWordArray;
-  visibleElements: TLabelInstanceElementList;
+  visibleElements: TTextLabelElementList;
   eli, glyphCnt, gi: Integer;
-  element, elementCopy: TLabelInstanceElement;
+  element, elementCopy: TTextLabelElement;
   pRow: ^TMapMask;
   padding: Double;
   rectangle: TIntRectangle;
   pCanvas: ^TQWordArray;
   IsCollision: Boolean;
-  instanceCopy: TLabelInstance;
+  instanceCopy: TTextLabel;
   pGlyph: ^TMapGlyph;
 begin
   iconPadding := AProjection.ConvertWidthToPixel(AParameter.IconPadding);
@@ -825,13 +853,9 @@ begin
   contourLabelPadding := AProjection.ConvertWidthToPixel(AParameter.ContourLabelPadding);
   overlayLabelPadding := AProjection.ConvertWidthToPixel(AParameter.OverlayLabelPadding);
 
-
-  AllSortedLabels := FLabelInstances;
-  AllSortedContourLabels := FContourLabelInstances;
   // sort labels by priority and position (to be deterministic)
-  { TODO : sorting }
-  //AllSortedLabels.Sort(@LabelInstanceSorter);
-  //AllSortedContourLabels.Sort(@ContourLabelSorter);
+  FAllTextLabelList.Sort(@LabelInstanceSorter);
+  FAllContourLabelList.Sort(@ContourLabelSorter);
 
   // compute collisions, hide some labels
   rowSize := Trunc((FLayoutViewport.Width / 64)+1);
@@ -841,24 +865,26 @@ begin
 
   iLabel := 0;
   iContour := 0;
-  while (iLabel < AllSortedLabels.Count) or (iContour < AllSortedContourLabels.Count) do
+  while (iLabel < FAllTextLabelList.Count) or (iContour < FAllContourLabelList.Count) do
   begin
-    currentLabel := nil;
-    currentContourLabel := nil;
-    if (iLabel < AllSortedLabels.Count) and (iContour < AllSortedContourLabels.Count) then
-    begin
-      currentLabel := AllSortedLabels[iLabel];
-      currentContourLabel := AllSortedContourLabels[iContour];
-      if (currentLabel.Priority <> currentContourLabel.Priority) then
-      begin
-        if (currentLabel.Priority < currentContourLabel.Priority) then
-          currentContourLabel := nil
-        else
-          currentLabel := nil;
-      end;
-    end
+    if (iLabel < FAllTextLabelList.Count) then
+      currentLabel := FAllTextLabelList[iLabel]
     else
-      Break;
+      currentLabel := nil;
+
+    if (iContour < FAllContourLabelList.Count) then
+      currentContourLabel := FAllContourLabelList[iContour]
+    else
+      currentContourLabel := nil;
+
+    if Assigned(currentLabel) and Assigned(currentContourLabel) then
+    begin
+      if (currentLabel.Priority < currentContourLabel.Priority) then
+        currentContourLabel := nil
+      else
+      if (currentLabel.Priority > currentContourLabel.Priority) then
+        currentLabel := nil;
+    end;
 
     if Assigned(currentLabel) then
     begin
@@ -870,94 +896,90 @@ begin
       for i := 0 to Length(canvases)-1 do
         canvases[i] := nil;
 
-      visibleElements := TLabelInstanceElementList.Create(False);
-      try
+      visibleElements.Clear();
+      for eli := 0 to currentLabel.Elements.Count-1 do
+      begin
+        element := currentLabel.Elements.Items[eli];
+        pRow := Addr(masks[eli]);
+
+        if element.LabelData.DataType in [ldtIcon, ldtSymbol] then
+          padding := iconPadding
+        else if IsOverlay(element.LabelData) then
+          padding := overlayLabelPadding
+        else if Assigned(element.LabelData.Style) then
+          padding := shieldLabelPadding
+        else
+          padding := labelPadding;
+
+        rectangle.Init(floor(element.X - FLayoutViewport.X - padding),
+                       floor(element.Y - FLayoutViewport.Y - padding),
+                       0, 0);
+
+        pCanvas := Addr(labelCanvas);
+        if (element.labelData.DataType in [ldtIcon, ldtSymbol]) then
+        begin
+          rectangle.width := ceil(element.LabelData.IconWidth + 2*padding);
+          rectangle.height := ceil(element.LabelData.IconHeight + 2*padding);
+          pCanvas := Addr(iconCanvas);
+          {$ifdef DEBUG_LABEL_LAYOUTER}
+          if (element.labelData.DataType = ldtIcon) then
+            Writeln('Test icon ', element.LabelData.IconStyle.IconName)
+          else
+            WriteLn('Test symbol ', element.labelData.IconStyle.Symbol.Name);
+          {$endif}
+        end
+        else
+        begin
+          {$ifdef DEBUG_LABEL_LAYOUTER}
+          if IsOverlay(element.LabelData) then
+            WriteLn('Test overlay label prio ', currentLabel.Priority, ': ', element.LabelData.Text)
+          else
+            WriteLn('Test label prio ', currentLabel.Priority, ': ', element.LabelData.Text);
+          {$endif}
+
+          rectangle.Width := ceil(element.MapLabel.Width + 2*padding);
+          rectangle.Height := ceil(element.MapLabel.Height + 2*padding);
+
+          if (IsOverlay(element.labelData)) then
+            pCanvas := Addr(overlayCanvas);
+        end;
+        pRow^.Prepare(rectangle);
+        IsCollision := CheckLabelCollision(pCanvas^, pRow^, Trunc(FLayoutViewport.Height));
+        if (not IsCollision) then
+        begin
+          visibleElements.Add(element);
+          canvases[eli] := pCanvas;
+        end;
+        {$ifdef DEBUG_LABEL_LAYOUTER}
+        if IsCollision then
+          WriteLn(' -> skipped')
+        else
+          WriteLn(' -> added');
+        {$endif}
+      end;
+
+      if (visibleElements.Count <> 0) then
+      begin
+        instanceCopy := TTextLabel.Create();
+        instanceCopy.Priority := currentLabel.Priority;
+        //instanceCopy.Elements.Assign(visibleElements);
+        for element in visibleElements.Items do
+        begin
+          //elementCopy := TTextLabelElement.Create();
+          elementCopy.Assign(element);
+          instanceCopy.Elements.Add(elementCopy);
+        end;
+        TextLabels.Add(instanceCopy);
+
+        // mark all labels at once
         for eli := 0 to currentLabel.Elements.Count-1 do
         begin
-          element := currentLabel.Elements[eli];
-          pRow := Addr(masks[eli]);
-
-          if element.LabelData.DataType in [ldtIcon, ldtSymbol] then
-            padding := iconPadding
-          else if IsOverlay(element.LabelData) then
-            padding := overlayLabelPadding
-          else if Assigned(element.LabelData.Style) then
-            padding := shieldLabelPadding
-          else
-            padding := labelPadding;
-
-          rectangle.Init(floor(element.X - FLayoutViewport.X - padding),
-                         floor(element.Y - FLayoutViewport.Y - padding),
-                         0, 0);
-
-          pCanvas := Addr(labelCanvas);
-          if (element.labelData.DataType in [ldtIcon, ldtSymbol]) then
-          begin
-            rectangle.width := ceil(element.LabelData.IconWidth + 2*padding);
-            rectangle.height := ceil(element.LabelData.IconHeight + 2*padding);
-            pCanvas := Addr(iconCanvas);
-            {$ifdef DEBUG_LABEL_LAYOUTER}
-            if (element.labelData.DataType = ldtIcon) then
-              Writeln('Test icon ', element.LabelData.IconStyle.IconName)
-            else
-              WriteLn('Test symbol ', element.labelData.IconStyle.Symbol.Name);
-            {$endif}
-          end
-          else
-          begin
-            {$ifdef DEBUG_LABEL_LAYOUTER}
-            if IsOverlay(element.LabelData) then
-              WriteLn('Test overlay label prio ', currentLabel.Priority, ': ', element.LabelData.Text)
-            else
-              WriteLn('Test label prio ', currentLabel.Priority, ': ', element.LabelData.Text);
-            {$endif}
-
-            rectangle.Width := ceil(element.MapLabel.Width + 2*padding);
-            rectangle.Height := ceil(element.MapLabel.Height + 2*padding);
-
-            if (IsOverlay(element.labelData)) then
-              pCanvas := Addr(overlayCanvas);
-          end;
-          pRow^.Prepare(rectangle);
-          IsCollision := CheckLabelCollision(pCanvas^, pRow^, Trunc(FLayoutViewport.Height));
-          if (not IsCollision) then
-          begin
-            visibleElements.Add(element);
-            canvases[eli] := pCanvas;
-          end;
-          {$ifdef DEBUG_LABEL_LAYOUTER}
-          if IsCollision then
-            WriteLn(' -> skipped')
-          else
-            WriteLn(' -> added');
-          {$endif}
+          if Assigned(canvases[eli]) then
+            MarkLabelPlace(canvases[eli]^, masks[eli], Trunc(FLayoutViewport.Height));
         end;
-
-        if (visibleElements.Count <> 0) then
-        begin
-          instanceCopy := TLabelInstance.Create();
-          instanceCopy.Priority := currentLabel.Priority;
-          //instanceCopy.Elements.Assign(visibleElements);
-          for element in visibleElements do
-          begin
-            elementCopy := TLabelInstanceElement.Create();
-            elementCopy.Assign(element);
-            instanceCopy.Elements.Add(elementCopy);
-          end;
-          FLabelInstances.Add(instanceCopy);
-
-          // mark all labels at once
-          for eli := 0 to currentLabel.Elements.Count-1 do
-          begin
-            if Assigned(canvases[eli]) then
-              MarkLabelPlace(canvases[eli]^, masks[eli], Trunc(FLayoutViewport.Height));
-          end;
-        end;
-
-        Inc(iLabel);
-      finally
-        visibleElements.Free();
       end;
+
+      Inc(iLabel);
     end;
 
     if Assigned(currentContourLabel) then
@@ -990,7 +1012,12 @@ begin
         for gi :=0 to glyphCnt-1 do
           MarkLabelPlace(labelCanvas, masks[gi], Trunc(FLayoutViewport.Height));
 
-        FContourLabelInstances.Add(currentContourLabel);
+        ContourLabelCopy := TContourLabel.Create();
+        ContourLabelCopy.Text := currentContourLabel.Text;
+        ContourLabelCopy.Priority := currentContourLabel.Priority;
+        ContourLabelCopy.Glyphs := currentContourLabel.Glyphs;
+        ContourLabelCopy.Style := currentContourLabel.Style;
+        ContourLabels.Add(ContourLabelCopy);
       end;
       {$ifdef DEBUG_LABEL_LAYOUTER}
       if IsCollision then
@@ -1006,8 +1033,8 @@ end;
 procedure TLabelLayouter.DrawLabels(AProjection: TProjection;
   AParameter: TMapParameter);
 var
-  inst: TLabelInstance;
-  el: TLabelInstanceElement;
+  inst: TTextLabel;
+  el: TTextLabelElement;
   elementRectangle: TDoubleRectangle;
   ConLabel: TContourLabel;
 begin
@@ -1015,9 +1042,9 @@ begin
   FTextElements.Clear();
   // draw symbols and icons first, then standard labels and then overlays
 
-  for inst in Labels do
+  for inst in TextLabels do
   begin
-    for el in inst.Elements do
+    for el in inst.Elements.Items do
     begin
       if (el.LabelData.DataType = ldtText) then
         elementRectangle.Init(el.x, el.y, el.MapLabel.Width, el.MapLabel.Height)
@@ -1055,14 +1082,14 @@ begin
   if not Assigned(OnDrawLabel) then Exit;
 
   // draw postponed text elements
-  for el in FTextElements do
+  for el in FTextElements.Items do
   begin
     OnDrawLabel(AProjection, AParameter,
                 el.X, el.Y,
                 el.MapLabel, el.LabelData);
   end;
 
-  for el in FOverlayElements do
+  for el in FOverlayElements.Items do
   begin
     OnDrawLabel(AProjection, AParameter,
                 el.X, el.Y,
@@ -1080,20 +1107,20 @@ procedure TLabelLayouter.RegisterLabel(AProjection: TProjection;
   AParameter: TMapParameter; const APoint: TVertex2D;
   const ADataList: TLabelDataList; AObjectWidth: Double);
 var
-  instance: TLabelInstance;
+  instance: TTextLabel;
   offset: Double;
   i: Integer;
   d: TLabelData;
-  element: TLabelInstanceElement;
+  element: TTextLabelElement;
 begin
-  instance := TLabelInstance.Create();
+  instance := TTextLabel.Create();
   instance.Priority := MaxInt;
 
   offset := -1;
   for i := 0 to ADataList.Count-1 do
   begin
     d := ADataList.Items[i];
-    element := TLabelInstanceElement.Create();
+    element.Init();
     element.LabelData := d;
     if (d.DataType in [ldtIcon, ldtSymbol]) then
     begin
@@ -1139,7 +1166,7 @@ begin
     instance.elements.Add(element);
   end;
 
-  FLabelInstances.Add(instance);
+  FAllTextLabelList.Add(instance);
 end;
 
 procedure TLabelLayouter.RegisterContourLabel(AProjection: TProjection;
@@ -1192,8 +1219,8 @@ begin
     ContLabel.Priority := ALabelData.Priority;
     ContLabel.Style := ALabelData.Style;
 
-    {$ifdef DEBUG_LABEL_LAYOUTER}
-    ContLabel.Text = ALabelData.Text;
+    {$ifdef DEBUG_LABEL_TEXT}
+    ContLabel.Text := ALabelData.Text;
     {$endif}
 
     // do the magic to make sure that we don't render label upside-down
@@ -1289,23 +1316,26 @@ begin
     if GlyphIndex <> -1 then // is some glyph visible?
     begin
       SetLength(ContLabel.Glyphs, GlyphIndex+1);
-      FContourLabelInstances.Add(ContLabel);
-    end;
+      FAllContourLabelList.Add(ContLabel);
+    end
+    else
+      ContLabel.Free();
     offset := offset + TmpLabel.Width + ALabelData.ContourLabelSpace;
   end;
 end;
 
-{ TLabelInstance }
+{ TTextLabel }
 
-constructor TLabelInstance.Create();
+constructor TTextLabel.Create();
 begin
-  FElements := TLabelInstanceElementList.Create();
+  inherited;
+  FElements.Clear();
   Priority := 0;
 end;
 
-destructor TLabelInstance.Destroy;
+destructor TTextLabel.Destroy;
 begin
-  FreeAndNil(FElements);
+  FElements.Clear();
   inherited Destroy;
 end;
 
@@ -1339,14 +1369,41 @@ begin
   ContourLabelSpace := 0.0;
 end;
 
-{ TLabelInstanceElement }
+{ TTextLabelElement }
 
-procedure TLabelInstanceElement.Assign(AOther: TLabelInstanceElement);
+procedure TTextLabelElement.Init();
+begin
+  LabelData.Init();
+  MapLabel.Init();
+  X := 0;
+  Y := 0;
+end;
+
+procedure TTextLabelElement.Assign(AOther: TTextLabelElement);
 begin
   LabelData := AOther.LabelData;
   MapLabel := AOther.MapLabel;
   X := AOther.X;
   Y := AOther.Y;
+end;
+
+{ TTextLabelElementList }
+
+function TTextLabelElementList.GetCount: Integer;
+begin
+  Result := Length(Items);
+end;
+
+procedure TTextLabelElementList.Clear();
+begin
+  SetLength(Items, 0);
+end;
+
+function TTextLabelElementList.Add(const AItem: TTextLabelElement): Integer;
+begin
+  Result := Length(Items);
+  SetLength(Items, Result+1);
+  Items[Result] := AItem;
 end;
 
 
