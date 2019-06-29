@@ -230,10 +230,11 @@ var
   TextColor: TMapColor;
 begin
   Assert(Assigned(AStyle));
-  TextColor.Init(0, 0, 0, 0);
+  TextColor.Init(0, 0, 0, 1);
   //FAgg2D.FillColor := GetAggRgba8(AStyle.TextColor);
   FAgg2D.FillColor := GetAggRgba8(TextColor);
   FAgg2D.NoLine();
+  //FAgg2D.FlipText := True;
   //FAgg2D.LineColor := GetAggRgba8(AStyle.TextColor);
 
   //matrix := TAggTransAffine.Create();
@@ -260,7 +261,6 @@ begin
                           *renderer_aa);   }
 
     FAgg2D.TextAngle := layoutGlyph.Angle;
-    FAgg2D.FlipText := True;
     FAgg2D.Text(layoutGlyph.Position.X,
       layoutGlyph.Position.Y,
       layoutGlyph.TextChar);
@@ -563,9 +563,75 @@ end;
 
 procedure TMapPainterAgg.DrawLabels(const AProjection: TProjection;
   const AParameter: TMapParameter; const AData: TMapData);
+var
+  TextLabel: TTextLabel;
+  el: TTextLabelElement;
+  OverlayElements, TextElements: TTextLabelElementList;
+  elementRectangle: TDoubleRectangle;
+  ConLabel: TContourLabel;
 begin
   FLabelLayouter.Layout(AProjection, AParameter);
-  FLabelLayouter.DrawLabels(AProjection, AParameter);
+  //FLabelLayouter.DrawLabels(AProjection, AParameter);
+  OverlayElements.Clear();
+  TextElements.Clear();
+  // draw symbols and icons first, then standard labels and then overlays
+
+  for TextLabel in FLabelLayouter.TextLabels do
+  begin
+    if TextLabel.Priority < 0 then
+      Continue;
+    for el in TextLabel.Elements.Items do
+    begin
+      if (el.LabelData.DataType = ldtText) then
+        elementRectangle.Init(el.x, el.y, el.MapLabel.Width, el.MapLabel.Height)
+      else
+        elementRectangle.Init(el.x, el.y, el.LabelData.IconWidth, el.LabelData.IconHeight);
+
+      if (not FLabelLayouter.VisibleViewport.Intersects(elementRectangle)) then
+        Continue;
+
+      if (el.LabelData.DataType = ldtSymbol) then
+      begin
+        DrawSymbol(AProjection, AParameter,
+          el.LabelData.IconStyle.Symbol,
+          el.X + el.LabelData.IconWidth / 2,
+          el.Y + el.LabelData.IconHeight / 2);
+      end
+      else if (el.LabelData.DataType = ldtIcon) then
+      begin
+        DrawIcon(el.LabelData.IconStyle,
+          el.X + el.LabelData.IconWidth / 2,
+          el.Y + el.LabelData.IconHeight / 2,
+          el.LabelData.IconWidth, el.LabelData.IconHeight);
+      end
+      else
+      begin
+        // postpone text elements
+        if (FLabelLayouter.IsOverlay(el.LabelData)) then
+          OverlayElements.Add(el)
+        else
+          TextElements.Add(el);
+      end;
+    end;
+  end;
+
+  // draw postponed text elements
+  for el in TextElements.Items do
+  begin
+    DrawLabel(AProjection, AParameter, el.X, el.Y, el.MapLabel, el.LabelData);
+  end;
+
+  for el in OverlayElements.Items do
+  begin
+    DrawLabel(AProjection, AParameter, el.X, el.Y, el.MapLabel, el.LabelData);
+  end;
+
+  for ConLabel in FLabelLayouter.ContourLabels do
+  begin
+    if ConLabel.Priority < 0 then
+      Continue;
+    DrawGlyphs(AProjection, AParameter, ConLabel.Style, ConLabel.Glyphs);
+  end;
   FLabelLayouter.Reset();
 end;
 
@@ -734,10 +800,6 @@ begin
 
   FAgg2D := TAgg2D.Create();
   FLabelLayouter := TLabelLayouter.Create();
-  FLabelLayouter.OnDrawGlyphs := @DrawGlyphs;
-  FLabelLayouter.OnDrawIcon := @DrawIcon;
-  FLabelLayouter.OnDrawLabel := @DrawLabel;
-  FLabelLayouter.OnDrawSymbol := @DrawSymbol;
   //FLabelLayouter.OnGlyphBoundingBox := @OnGlyphBoundingBoxHandler;
   FLabelLayouter.OnTextLayout := @OnTextLayoutHandler;
 

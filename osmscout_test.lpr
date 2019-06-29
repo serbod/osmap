@@ -10,8 +10,7 @@ uses
   Forms, MainForm, OsMapPainter, OsMapTypes, OsMapStyles, OsMapGeometry,
   OsMapObjects, OsMapParameters, OsMapObjTypes, OsMapTags, OsMapFiles,
   OsMapUtils, OsMapObjFeatures, OsMapStyleConfig, OsMapLabels, OsMapTransform,
-  OsMapPainterAgg, OsMapProjection, OsMapManager, OsMapFormatMp, OsMapGeocoder
-  { you can add units after this };
+  OsMapPainterAgg, OsMapProjection, OsMapManager, OsMapFormatMp;
 
 {$R *.res}
 

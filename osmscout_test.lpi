@@ -50,7 +50,6 @@
           <Linking>
             <Debugging>
               <DebugInfoType Value="dsDwarf2Set"/>
-              <UseHeaptrc Value="True"/>
               <UseExternalDbgSyms Value="True"/>
             </Debugging>
             <Options>
@@ -118,7 +117,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="21">
+    <Units Count="20">
       <Unit0>
         <Filename Value="osmscout_test.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -221,11 +220,6 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapFormatMp"/>
       </Unit19>
-      <Unit20>
-        <Filename Value="osmapgeocoder.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapGeocoder"/>
-      </Unit20>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
