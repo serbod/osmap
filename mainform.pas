@@ -62,6 +62,11 @@ var
 begin
   ImportFromMpFile(FMapManager, 'minsk.mp');
   ImportFromMpFile(FMapManager, 'minsk_obl.mp');
+  ImportFromMpFile(FMapManager, 'brest.mp');
+  ImportFromMpFile(FMapManager, 'gomel.mp');
+  ImportFromMpFile(FMapManager, 'grodno.mp');
+  ImportFromMpFile(FMapManager, 'mogilev.mp');
+  ImportFromMpFile(FMapManager, 'vitebsk.mp');
 
   {Bitmap := Image1.Picture.Bitmap;
   Bitmap.PixelFormat := TPixelFormat.pf32bit;

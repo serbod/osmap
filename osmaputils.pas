@@ -66,17 +66,16 @@ type
     Value: Integer;
   end;
 
-  { TStringHash }
+  { TSimpleStringHash }
   { Simple string-to-integer hashtable }
-  TStringHash = class
+  TSimpleStringHash = object
   private
     Buckets: array of PHashItem;
   protected
     function Find(const Key: string): PHashItem;
     function HashOf(const Key: string): Cardinal; virtual;
   public
-    constructor Create(Size: Cardinal = 256);
-    destructor Destroy; override;
+    procedure Init(Size: Cardinal = 256);
     procedure Add(const Key: string; Value: Integer);
     procedure Clear;
     function Modify(const Key: string; Value: Integer): Boolean;
@@ -413,9 +412,9 @@ begin
   Result := FormatDateTime('[S].Z', (StopTime - StartTime));
 end;
 
-{ TStringHash }
+{ TSimpleStringHash }
 
-function TStringHash.Find(const Key: string): PHashItem;
+function TSimpleStringHash.Find(const Key: string): PHashItem;
 var
   Hash: Integer;
 begin
@@ -432,7 +431,7 @@ begin
   end;
 end;
 
-function TStringHash.HashOf(const Key: string): Cardinal;
+function TSimpleStringHash.HashOf(const Key: string): Cardinal;
 var
   I: Integer;
 begin
@@ -441,19 +440,12 @@ begin
     Result := ((Result shl 2) or (Result shr (SizeOf(Result) * 8 - 2))) xor Ord(Key[I]);
 end;
 
-constructor TStringHash.Create(Size: Cardinal);
+procedure TSimpleStringHash.Init(Size: Cardinal);
 begin
-  inherited Create;
   SetLength(Buckets, Size);
 end;
 
-destructor TStringHash.Destroy;
-begin
-  Clear;
-  inherited Destroy;
-end;
-
-procedure TStringHash.Add(const Key: string; Value: Integer);
+procedure TSimpleStringHash.Add(const Key: string; Value: Integer);
 var
   Hash: Integer;
   Bucket: PHashItem;
@@ -466,7 +458,7 @@ begin
   Buckets[Hash] := Bucket;
 end;
 
-procedure TStringHash.Clear;
+procedure TSimpleStringHash.Clear;
 var
   I: Integer;
   P, N: PHashItem;
@@ -484,7 +476,7 @@ begin
   end;
 end;
 
-function TStringHash.Modify(const Key: string; Value: Integer): Boolean;
+function TSimpleStringHash.Modify(const Key: string; Value: Integer): Boolean;
 var
   P: PHashItem;
 begin
@@ -498,7 +490,7 @@ begin
     Result := False;
 end;
 
-function TStringHash.ValueOf(const Key: string): Integer;
+function TSimpleStringHash.ValueOf(const Key: string): Integer;
 var
   P: PHashItem;
 begin
@@ -509,7 +501,7 @@ begin
     Result := -1;
 end;
 
-function TStringHash.FindValue(const Key: string; out Value: Integer): Boolean;
+function TSimpleStringHash.FindValue(const Key: string; out Value: Integer): Boolean;
 var
   P: PHashItem;
 begin

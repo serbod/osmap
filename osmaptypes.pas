@@ -118,6 +118,7 @@ type
   TVehicleType = (vehicleFoot, vehicleBicycle, vehicleCar);
   TVehicleTypes = set of TVehicleType;
 
+  { from VEHICLE_ constants }
   TVehicleMask = Byte;
 
   // distance in meters
@@ -244,6 +245,9 @@ type
 
   function Vertex2D(AX, AY: Double): TVertex2D; inline;
 
+  function VehicleTypesToMask(AValue: TVehicleTypes): TVehicleMask;
+  function VehicleMaskToTypes(AValue: TVehicleMask): TVehicleTypes;
+
 implementation
 
 uses OsMapUtils;
@@ -267,6 +271,28 @@ function Vertex2D(AX, AY: Double): TVertex2D;
 begin
   Result.X := AX;
   Result.Y := AY;
+end;
+
+function VehicleTypesToMask(AValue: TVehicleTypes): TVehicleMask;
+begin
+  Result := 0;
+  if vehicleFoot in AValue then
+    Result := Result or VEHICLE_FOOT;
+  if vehicleBicycle in AValue then
+    Result := Result or VEHICLE_BICYCLE;
+  if vehicleCar in AValue then
+    Result := Result or VEHICLE_CAR;
+end;
+
+function VehicleMaskToTypes(AValue: TVehicleMask): TVehicleTypes;
+begin
+  Result := [];
+  if (AValue and VEHICLE_FOOT) <> 0 then
+    Result := Result + [vehicleFoot];
+  if (AValue and VEHICLE_BICYCLE) <> 0 then
+    Result := Result + [vehicleBicycle];
+  if (AValue and VEHICLE_CAR) <> 0 then
+    Result := Result + [vehicleCar];
 end;
 
 { TMagnificationConverter }

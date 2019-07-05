@@ -112,6 +112,7 @@ type
     procedure Read(out AValue: SmallInt); overload;
     procedure Read(out AValue: LongInt); overload;
     procedure Read(out AValue: Int64); overload;
+    procedure Read(out AValue: QWord); overload;
     procedure Read(out AValue: Word); overload;
     procedure Read(out AValue: LongWord); overload;
 
@@ -183,9 +184,11 @@ type
     procedure Write(AValue: SmallInt); overload;
     procedure Write(AValue: LongInt); overload;
     procedure Write(AValue: Int64); overload;
+    procedure Write(AValue: QWord); overload;
     procedure Write(const AValue: string); overload;
     procedure Write(AValue: Boolean); overload;
     //procedure Write(AValue: Byte); overload;
+    procedure Write(const AValue: TObjectFileRef); overload;
 
     procedure WriteNumber(AValue: Word);
     procedure WriteNumber(AValue: LongWord); overload;
@@ -292,6 +295,12 @@ begin
   FFile.Write(AValue, SizeOf(AValue));
 end;
 
+procedure TFileWriter.Write(AValue: QWord);
+begin
+  Assert(Assigned(FFile));
+  FFile.Write(AValue, SizeOf(AValue));
+end;
+
 procedure TFileWriter.Write(const AValue: string);
 var
   n: Integer;
@@ -310,6 +319,12 @@ begin
   else
     TmpByte := 0;
   FFile.WriteByte(TmpByte)
+end;
+
+procedure TFileWriter.Write(const AValue: TObjectFileRef);
+begin
+  Write(Byte(Ord(AValue.RefType)));
+  Write(AValue.Offset);
 end;
 
 procedure TFileWriter.WriteNumber(AValue: Word);
@@ -918,6 +933,13 @@ begin
 end;
 
 procedure TFileScanner.Read(out AValue: Int64);
+begin
+  Assert(Assigned(FFile));
+  AValue := 0;
+  FFile.Read(AValue, SizeOf(AValue));
+end;
+
+procedure TFileScanner.Read(out AValue: QWord);
 begin
   Assert(Assigned(FFile));
   AValue := 0;

@@ -25,7 +25,7 @@
 (*
   OsMap geometry routines
 GeoCoord:
-  Coord -> TGeoCoord
+  Coord -> TGeoPoint
 
 Point:
   Point -> TGeoPoint

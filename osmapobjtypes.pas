@@ -31,9 +31,9 @@ TypeFeature:
   FeatureInstance -> TFeatureInfo
 
 TypeConfig:
-  TypeInfo
-  TypeCondition
-  FeatureValueBuffer
+  TypeInfo  -> TTypeInfo
+  TypeCondition -> TTypeCondition
+  FeatureValueBuffer -> TFeatureValueBuffer
   TypeConfig ...
 *)
 unit OsMapObjTypes;
@@ -84,7 +84,7 @@ type
   TFeatureValueStorage = class
   private
     FStrList: TStringList;
-    FStrHash: TStringHash;
+    FStrHash: TSimpleStringHash;
   public
     procedure AfterConstruction(); override;
     procedure BeforeDestruction(); override;
@@ -2458,7 +2458,7 @@ procedure TFeatureValueStorage.AfterConstruction();
 begin
   inherited AfterConstruction();
   FStrList := TStringList.Create();
-  FStrHash := TStringHash.Create();
+  FStrHash.Init();
 end;
 
 procedure TFeatureValueStorage.BeforeDestruction();
@@ -2470,27 +2470,17 @@ end;
 
 procedure TFeatureValueStorage.ClearHash();
 begin
-  if Assigned(FStrHash) then
-    FreeAndNil(FStrHash);
+  FStrHash.Clear();
 end;
 
 function TFeatureValueStorage.AddStr(const AValue: string): Integer;
 begin
-  if Assigned(FStrHash) then
-  begin
-    Result := FStrHash.ValueOf(AValue);
-    if Result <> -1 then
-      Exit;
+  Result := FStrHash.ValueOf(AValue);
+  if Result <> -1 then
+    Exit;
 
-    Result := FStrList.Add(AValue);
-    FStrHash.Add(AValue, Result);
-  end
-  else
-  begin
-    Result := FStrList.IndexOf(AValue);
-    if Result = -1 then
-      Result := FStrList.Add(AValue);
-  end;
+  Result := FStrList.Add(AValue);
+  FStrHash.Add(AValue, Result);
 end;
 
 function TFeatureValueStorage.GetStr(ASID: Integer): string;
