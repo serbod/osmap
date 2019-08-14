@@ -42,7 +42,11 @@ util\Geometry (...)
 
 unit OsMapGeometry;
 
-{$mode objfpc}{$H+}
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$else}
+  {$ZEROBASEDSTRINGS OFF}
+{$endif}
 
 interface
 
@@ -133,7 +137,7 @@ type
 
       Possibly in future more variants will be supported. It is guaranteed
       that the result of GetDisplayText() is successfully parsed. }
-    function Parse(const AText: string): Boolean;
+    function Parse(AText: string): Boolean;
 
     { Get distance between two coordinates. The difference in height between the two points is neglected.
       ATarget: Target coordinate to measure distance }
@@ -207,7 +211,7 @@ type
       AFirstIndex: Integer = 0; ALastIndex: Integer = MaxInt);
 
     { Resize the bounding box to include the original bounding box and the given bounding box }
-    procedure Include(const AOther: TGeoBox);
+    procedure Include(const AOther: TGeoBox); overload;
 
     { Resize the bounding box to include the original bounding box and the given point }
     procedure Include(const ACoord: TGeoPoint); overload;
@@ -320,7 +324,7 @@ function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoin
 
 { Calculating Vincenty's inverse for getting the ellipsoidal distance
   of two points on earth. }
-function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance;
+function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance; overload;
 
 function GetEllipsoidalDistance(const A, B: TGeoPoint): TDistance; overload;
 
@@ -524,9 +528,9 @@ begin
   Result := b * A1 * (sigma - deltasigma);
 end;
 
-procedure CalcEllipsoidalDistance(Lat1, Lon1, ABearing: Double;
+procedure CalcEllipsoidalDistance(Lat1: TLatitude; Lon1: TLongtitude; ABearing: Double;
                             const ADistance: TDistance;
-                            out lat2, lon2: Double);
+                            out lat2: TLatitude; out lon2: TLongtitude);
 var
   a, b, f, A1, B1, C, L: Double;
   distanceAsMeter: Double;
@@ -787,7 +791,7 @@ end;
 
 function TGeoPoint.GetHash(): TId;
 var
-  LatValue, LonValue: Int64;
+  LatValue, LonValue: UInt64;
   i: Integer;
 begin
   LatValue := Round((Lat + 90.0) * GlobalLatConversionFactor);
@@ -806,7 +810,7 @@ end;
 
 procedure TGeoPoint.EncodeToBuffer(out ABuf: TGeoCoordBuffer);
 var
-  LatValue, LonValue: Int64;
+  LatValue, LonValue: UInt64;
 begin
   LatValue := Round((Lat + 90.0) * GlobalLatConversionFactor);
   LonValue := Round((Lon + 180.0) * GlobalLonConversionFactor);
@@ -881,7 +885,8 @@ end;
 { for TGeoPoint.Parse() }
 function EatWhitespace(const AText: string; APos: Integer): Integer;
 begin
-  while (APos < Length(AText)) and (Copy(AText, APos, 1) = ' ') do
+  // using TStringHelper with 0-based char index
+  while (APos <= AText.Length) and (AText.Chars[APos] = ' ') do
   begin
     Inc(APos);
   end;
@@ -894,15 +899,16 @@ var
   n, DigitsCount: Integer;
   Factor: Double;
 begin
+  // using TStringHelper with 0-based char index
   Result := False;
   AValue := 0.0;
   DigitsCount := 0;
 
   if APos < 0 then Exit;
 
-  while (APos <= Length(AText)) do
+  while (APos < AText.Length) do
   begin
-    n := Ord(AText[APos]) - Ord('0');
+    n := Ord(AText.Chars[APos]) - Ord('0');
     if (n >= 0) and (n < 10) then
     begin
       Inc(DigitsCount);
@@ -920,15 +926,15 @@ begin
 
   // TODO: Scan Digit and Co
 
-  if (APos < Length(AText)) and (Pos(AText[APos], '.,') > 0) then
+  if (APos <= AText.Length) and ((AText.Chars[APos] = '.') or (AText.Chars[APos] = ',')) then
   begin
     Inc(APos);
 
     Factor := 10;
 
-    while (APos <= Length(AText)) do
+    while (APos < AText.Length) do
     begin
-      n := Ord(AText[APos]) - Ord('0');
+      n := Ord(AText.Chars[APos]) - Ord('0');
       if (n < 0) or (n > 9) then
         Break;
 
@@ -948,23 +954,24 @@ var
   n, TextLen: Integer;
   Minutes, Seconds: Double;
 begin
+  // using TStringHelper with 0-based char index
   Result := ScanNumber(AText, APos, AValue, AMaxDigits);
   if (not Result) then
     Exit;
 
   TextLen := Length(AText);
-  if (APos >= TextLen) or (APos+1 < TextLen) then
+  if (APos > TextLen) or (APos+1 <= TextLen) then
     Exit;
 
   Result := False;
 
-  if (Ord(AText[APos]) = 248)  // ASCII Latin Small Letter O with stroke
-  or (Ord(AText[APos]) = $B0)  // ASCII Degree symbol
-  or (Ord(AText[APos]) = $BA)  // ASCII Masculine ordinal indicator
-  or ((Ord(AText[APos]) = $C2) and (Ord(AText[APos+1]) = $B0)) // UTF8 sequence 0xc2b0: degree sign (°)
+  if (Ord(AText.Chars[APos]) = 248)  // ASCII Latin Small Letter O with stroke
+  or (Ord(AText.Chars[APos]) = $B0)  // ASCII Degree symbol
+  or (Ord(AText.Chars[APos]) = $BA)  // ASCII Masculine ordinal indicator
+  or ((Ord(AText.Chars[APos]) = $C2) and (Ord(AText.Chars[APos+1]) = $B0)) // UTF8 sequence 0xc2b0: degree sign (°)
   then
   begin
-    if (Ord(AText[APos]) = $C2) then
+    if (Ord(AText.Chars[APos]) = $C2) then
       Inc(APos, 2)
     else
       Inc(APos, 1);
@@ -972,8 +979,8 @@ begin
     // try pattern:
     // DDD°[D[.DDD]'[D[.DDD]"]]
     // parse minutes
-    if (APos < TextLen) then
-      n := Ord(AText[APos]) - Ord('0')
+    if (APos <= TextLen) then
+      n := Ord(AText.Chars[APos]) - Ord('0')
     else
       n := -1;
 
@@ -983,14 +990,14 @@ begin
       if (not ScanNumber(AText, APos, Minutes, 2)) then
         Exit;
 
-      if (APos < TextLen) and (AText[APos] = '''') then
+      if (APos <= TextLen) and (AText.Chars[APos] = '''') then
       begin
         AValue := AValue + (Minutes / 60.0);
         Inc(APos);
 
         // parse seconds
-        if (APos < TextLen) then
-          n := Ord(AText[APos]) - Ord('0')
+        if (APos <= TextLen) then
+          n := Ord(AText.Chars[APos]) - Ord('0')
         else
           n := -1;
 
@@ -1000,7 +1007,7 @@ begin
           if (not ScanNumber(AText, APos, Seconds, 2)) then
             Exit;
 
-          if (APos < TextLen) and (AText[APos] = '"') then
+          if (APos <= TextLen) and (AText.Chars[APos] = '"') then
           begin
             AValue := AValue + (Seconds / 3600.0);
             Inc(APos);
@@ -1017,7 +1024,7 @@ begin
   Result := True;
 end;
 
-function TGeoPoint.Parse(const AText: string): Boolean;
+function TGeoPoint.Parse(AText: string): Boolean;
 var
   CurPos, TextLen: Integer;
   TmpLat, TmpLon: Double;
@@ -1026,17 +1033,18 @@ var
 
   function _EatWhitespaces(): Boolean;
   begin
-    while (CurPos <= TextLen) and (AText[CurPos] = ' ') do
+    while (CurPos < TextLen) and (AText.Chars[CurPos] = ' ') do
     begin
       Inc(CurPos);
     end;
-    Result := (CurPos <= TextLen)
+    Result := (CurPos < TextLen)
   end;
 
 begin
+  // using TStringHelper with 0-based char index
   Result := False;
-  CurPos := 1;
-  TextLen := Length(AText);
+  CurPos := 0;
+  TextLen := AText.Length;
   TmpLat := 0;
   IsLatPos := True;
   IsLatDirectionGiven := False;
@@ -1050,7 +1058,7 @@ begin
 
   // === Latitude
 
-  case AText[CurPos] of
+  case AText.Chars[CurPos] of
     'N', '+':
     begin
       IsLatPos := True;
@@ -1075,7 +1083,7 @@ begin
   if not _EatWhitespaces() then
     Exit;
 
-  if (AText[CurPos] = 'N') then
+  if (AText.Chars[CurPos] = 'N') then
   begin
     if IsLatDirectionGiven then
       Exit;
@@ -1084,7 +1092,7 @@ begin
     IsLatDirectionGiven := true;
     Inc(CurPos);
   end
-  else if (AText[CurPos] = 'S') then
+  else if (AText.Chars[CurPos] = 'S') then
   begin
     if IsLatDirectionGiven then
       Exit;
@@ -1102,7 +1110,7 @@ begin
 
   // === Longitude
 
-  case AText[CurPos] of
+  case AText.Chars[CurPos] of
     'E', '+':
     begin
       IsLonPos := True;
@@ -1131,7 +1139,7 @@ begin
 
   if _EatWhitespaces() then
   begin
-    case AText[CurPos] of
+    case AText.Chars[CurPos] of
       'E':
       begin
         if IsLonDirectionGiven then
@@ -1422,7 +1430,8 @@ end;
 function TGeoBox.BoxByCenterAndRadius(const ACenter: TGeoPoint;
   const ARadius: TDistance): TGeoBox;
 var
-  topLat, botLat, leftLon, rightLon: Double;
+  topLat, botLat: TLatitude;
+  leftLon, rightLon: TLongtitude;
 begin
   CalcEllipsoidalDistance(ACenter.Lat,
                          ACenter.Lon,

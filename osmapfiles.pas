@@ -29,7 +29,9 @@ util\FileWriter  (TFileWriter...)
 *)
 unit OsMapFiles;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -43,7 +45,7 @@ type
 
   { TFileScanner }
 
-  TFileScanner = class
+  TFileScanner = class(TObject)
   private
     FFilename: string;  // Filename
     FFile: TStream;     // Internal low level file handle
@@ -85,7 +87,7 @@ type
     procedure SetPos(AValue: TFileOffset);
 
     function ReadEncodedSignedNumber(): Int64;
-    function ReadEncodedUnsignedNumber(): QWord;
+    function ReadEncodedUnsignedNumber(): UInt64;
 
   public
     constructor Create();
@@ -104,7 +106,7 @@ type
       want to clean up the resources using best effort. }
     procedure CloseFailsafe();
 
-    procedure Read(var ABuffer; ABytesCount: Integer);
+    procedure Read(var ABuffer; ABytesCount: Integer); overload;
     { Read 0-terminated string }
     procedure Read(out AValue: string); overload;
     procedure Read(out AValue: Boolean); overload;
@@ -112,13 +114,13 @@ type
     procedure Read(out AValue: SmallInt); overload;
     procedure Read(out AValue: LongInt); overload;
     procedure Read(out AValue: Int64); overload;
-    procedure Read(out AValue: QWord); overload;
+    procedure Read(out AValue: UInt64); overload;
     procedure Read(out AValue: Word); overload;
     procedure Read(out AValue: LongWord); overload;
 
     procedure Read(out AValue: TObjectFileRef); overload;
 
-    procedure ReadNumber(out AValue: Byte);
+    procedure ReadNumber(out AValue: Byte); overload;
     procedure ReadNumber(out AValue: SmallInt); overload;
     procedure ReadNumber(out AValue: Word); overload;
     procedure ReadNumber(out AValue: LongInt); overload;
@@ -164,7 +166,7 @@ type
 
   { TFileWriter }
 
-  TFileWriter = class
+  TFileWriter = class(TObject)
   private
     FFilename: string;  // Filename
     FFile: TStream;     // Internal low level file handle
@@ -172,25 +174,25 @@ type
     function GetIsOpen: Boolean;
 
     procedure WriteEncodedSignedNumber(AValue: Int64);
-    procedure WriteEncodedUnsignedNumber(AValue: QWord);
+    procedure WriteEncodedUnsignedNumber(AValue: UInt64);
   public
     procedure Open(const AFilename: string);
     procedure Close();
 
 
-    procedure Write(AValue: Byte);
+    procedure Write(AValue: Byte); overload;
     procedure Write(AValue: Word); overload;
     procedure Write(AValue: LongWord); overload;
     procedure Write(AValue: SmallInt); overload;
     procedure Write(AValue: LongInt); overload;
     procedure Write(AValue: Int64); overload;
-    procedure Write(AValue: QWord); overload;
+    procedure Write(AValue: UInt64); overload;
     procedure Write(const AValue: string); overload;
     procedure Write(AValue: Boolean); overload;
     //procedure Write(AValue: Byte); overload;
     procedure Write(const AValue: TObjectFileRef); overload;
 
-    procedure WriteNumber(AValue: Word);
+    procedure WriteNumber(AValue: Word); overload;
     procedure WriteNumber(AValue: LongWord); overload;
     procedure WriteNumber(AValue: SmallInt); overload;
     procedure WriteNumber(AValue: LongInt); overload;
@@ -209,7 +211,7 @@ type
 
 implementation
 
-uses LazDbgLog, Math; // eliminate "end of source not found"
+uses Math; // eliminate "end of source not found"
 
 const
   MAX_NODES = $03FFFFFF; // 26 bits
@@ -230,7 +232,7 @@ begin
   FFile.Write(Buf, BufSize);
 end;
 
-procedure TFileWriter.WriteEncodedUnsignedNumber(AValue: QWord);
+procedure TFileWriter.WriteEncodedUnsignedNumber(AValue: UInt64);
 var
   Buf: array[0..9] of Byte;
   BufSize: Integer;
@@ -295,7 +297,7 @@ begin
   FFile.Write(AValue, SizeOf(AValue));
 end;
 
-procedure TFileWriter.Write(AValue: QWord);
+procedure TFileWriter.Write(AValue: UInt64);
 begin
   Assert(Assigned(FFile));
   FFile.Write(AValue, SizeOf(AValue));
@@ -318,7 +320,8 @@ begin
     TmpByte := 1
   else
     TmpByte := 0;
-  FFile.WriteByte(TmpByte)
+  //FFile.WriteByte(TmpByte)
+  FFile.Write(TmpByte, 1);
 end;
 
 procedure TFileWriter.Write(const AValue: TObjectFileRef);
@@ -329,12 +332,12 @@ end;
 
 procedure TFileWriter.WriteNumber(AValue: Word);
 begin
-  WriteEncodedUnsignedNumber(QWord(AValue));
+  WriteEncodedUnsignedNumber(UInt64(AValue));
 end;
 
 procedure TFileWriter.WriteNumber(AValue: LongWord);
 begin
-  WriteEncodedUnsignedNumber(QWord(AValue));
+  WriteEncodedUnsignedNumber(UInt64(AValue));
 end;
 
 procedure TFileWriter.WriteNumber(AValue: SmallInt);
@@ -811,7 +814,7 @@ begin
   FFile.Position := TmpPos + n;
 end;
 
-function TFileScanner.ReadEncodedUnsignedNumber(): QWord;
+function TFileScanner.ReadEncodedUnsignedNumber(): UInt64;
 var
   TmpBuf: array [0..9] of Byte;
   TmpPos: Int64;
@@ -868,8 +871,8 @@ end;
 procedure TFileScanner.Read(out AValue: string);
 var
   TmpPos: Int64;
-  TmpBuffer: AnsiString;
-  nSize, nRead, n: Integer;
+  TmpBuffer: TBytes;  // AnsiString
+  nSize, nRead, n, i: Integer;
   IsFinished: Boolean;
 begin
   Assert(Assigned(FFile));
@@ -883,7 +886,17 @@ begin
     while not IsFinished do
     begin
       nRead := FFile.Read(TmpBuffer[1], nSize);
-      n := Pos(#0, TmpBuffer)-1;
+      //n := Pos(#0, TmpBuffer)-1;
+      n := -1;
+      for i := 0 to nSize-1 do
+      begin
+        if TmpBuffer[i] = 0 then
+        begin
+          n := i;
+          Break;
+        end;
+      end;
+
       IsFinished := (nRead < nSize) or (n >= 0) or (n > nRead);
       if (n > nRead) then
         n := nRead
@@ -891,7 +904,11 @@ begin
         n := nRead;
 
       if n > 0 then
-        AValue := AValue + Copy(TmpBuffer, 1, n);
+      begin
+        //AValue := AValue + Copy(TmpBuffer, 1, n);
+        for i := 1 to n do
+          AValue := AValue + Chr(TmpBuffer[i]);
+      end
     end;
 
     TmpPos := TmpPos + Length(AValue) + 1;
@@ -908,14 +925,16 @@ var
   TmpByte: Byte;
 begin
   Assert(Assigned(FFile));
-  TmpByte := FFile.ReadByte();
+  //TmpByte := FFile.ReadByte();
+  FFile.Read(TmpByte, 1);
   AValue := (TmpByte <> 0);
 end;
 
 procedure TFileScanner.Read(out AValue: Byte);
 begin
   Assert(Assigned(FFile));
-  AValue := FFile.ReadByte();
+  //AValue := FFile.ReadByte();
+  FFile.Read(AValue, 1);
 end;
 
 procedure TFileScanner.Read(out AValue: SmallInt);
@@ -939,7 +958,7 @@ begin
   FFile.Read(AValue, SizeOf(AValue));
 end;
 
-procedure TFileScanner.Read(out AValue: QWord);
+procedure TFileScanner.Read(out AValue: UInt64);
 begin
   Assert(Assigned(FFile));
   AValue := 0;
@@ -1008,7 +1027,7 @@ function TFileScanner.ReadMapPoints(var ANodes: TGeoPointArray;
   AIsReadIds: Boolean): Boolean;
 var
   CoordBitSize, NodeCount, ShiftCount, SegmentCount: Integer;
-  SizeByte, BitsetByte: Byte;
+  SizeByte, BitsetByte, TmpByte: Byte;
   HasNodes: Boolean;
   ByteBufferSize: Integer;
   FirstCoord: TGeoPoint;
@@ -1022,7 +1041,8 @@ var
   Bitmask: LongWord;
 begin
   Result := False;
-  SizeByte := Stream.ReadByte();
+  //SizeByte := Stream.ReadByte();
+  Read(SizeByte);
 
   if SizeByte = 0 then
     Exit;
@@ -1049,7 +1069,7 @@ begin
   // read rest of NodeCount
   while ((SizeByte and $80) <> 0) and (ShiftCount < 20) do
   begin
-    SizeByte := Stream.ReadByte();
+    Read(SizeByte);
     NodeCount := NodeCount or ((SizeByte and $7F) shl ShiftCount);
     Inc(ShiftCount, 7);
   end;
@@ -1171,14 +1191,14 @@ begin
     while (IdCurrent < NodeCount) do
     begin
       Bitmask := 1;
-      BitsetByte := Stream.ReadByte();
+      Read(BitsetByte);
       n := 0;
       while (n < 8) and (IdCurrent < NodeCount) do
       begin
         if (BitsetByte and Bitmask) <> 0 then
         begin
           //ANodes[IdCurrent].Serial := Stream.ReadByte();
-          Stream.ReadByte();
+          Read(TmpByte);
         end;
         Bitmask := Bitmask shl 1;
         Inc(IdCurrent);

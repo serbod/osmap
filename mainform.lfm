@@ -7,7 +7,7 @@ object Form1: TForm1
   ClientHeight = 483
   ClientWidth = 586
   OnCreate = FormCreate
-  LCLVersion = '2.1.0.0'
+  LCLVersion = '2.0.2.0'
   object Agg2DControl1: TAgg2DControl
     Left = 0
     Height = 423
@@ -112,7 +112,7 @@ object Form1: TForm1
   object Timer100ms: TTimer
     Interval = 100
     OnTimer = Timer100msTimer
-    Left = 301
-    Top = 188
+    left = 301
+    top = 188
   end
 end

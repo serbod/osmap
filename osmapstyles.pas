@@ -76,15 +76,31 @@ Styles:
 *)
 unit OsMapStyles;
 
-{$mode objfpc}{$H+}
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$else}
+  {$ZEROBASEDSTRINGS OFF}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, Graphics, OsMapTypes;
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl, Graphics,
+  {$else}
+  System.Generics.Collections,
+  System.UITypes,
+  FMX.Graphics,
+  {$endif}
+  OsMapTypes, OsMapUtils;
 
 type
   TMapSymbol = class;
+
+  {$ifndef FPC}
+  TColor = TAlphaColor;
+  {$endif}
 
   { TMapColor }
 
@@ -122,7 +138,7 @@ type
 
     Used by the style sheet parser. The parser uses the StyleDescriptor to get te attribute name,
     type and index. Attribute values are written back to the style instance using the index. }
-  TStyle = class
+  TStyle = class(TObject)
   public
     Name: string;
     {
@@ -139,7 +155,11 @@ type
     }
   end;
 
-  TStyleList = specialize TFPGList<TStyle>;
+  {$ifdef FPC}
+  TStyleList = specialize TFPGObjectList<TStyle>;
+  {$else}
+  TStyleList = TObjectList<TStyle>;
+  {$endif}
 
   { Enumeration of different style sheet attribute value types }
   TStyleAttributeType = (
@@ -187,7 +207,12 @@ type
     property AttributeId: Integer read FAttributeId;
   end;
 
-  TAttributeMap = specialize TFPGMap<string, TStyleAttributeDescriptor>;
+  TAttributeMap = class(TStringList)
+  public
+    procedure SetValue(const AName: string; AValue: TStyleAttributeDescriptor);
+    function GetValue(const AName: string): TStyleAttributeDescriptor;
+    property Values[const AName: string]: TStyleAttributeDescriptor read GetValue write SetValue; default;
+  end;
 
   { Holds Meta information and technical description of a style. It currently holds
     a list of parameters and their types. It also allows to assign type safe values
@@ -227,13 +252,13 @@ type
     Slot: string;
     LineColor: TMapColor;
     GapColor: TMapColor;
-    DisplayWidth: Double;
-    Width: Double;
+    DisplayWidth: Double;    // width in mm, added to Width
+    Width: Double;           // width in meters
     DisplayOffset: Double;
     Offset: Double;          // for parallel line
     JoinCap: TLineCapStyle;  // capButt, capRound, capSquare
     EndCap: TLineCapStyle;   // capButt, capRound, capSquare
-    Dash: array of Double;
+    Dash: array of Double;   // pairs of line and gap widths (in pixels?)
     Priority: Integer;
     ZIndex: Integer;
     OffsetRel: TLineOffsetRel;  // lorBase, lorLeftOutline, lorRightOutline, lorLaneDivider
@@ -244,7 +269,11 @@ type
     procedure AddDash(ALen, AGap: Double);
   end;
 
+  {$ifdef FPC}
   TLineStyleList = specialize TFPGList<TLineStyle>;
+  {$else}
+  TLineStyleList = TList<TLineStyle>;
+  {$endif}
 
   TFillStyleAttribute = (attrFillColor, attrPattern, attrPatternMinMag);
 
@@ -282,7 +311,11 @@ type
     function IsVisible(): Boolean;
   end;
 
+  {$ifdef FPC}
   TBorderStyleList = specialize TFPGList<TBorderStyle>;
+  {$else}
+  TBorderStyleList = TList<TBorderStyle>;
+  {$endif}
 
   { Abstract base class for all (point) labels. All point labels have priority
     and a alpha value. }
@@ -319,7 +352,11 @@ type
     // GetAlpha() -> TextColor.A
   end;
 
+  {$ifdef FPC}
   TTextStyleList = specialize TFPGList<TTextStyle>;
+  {$else}
+  TTextStyleList = TList<TTextStyle>;
+  {$endif}
 
   {TShieldStyleAttribute = (
       attrPriority,
@@ -421,7 +458,11 @@ type
     property BorderStyle: TBorderStyle read FBorderStyle;
   end;
 
+  {$ifdef FPC}
   TDrawPrimitiveList = specialize TFPGList<TDrawPrimitive>;
+  {$else}
+  TDrawPrimitiveList = TList<TDrawPrimitive>;
+  {$endif}
 
   { TPolygonPrimitive }
 
@@ -836,12 +877,12 @@ end;
 
 procedure TStyleDescriptor.AddAttribute(AAttribute: TStyleAttributeDescriptor);
 begin
-  FAttributeMap.AddOrSetData(AAttribute.Name, AAttribute);
+  FAttributeMap.Values[AAttribute.Name] := AAttribute;
 end;
 
 function TStyleDescriptor.GetAttribute(const AName: string): TStyleAttributeDescriptor;
 begin
-  Result := FAttributeMap.KeyData[AName];
+  Result := FAttributeMap.Values[AName];
 end;
 
 { TLineStyle }
@@ -1022,6 +1063,31 @@ begin
   inherited BeforeDestruction;
 end;
 
+
+{ TAttributeMap }
+
+function TAttributeMap.GetValue(const AName: string): TStyleAttributeDescriptor;
+var
+  n: Integer;
+begin
+  n := IndexOf(AName);
+  if n <> -1 then
+    Result := TStyleAttributeDescriptor(GetObject(n))
+  else
+    Result := nil;
+end;
+
+procedure TAttributeMap.SetValue(const AName: string;
+  AValue: TStyleAttributeDescriptor);
+var
+  n: Integer;
+begin
+  n := IndexOf(AName);
+  if n <> -1 then
+    Objects[n] := AValue
+  else
+    AddObject(AName, AValue);
+end;
 
 end.
 

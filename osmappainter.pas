@@ -29,12 +29,20 @@ MapPainter:
 *)
 unit OsMapPainter;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapTypes, OsMapStyles, OsMapGeometry,
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$else}
+  System.Generics.Collections,
+  {$endif}
+  OsMapTypes, OsMapStyles, OsMapGeometry,
   OsMapParameters, OsMapObjTypes, OsMapObjects, OsMapStyleConfig,
   OsMapObjFeatures, OsMapLabels, OsMapTransform, OsMapProjection;
 
@@ -79,7 +87,7 @@ type
     WayPriority: Integer;        // Priority of way (from style sheet)
     TransStart: Integer;         // Start of coordinates in transformation buffer
     TransEnd: Integer;           // End of coordinates in transformation buffer
-    LineWidth: Double;           // Line width
+    LineWidth: Double;           // Line width in pixels
     IsStartClosed: Boolean;      // The end of the way is closed, it does not lead to another way or area
     IsEndClosed: Boolean;        // The end of the way is closed, it does not lead to another way or area
   end;
@@ -204,7 +212,7 @@ type
    implements the general rendering algorithm. Concrete renders are
    implemented by implementing the abstract methods defined by this class
    and used as callbacks to the concrete renderer. }
-  TMapPainter = class
+  TMapPainter = class(TObject)
   private
     //FStepMethods: array [TRenderSteps] of TStepMethod;
     FErrorTolerancePixel: Double;
@@ -446,9 +454,11 @@ type
                        const ACoord: TGeoPoint;
                        var X, Y: Double);
 
+    { translate meters to pixels, result not less than AMinPixel }
     function GetProjectedWidth(const AProjection: TProjection;
-                       AMinPixel, AWidth: Double): Double;
+                       AMinPixel, AWidth: Double): Double; overload;
 
+    { translate meters to pixels }
     function GetProjectedWidth(const AProjection: TProjection;
                        AWidth: Double): Double; overload;
 
@@ -559,7 +569,7 @@ type
     procedure DrawWay(AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
                      const AParameter: TMapParameter;
-                     const AData: TWayData); virtual; virtual;
+                     const AData: TWayData); virtual;
   public
     constructor Create(const AStyleConfig: TStyleConfig);
     destructor Destroy; override;
@@ -582,7 +592,11 @@ type
     property CurrentStep: TRenderSteps read FCurStep;
   end;
 
+  {$ifdef FPC}
   TMapPainterList = specialize TFPGList<TMapPainter>;
+  {$else}
+  TMapPainterList = TList<TMapPainter>;
+  {$endif}
 
   { Batch renderer helps to render map based on multiple databases
     - map data and corresponding MapPainter }
@@ -1276,7 +1290,9 @@ begin
       begin
         BorderStyle := FBorderStyles[borderStyleIndex];
         Inc(BorderStyleIndex);
-      end;
+      end
+      else
+        BorderStyle := nil;
 
       IsFoundRing := True;
 
@@ -1646,7 +1662,7 @@ begin
 
   sLabel := GetLabelText(ShieldStyle.ShieldStyle.FeatureType, AParameter, AData.FeatureValueBuffer);
 
-  if (sLabel = '') then
+  if (sLabel = '') or (Length(AData.Nodes) < 2) then
     Exit;
 
   RegisterPointWayLabel(AProjection,
@@ -2568,12 +2584,10 @@ end;
 function TMapPainter.GetProjectedWidth(const AProjection: TProjection;
   AMinPixel, AWidth: Double): Double;
 begin
-  AWidth := AWidth / AProjection.PixelSize;
+  Result := AWidth / AProjection.PixelSize;
 
-  if (AWidth < AMinPixel) then
-    Result := AMinPixel
-  else
-    Result := AWidth;
+  if (Result < AMinPixel) then
+    Result := AMinPixel;
 end;
 
 function TMapPainter.GetProjectedWidth(const AProjection: TProjection;

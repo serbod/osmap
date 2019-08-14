@@ -1,11 +1,19 @@
-unit OsMapFormatMp;
+﻿unit OsMapFormatMp;
 
-{$mode objfpc}{$H+}
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$else}
+  {$ZEROBASEDSTRINGS OFF}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, strutils, OsMapManager, OsMapObjects, OsMapGeometry,
+  Types, Classes, SysUtils, strutils,
+  {$ifdef FPC}
+  streamex,
+  {$endif}
+  OsMapManager, OsMapObjects, OsMapGeometry,
   OsMapTypes;
 
 type
@@ -21,12 +29,12 @@ type
 
     TmpArea: TMapArea;
     TmpWay: TMapWay;
-    procedure ParseLine(const AText: string);
+    procedure ParseLine(AText: string);
     procedure ParseKeyValue(const AKey, AValue: string);
     procedure ParseAreaType(const TypeId: Integer);
     procedure ParseWayType(const TypeId: Integer);
     procedure ParseLabel(const AValue: string);
-    procedure ParseData0(const AValue: string);
+    procedure ParseData0(AValue: string);
   public
     procedure Init();
 
@@ -37,7 +45,9 @@ function ImportFromMpFile(AManager: TMapManager; AFileName: string): Boolean;
 
 implementation
 
+{$ifdef FPC}
 uses Math, LazUTF8;
+{$endif}
 
 function ImportFromMpFile(AManager: TMapManager; AFileName: string): Boolean;
 var
@@ -58,7 +68,7 @@ begin
   TmpWay := nil;
 end;
 
-procedure TMpFileImporter.ParseLine(const AText: string);
+procedure TMpFileImporter.ParseLine(AText: string);
 var
   s, sKey, sValue: string;
   n: Integer;
@@ -66,52 +76,50 @@ begin
   s := Copy(AText, 1, 1);
   if s = '[' then
   begin
-    case AText of
-      '[POI]':
+    if AText = '[POI]' then
+    begin
+      IsPoint := True;
+    end
+    else
+    if AText = '[POLYLINE]' then
+    begin
+      IsWay := True;
+    end
+    else
+    if AText = '[POLYGON]' then
+    begin
+      IsArea := True;
+      AreaCircleNo := 0;
+    end
+    else
+    if AText = '[END]' then
+    begin
+      if IsPoint then
       begin
-        IsPoint := True;
+        IsPoint := False;
       end;
 
-      '[POLYLINE]':
+      if IsWay then
       begin
-        IsWay := True;
-      end;
-
-      '[POLYGON]':
-      begin
-        IsArea := True;
-        AreaCircleNo := 0;
-      end;
-
-      '[END]':
-      begin
-        if IsPoint then
+        IsWay := False;
+        if Assigned(TmpWay) then
         begin
-          IsPoint := False;
+          FManager.MapData.WayList.Add(TmpWay);
+          TmpWay := nil;
         end;
 
-        if IsWay then
-        begin
-          IsWay := False;
-          if Assigned(TmpWay) then
-          begin
-            FManager.MapData.WayList.Add(TmpWay);
-            TmpWay := nil;
-          end;
+      end;
 
-        end;
-
-        if IsArea then
+      if IsArea then
+      begin
+        IsArea := False;
+        if Assigned(TmpArea) then
         begin
-          IsArea := False;
-          if Assigned(TmpArea) then
-          begin
-            if Length(TmpArea.Rings[0].Nodes) > 2 then
-              FManager.MapData.AreaList.Add(TmpArea)
-            else
-              TmpArea.Free();
-            TmpArea := nil;
-          end;
+          if Length(TmpArea.Rings[0].Nodes) > 2 then
+            FManager.MapData.AreaList.Add(TmpArea)
+          else
+            TmpArea.Free();
+          TmpArea := nil;
         end;
       end;
     end;
@@ -394,7 +402,7 @@ begin
   end;
 end;
 
-procedure TMpFileImporter.ParseData0(const AValue: string);
+procedure TMpFileImporter.ParseData0(AValue: string);
   function _ExtractCoord(var AOffs: Integer; out ACoord: TGeoPoint): Boolean;
   var
     iBeg, iEnd: Integer;
@@ -452,31 +460,66 @@ end;
 
 function TMpFileImporter.Import(AManager: TMapManager; AFileName: string): Boolean;
 var
-  txt: TextFile;
+  //txt: TextFile;
   ss: string;
+  ResStream: TStream;
+  sr: TStreamReader;
 begin
   Result := False;
   Assert(Assigned(AManager));
-  if not FileExists(AFileName) then
-    Exit;
+  if Pos('_', AFileName) = 1 then
+  begin
+    // from resource
+    ResStream := TResourceStream.Create(HInstance, AFileName, RT_RCDATA);
+  end
+  else
+  begin
+    //ResStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+    ResStream := TFileStream.Create(AFileName, fmOpenRead);
+  end;
+  sr := TStreamReader.Create(ResStream);
 
   Init();
   FManager := AManager;
   LineNo := 0;
-  AssignFile(txt, AFileName);
-  try
-    Reset(txt);
-    while not EOF(txt) do
-    begin
-      Inc(LineNo);
-      ReadLn(txt, ss);
-      ParseLine(ss);
-    end;
-
-    Result := True;
-  finally
-    CloseFile(txt);
+  {$ifdef FPC}
+  while not sr.Eof do
+  {$else}
+  while not sr.EndOfStream do
+  {$endif}
+  begin
+    Inc(LineNo);
+    ss := sr.ReadLine;
+    ParseLine(ss);
   end;
+  Result := True;
+  sr.Free();
+  ResStream.Free();
+
+  {end
+  else
+  begin
+    if not FileExists(AFileName) then
+      Exit;
+
+    Init();
+    FManager := AManager;
+    LineNo := 0;
+    AssignFile(txt, AFileName);
+    try
+      Reset(txt);
+      while not EOF(txt) do
+      begin
+        Inc(LineNo);
+        ReadLn(txt, ss);
+        ParseLine(ss);
+      end;
+
+      Result := True;
+    finally
+      CloseFile(txt);
+    end;
+  end;  }
 end;
 
 end.

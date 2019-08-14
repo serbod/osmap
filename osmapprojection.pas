@@ -30,7 +30,9 @@ util\Projection
 *)
 unit OsMapProjection;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -263,7 +265,7 @@ type
     function Setup(const ATile: TOsmTileId;
                    const AMagnification: TMagnification;
                    ADpi: Double;
-                   AWidth, AHeight: Integer): Boolean;
+                   AWidth, AHeight: Integer): Boolean; overload;
 
     function Setup(const ATileBox: TOsmTileIdBox;
                    const AMagnification: TMagnification;

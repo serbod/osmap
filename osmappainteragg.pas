@@ -1,6 +1,8 @@
 unit OsMapPainterAgg;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 

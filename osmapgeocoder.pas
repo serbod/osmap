@@ -24,7 +24,9 @@ Geocoder - find coordinates by postal address
 
 unit OsMapGeocoder;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -56,7 +58,19 @@ type
 
 implementation
 
+{$ifdef FPC}
 uses LazUTF8;
+{$endif}
+
+function LoCase(const AStr: string): string;
+begin
+{$ifdef FPC}
+Result := Trim(UTF8LowerCase(AStr));
+{$else}
+Result := Trim(AnsiLowerCase(AStr));
+{$endif}
+
+end;
 
 { TMapGeocoder }
 
@@ -68,15 +82,18 @@ begin
   if not Assigned(ValStorage) then Exit;
   if not Assigned(MapData) then Exit;
 
-  sName := Trim(UTF8LowerCase(AName));
+  sName := LoCase(AName);
   IdCount := 0;
   SetLength(AIdArr, AMaxCount);
   for i := 0 to ValStorage.StrList.Count-1 do
   begin
-    s := Trim(UTF8LowerCase(ValStorage.StrList[i]));
+    s := LoCase(ValStorage.StrList[i]);
 
-    //if Pos(sName, s) > 0 then
+    {$ifdef FPC}
     if UTF8Pos(sName, s) > 0 then
+    {$else}
+    if Pos(sName, s) > 0 then
+    {$endif}
     begin
       AIdArr[IdCount] := i;
       Inc(IdCount);
@@ -96,13 +113,16 @@ begin
   if not Assigned(ValStorage) then Exit;
   if not Assigned(MapData) then Exit;
 
-  sName := Trim(UTF8LowerCase(AName));
+  sName := LoCase(AName);
   for i := 0 to ValStorage.StrList.Count-1 do
   begin
-    s := Trim(UTF8LowerCase(ValStorage.StrList[i]));
+    s := LoCase(ValStorage.StrList[i]);
 
-    //if Pos(sName, s) > 0 then
+    {$ifdef FPC}
     if UTF8Pos(sName, s) > 0 then
+    {$else}
+    if Pos(sName, s) > 0 then
+    {$endif}
     begin
       Result := i;
       Exit;

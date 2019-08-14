@@ -48,7 +48,9 @@ routing\RouteData
 *)
 unit OsMapRouting;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -89,6 +91,8 @@ type
 
     procedure Init(ADatabaseId: TMapDatabaseId; AId: TId);
   end;
+
+  TMapDBIdArray = array of TMapDBId;
 
   { TMapDBFileOffset }
 
@@ -398,8 +402,9 @@ type
       ATargetNodeIndex: Integer);
 
     procedure Append(ARoutePart: TRouteData);
-
     procedure PopEntry();
+
+    function IsEmpty(): Boolean;
   end;
 
 implementation
@@ -1010,6 +1015,11 @@ begin
   n := Length(Entries);
   if n > 0 then
     SetLength(Entries, n-1);
+end;
+
+function TRouteData.IsEmpty(): Boolean;
+begin
+  Result := (Length(Entries) > 0);
 end;
 
 { TObjectVariantDataFile }

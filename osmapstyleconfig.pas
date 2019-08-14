@@ -44,18 +44,23 @@ StyleProcessor:
 *)
 unit OsMapStyleConfig;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapTypes, OsMapObjTypes, OsMapStyles, OsMapGeometry,
-  OsMapObjFeatures, OsMapProjection;
+  Classes, SysUtils, {fgl,} OsMapTypes, OsMapObjTypes, OsMapStyles, OsMapGeometry,
+  OsMapObjFeatures, OsMapProjection, OsMapUtils;
 
 type
-  TStringToIntegerMap = specialize TFPGMap<string, Integer>;
-
-  TNamedStyleMap = specialize TFPGMap<string, TStyle>;
+  //TNamedStyleMap = specialize TFPGMap<string, TStyle>;
+  TNamedStyleMap = class(TStringList)
+  public
+    function TryGetData(AName: string; out AValue: TStyle): Boolean;
+    procedure AddOrSetData(AName: string; AValue: TStyle);
+  end;
 
   { TODO : remove this crutch }
 
@@ -64,7 +69,7 @@ type
   TStyleResolveContext = class
   private
     FTypeConfig: TTypeConfig;
-    FFeatureReaderMap: TStringToIntegerMap;
+    FFeatureReaderMap: TSimpleStringHash;
     FFeatureReaders: array of TFeatureValueReader;
     FAccessReader: TFeatureValueReader;
   public
@@ -80,7 +85,7 @@ type
     function IsOneway(const ABuffer: TFeatureValueBuffer): Boolean;
   end;
 
-  TNamedFlagMap = specialize TFPGMap<string, Boolean>;
+  TNamedFlagMap = TStringList;
 
   TStyleConstant = class
   public
@@ -89,7 +94,8 @@ type
     Number: Integer;
   end;
 
-  TNamedStyleConstantMap = specialize TFPGMapObject<string, TStyleConstant>;
+  //TNamedStyleConstantMap = specialize TFPGMapObject<string, TStyleConstant>;
+  TNamedStyleConstantMap = TStringList;
 
   TFeatureFilterData = record
     FeatureFilterIndex: Integer;
@@ -110,7 +116,8 @@ type
                  AMeterInPixel, AMeterInMM: Double): Boolean;
   end;
 
-  TNamedSymbolMap = specialize TFPGMap<string, TMapSymbol>;
+  //TNamedSymbolMap = specialize TFPGMap<string, TMapSymbol>;
+  TNamedSymbolMap = TStringList;
 
   { TFillStyleProcessor }
 
@@ -119,7 +126,7 @@ type
     function Process(const ABuffer: TFeatureValueBuffer; AFillStyle: TFillStyle): TFillStyle; virtual; abstract;
   end;
 
-  TFillStyleProcessorList = specialize TFPGList<TFillStyleProcessor>;
+  //TFillStyleProcessorList = specialize TFPGList<TFillStyleProcessor>;
 
   { TStyleConfig }
   { A complete style definition
@@ -261,7 +268,7 @@ type
 
 implementation
 
-uses LazDbgLog; // eliminate "end of source not found"
+uses Math; // eliminate "end of source not found"
 
 const
   DEF_LINE_WIDTH = 1;
@@ -273,7 +280,8 @@ constructor TStyleConfig.Create(ATypeConfig: TTypeConfig);
 begin
   inherited Create();
   FFlags := TNamedFlagMap.Create();
-  FConstants := TNamedStyleConstantMap.Create(True);
+  FConstants := TNamedStyleConstantMap.Create();
+  FConstants.OwnsObjects := True;
   FSymbols := TNamedSymbolMap.Create();
   FErrors := TStringList.Create();
   FWarnings := TStringList.Create();
@@ -310,14 +318,17 @@ var
   n: Integer;
 begin
   if FFlags.Find(AName, n) then
-    Result := FFlags.Data[n]
+    Result := (FFlags.ValueFromIndex[n] <> '')
   else
     Result := False;
 end;
 
 procedure TStyleConfig.AddFlag(const AName: string; AValue: Boolean);
 begin
-  FFlags.AddOrSetData(AName, AValue);
+  if AValue then
+    FFlags.Values[AName] := '1'
+  else
+    FFlags.Values[AName] := '';
 end;
 
 function TStyleConfig.GetConstantByName(const AName: string): TStyleConstant;
@@ -325,19 +336,19 @@ var
   n: Integer;
 begin
   if FConstants.Find(AName, n) then
-    Result := FConstants.Data[n]
+    Result := (FConstants.Objects[n] as TStyleConstant)
   else
     Result := nil;
 end;
 
 procedure TStyleConfig.AddConstant(const AName: string; AValue: TStyleConstant);
 begin
-  FConstants.AddOrSetData(AName, AValue);
+  FConstants.AddObject(AName, AValue);
 end;
 
 function TStyleConfig.RegisterSymbol(ASymbol: TMapSymbol): Boolean;
 begin
-  FSymbols.AddOrSetData(ASymbol.Name, ASymbol);
+  FSymbols.AddObject(ASymbol.Name, ASymbol);
   Result := True;
 end;
 
@@ -346,7 +357,7 @@ var
   n: Integer;
 begin
   if FSymbols.Find(AName, n) then
-    Result := FSymbols.Data[n]
+    Result := (FSymbols.Objects[n] as TMapSymbol)
   else
     Result := nil;
 end;
@@ -381,15 +392,21 @@ end;
 procedure TStyleConfig.AddStyle(ATypeInfo: TTypeInfo; AStyle: TStyle; const AName: string);
 begin
   if AName <> '' then
-    FNamedStyleMap.AddOrSetData(AName, AStyle)
+    FNamedStyleMap.AddObject(AName, AStyle)
   else
-    FNamedStyleMap.AddOrSetData(AStyle.Name, AStyle);
+    FNamedStyleMap.AddObject(AStyle.Name, AStyle);
 end;
 
 function TStyleConfig.GetObjTypeStyle(ATypeInfo: TTypeInfo): TStyle;
+var
+  n: Integer;
 begin
   Assert(Assigned(ATypeInfo));
-  Result := FNamedStyleMap.KeyData[ATypeInfo.TypeName];
+  n := FNamedStyleMap.IndexOf(ATypeInfo.TypeName);
+  if n <> -1 then
+    Result := (FNamedStyleMap.Objects[n] as TStyle)
+  else
+    Result := nil;
   //case ATypeInfo.TypeName;
 end;
 
@@ -802,7 +819,7 @@ constructor TStyleResolveContext.Create(ATypeConfig: TTypeConfig);
 begin
   inherited Create();
   FTypeConfig := ATypeConfig;
-  FFeatureReaderMap := TStringToIntegerMap.Create();
+  FFeatureReaderMap.Init();
   FAccessReader.Init(ATypeConfig, ftAccess);
 end;
 
@@ -816,13 +833,13 @@ function TStyleResolveContext.GetFeatureReaderIndex(AFeature: TFeature): Integer
 var
   n: Integer;
 begin
-  if not FFeatureReaderMap.Find(AFeature.GetName(), n) then
+  if not FFeatureReaderMap.FindValue(AFeature.GetName(), n) then
   begin
     n := Length(FFeatureReaders);
     SetLength(FFeatureReaders, n+1);
     FFeatureReaders[n].Init(FTypeConfig, AFeature.FeatureType);
 
-    FFeatureReaderMap.AddOrSetData(AFeature.GetName(), n);
+    FFeatureReaderMap.Add(AFeature.GetName(), n);
   end;
   Result := n;
 end;
@@ -861,6 +878,29 @@ function TStyleCriteria.Matches(const AContext: TStyleResolveContext;
   ): Boolean;
 begin
 
+end;
+
+{ TNamedStyleMap }
+
+procedure TNamedStyleMap.AddOrSetData(AName: string; AValue: TStyle);
+var
+  n: Integer;
+begin
+  n := IndexOf(AName);
+  if n <> -1 then
+    Objects[n] := AValue
+  else
+    AddObject(AName, AValue);
+end;
+
+function TNamedStyleMap.TryGetData(AName: string; out AValue: TStyle): Boolean;
+var
+  n: Integer;
+begin
+  n := IndexOf(AName);
+  Result := (n <> -1);
+  if Result then
+    AValue := Objects[n] as TStyle;
 end;
 
 end.

@@ -41,12 +41,20 @@ MapPainter:
 *)
 unit OsMapObjects;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapObjTypes, OsMapGeometry, OsMapTypes, OsMapFiles;
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$else}
+  System.Generics.Collections,
+  {$endif}
+  OsMapObjTypes, OsMapGeometry, OsMapTypes, OsMapFiles;
 
 const
   MASTER_RING_ID = 0;
@@ -86,7 +94,11 @@ type
     procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter);
   end;
 
+  {$ifdef FPC}
   TMapNodeList = specialize TFPGList<TMapNode>;
+  {$else}
+  TMapNodeList = TList<TMapNode>;
+  {$endif}
 
   { TMapAreaRing }
 
@@ -104,7 +116,7 @@ type
     { The array of coordinates }
     Nodes: TGeoPointArray;
     { Precomputed (cache) segment bounding boxes for optimisation }
-    Segments: array of TSegmentGeoBox;
+    Segments: TSegmentGeoBoxArray;
     { Precomputed (cache) bounding box }
     BBox: TGeoBox;
 
@@ -178,7 +190,11 @@ type
 
   end;
 
+  {$ifdef FPC}
   TMapAreaList = specialize TFPGList<TMapArea>;
+  {$else}
+  TMapAreaList = TList<TMapArea>;
+  {$endif}
 
   { TMapWay }
 
@@ -196,7 +212,7 @@ type
     { The array of coordinates }
     Nodes: TGeoPointArray;
     { Precomputed (cache) segment bounding boxes for optimisation }
-    Segments: array of TSegmentGeoBox;
+    Segments: TSegmentGeoBoxArray;
 
     function GetObjectFileRef(): TObjectFileRef;
     function GetType(): TTypeInfo;
@@ -247,7 +263,11 @@ type
     procedure WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
   end;
 
+  {$ifdef FPC}
   TMapWayList = specialize TFPGList<TMapWay>;
+  {$else}
+  TMapWayList = TList<TMapWay>;
+  {$endif}
 
   { Ground tiles }
 
@@ -328,13 +348,17 @@ type
     property GroundTileList: TGroundTileList read FGroundTileList;
   end;
 
+  {$ifdef FPC}
   TMapDataList = specialize TFPGList<TMapData>;
+  {$else}
+  TMapDataList = TList<TMapData>;
+  {$endif}
 
 //function MapNode();
 
 implementation
 
-uses LazDbgLog; // eliminate "end of source not found"
+uses Math; // eliminate "end of source not found"
 
 { TMapNode }
 
@@ -566,6 +590,7 @@ var
   IsStart: Boolean;
   i, ii: Integer;
 begin
+  Result := False;
   Assert(Length(Rings) > 0);
   MinCoord.Init(0.0, 0.0);
   MaxCoord.Init(0.0, 0.0);
@@ -656,7 +681,9 @@ begin
   case ADataMode of
     ndmAuto: IsReadIds := Rings[0].GetType().CanRoute;
     ndmAll:  IsReadIds := True;
-    ndmNone: IsReadIds := False;
+  else
+    //ndmNone:
+    IsReadIds := False;
   end;
 
   AScanner.ReadMapPoints(Rings[0].Nodes, Rings[0].Segments, Rings[0].BBox, IsReadIds);
@@ -676,7 +703,9 @@ begin
     case ADataMode of
       ndmAuto: IsReadIds := (RingTypeInfo.AreaId <> ObjTypeIgnore) and RingTypeInfo.CanRoute;
       ndmAll:  IsReadIds := (RingTypeInfo.AreaId <> ObjTypeIgnore) or (pRing^.Ring = OUTER_RING_ID);
-      ndmNone: IsReadIds := False;
+    else
+      // ndmNone:
+      IsReadIds := False;
     end;
 
     AScanner.ReadMapPoints(pRing^.Nodes, pRing^.Segments, pRing^.BBox, IsReadIds);
@@ -730,7 +759,9 @@ begin
   case ADataMode of
     ndmAuto: IsUseIds := Rings[0].GetType().CanRoute;
     ndmAll:  IsUseIds := True;
-    ndmNone: IsUseIds := False;
+  else
+    // ndmNone:
+    IsUseIds := False;
   end;
 
   AWriter.WriteMapPoints(pRing^.Nodes, IsUseIds);
@@ -743,7 +774,9 @@ begin
     case ADataMode of
       ndmAuto: IsUseIds := (RingTypeInfo.AreaId <> ObjTypeIgnore) and RingTypeInfo.CanRoute;
       ndmAll:  IsUseIds := (RingTypeInfo.AreaId <> ObjTypeIgnore) or (pRing^.Ring = OUTER_RING_ID);
-      ndmNone: IsUseIds := False;
+    else
+      // ndmNone:
+      IsUseIds := False;
     end;
 
     AWriter.WriteTypeId(RingTypeInfo.AreaId,
@@ -916,7 +949,9 @@ begin
   case ADataMode of
     ndmAuto: IsUseIds := (TypeInfo.CanRoute or TypeInfo.OptimizeLowZoom);
     ndmAll:  IsUseIds := True;
-    ndmNone: IsUseIds := False;
+  else
+    // ndmNone:
+    IsUseIds := False;
   end;
 
   AScanner.ReadMapPoints(Nodes, Segments, FBBox, IsUseIds);
@@ -944,7 +979,9 @@ begin
   case ADataMode of
     ndmAuto: IsUseIds := (FeatureValueBuffer.TypeInfo.CanRoute or FeatureValueBuffer.TypeInfo.OptimizeLowZoom);
     ndmAll:  IsUseIds := True;
-    ndmNone: IsUseIds := False;
+  else
+    // ndmNone:
+    IsUseIds := False;
   end;
 
   AWriter.WriteMapPoints(Nodes, IsUseIds);
@@ -1004,7 +1041,6 @@ begin
   FPoiAreaList.Clear();
   FPoiWayList.Clear();
 end;
-
 
 end.
 

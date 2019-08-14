@@ -21,26 +21,35 @@
 *)
 unit OsMapManager;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils,
+  Types, Classes, SysUtils, SyncObjs,
   OsMapPainter, OsMapProjection, OsMapStyleConfig, OsMapTypes, OsMapObjTypes,
   OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder, IniFiles;
 
 type
   TMapManager = class;
+  {$ifdef FPC}
+  TMapEvent = TSimpleEvent;
+  {$else}
+  TMapEvent = TEvent;
+  {$endif}
 
   { TMapRenderThread }
 
   TMapRenderThread = class(TThread)
   protected
+    FEvent: TMapEvent;
     procedure Execute; override;
   public
     // assigned
     MapManager: TMapManager;
+    procedure Run();
   end;
 
   { TMapManager }
@@ -49,15 +58,16 @@ type
   private
     // created
     FMapData: TMapData;
-    FMapProjection: TMercatorProjection;
     FMapParameter: TMapParameter;
     FMapTypeConfig: TTypeConfig;
     FMapStyleConfig: TStyleConfig;
     FMapRenderThread: TMapRenderThread;
     FMapGeocoder: TMapGeocoder;
     // assigned
+    FMapProjection: TMercatorProjection;
     FMapPainter: TMapPainter;
   public
+    Busy: Boolean;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
@@ -66,13 +76,14 @@ type
 
     procedure Render();
 
+    // shared
     property MapData: TMapData read FMapData;
-    property MapProjection: TMercatorProjection read FMapProjection;
     property MapParameter: TMapParameter read FMapParameter;
     property MapTypeConfig: TTypeConfig read FMapTypeConfig;
     property MapStyleConfig: TStyleConfig read FMapStyleConfig;
     property MapGeocoder: TMapGeocoder read FMapGeocoder;
 
+    property MapProjection: TMercatorProjection read FMapProjection write FMapProjection;
     property MapPainter: TMapPainter read FMapPainter write FMapPainter;
   end;
 
@@ -85,7 +96,7 @@ uses OsMapUtils;
 procedure TMapManager.AfterConstruction;
 begin
   inherited AfterConstruction;
-  FMapProjection := TMercatorProjection.Create();
+  FormatSettings.DecimalSeparator := '.';
   FMapParameter := TMapParameter.Create();
   FMapTypeConfig := TTypeConfig.Create();
   FMapStyleConfig := TStyleConfig.Create(FMapTypeConfig);
@@ -108,7 +119,6 @@ begin
   FreeAndNil(FMapStyleConfig);
   FreeAndNil(FMapTypeConfig);
   FreeAndNil(FMapParameter);
-  FreeAndNil(FMapProjection);
   inherited BeforeDestruction;
 end;
 
@@ -426,11 +436,23 @@ var
   TmpType: TTypeInfo;
   TmpStyle: TStyle;
   TmpFeature: TFeature;
+  ResStream: TResourceStream;
 begin
-  if not FileExists(AFileName) then
-    Exit;
+  ResStream := nil;
+  if Pos('_', AFileName) = 1 then
+  begin
+    // from resource
+    ResStream := TResourceStream.Create(HInstance, AFileName, RT_RCDATA);
+    ini := TMemIniFile.Create(ResStream);
+  end
+  else
+  begin
+    if not FileExists(AFileName) then
+      Exit;
+    ini := TMemIniFile.Create(AFileName);
+  end;
+
   slSections := TStringList.Create();
-  ini := TMemIniFile.Create(AFileName);
   try
     ini.ReadSections(slSections);
     for i := 0 to slSections.Count-1 do
@@ -531,29 +553,50 @@ begin
   finally
     ini.Free();
     slSections.Free();
+    if Assigned(ResStream) then
+      ResStream.Free();
   end;
 end;
 
 procedure TMapManager.Render();
 begin
-  if FMapRenderThread.Suspended then
+  {if FMapRenderThread.Suspended then
   begin
     FMapRenderThread.MapManager := Self;
     FMapRenderThread.Suspended := False;
   end;
+  FMapRenderThread.Run();}
+
+  if Assigned(MapProjection) and Assigned(MapPainter) then
+  begin
+    MapPainter.DrawMap(MapProjection, MapParameter, MapData);
+  end
 end;
 
 { TMapRenderThread }
 
 procedure TMapRenderThread.Execute;
 begin
-  while not Terminated do
-  begin
-    MapManager.MapPainter.DrawMap(MapManager.MapProjection,
-      MapManager.MapParameter, MapManager.MapData);
+  FEvent := TMapEvent.Create();
+  FEvent.ResetEvent();
 
-    Suspended := True;
+  while (not Terminated) do
+  begin
+    if FEvent.WaitFor(10) = wrSignaled then
+    begin
+      MapManager.MapPainter.DrawMap(MapManager.MapProjection,
+        MapManager.MapParameter, MapManager.MapData);
+    //Suspended := True;
+      FEvent.ResetEvent();
+    end;
   end;
+  FreeAndNil(FEvent);
+end;
+
+procedure TMapRenderThread.Run;
+begin
+  if Assigned(FEvent) then
+    FEvent.SetEvent();
 end;
 
 end.

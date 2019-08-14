@@ -33,7 +33,9 @@ util\Transformation
 *)
 unit OsMapTransform;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -254,7 +256,7 @@ implementation
 uses Math;
 
 const
-  SQRT2 = sqrt(2);
+  SQRT2 = 1.41421356237; // sqrt(2);
 
 function fabs(a: Double): Double; inline;
 begin
@@ -1441,11 +1443,13 @@ end;
 procedure TPolyCell.Init(AX, AY: Double; AHalfSize: Double;
   const APoly: TVertex2DArray);
 var
-  IsInside: Boolean = False;
-  minDistSq: Double = Infinity;
+  IsInside: Boolean;
+  minDistSq: Double;
   i, j, len: Integer;
   A, B: TVertex2D;
 begin
+  IsInside := False;
+  minDistSq := Infinity;
   CellCenter.SetValue(AX, AY);
   HalfSize := AHalfSize;
 

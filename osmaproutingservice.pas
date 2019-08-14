@@ -26,17 +26,33 @@
 (*
   OsMap routing service
 routing\RoutingService
-routing\AbstractRoutingService ...
+  RoutePosition
+  RouterParameter
+  RoutingProgress -> TRoutingProgressEvent
+  RoutingParameter
+  RoutingService
+    RNode
+    RNodeCostCompare -> CompareRNodes()
+    VNode
+    ClosedNodeHasher
+routing\AbstractRoutingService
+  RoutingResult
+  RoutePoints
+  RoutePointsResult
+  RouteDescriptionResult
+  RouteWayResult
 *)
 unit OsMapRoutingService;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
   Classes, SysUtils, OsMapTypes, OsMapGeometry, OsMapUtils, OsMapObjTypes,
-  OsMapRouting;
+  OsMapObjects, OsMapRouting;
 
 const
   { Relative filename of the intersection data file }
@@ -48,20 +64,27 @@ const
 
 type
   { Start or end position of a route calculation }
+
+  { TRoutePosition }
+
   TRoutePosition = object
     Obj: TObjectFileRef;
     NodeIndex: Integer;
     DatabaseId: TMapDatabaseId;
 
     procedure Init(const AObj: TObjectFileRef; ANodeIndex: Integer; ADatabaseId: TMapDatabaseId);
+    function IsValid(): Boolean; // Obj.IsValid
   end;
 
   { Database instance initialization parameter to influence the behavior of the database
     instance.
     The following groups attributes are currently available:
     - Switch for showing debug information }
+
+  { TRouterParameter }
+
   TRouterParameter = object
-    DebugPerformance: Boolean;
+    IsDebugPerformance: Boolean;
     procedure Init();
   end;
 
@@ -112,13 +135,94 @@ type
     Items: array of TVNode;
   end;
 
+  { Helper class for calculating hash codes for
+    VNode instances to make it usable in std::unordered_set. }
+  TClosedNodeHasher = object
+    OpenList: TRNodeList;
+    ClosedSet: TVNodeList;
+  end;
+
   { Abstract algorithms for routing }
+
+  { TRoutingService }
+
   TRoutingService = class
-  private
-    FOpenList: TRNodeList;
-    FClosedSet: TVNodeList;
   public
-    property OpenList: TRNodeList read FOpenList;
+    function GetDataFilename(const AFilenameBase: string): string;
+    function GetData2Filename(const AFilenameBase: string): string;
+    function GetIndexFilename(const AFilenameBase: string): string;
+
+    //procedure AfterConstruction; override;
+    //procedure BeforeDestruction; override;
+  end;
+
+  { Result of a routing calculation. This object is always returned.
+    In case of an routing error it however may not contain a valid route
+    (route is empty).
+    TODO: Adapt it to the same style as RoutePointsResult and Co. }
+
+  { TRoutingResult }
+
+  TRoutingResult = object
+    Route: TRouteData;
+    CurrentMaxDistance: TDistance;
+    OverallDistance: TDistance;
+
+    function Success(): Boolean;
+  end;
+
+  TRoutePoints = object
+    Points: TGeoPointArray;
+  end;
+
+  TRoutePointsResult = record
+    IsSuccess: Boolean;
+    Points: TGeoPointArray;
+  end;
+
+  TRouteDescriptionResult = record
+    IsSuccess: Boolean;
+    Description: TRouteDescription;
+  end;
+
+  TRouteWayResult = record
+    IsSuccess: Boolean;
+    Way: TMapWay;
+  end;
+
+  TRouteNodeMap = class(TStringList)
+    procedure SetValue(const AKey: TMapDBId; const AValue: TRouteNode);
+    function FindValue(const AKey: TMapDBId; out AValue: TRouteNode): Boolean;
+  end;
+
+  TRoutingState = class;
+
+  TAbstractRoutingService = class(TRoutingService)
+  protected
+    FIsDebugPerformance: Boolean;
+
+    function GetVehicle(AState: TRoutingState): TVehicleType; virtual;
+
+    function CanUse(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
+    function CanUseForward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
+    function CanUseBackward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
+
+    function GetCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
+      const ARouteNode: TRouteNode; APathIndex: Integer): Double; virtual; overload;
+    function GetCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
+      AWay: TMapWay; AWayLength: TDistance): Double; virtual; overload;
+
+    function GetEstimateCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
+      ATargetDistance: TDistance): Double; virtual;
+    function GetCostLimit(AState: TRoutingState; ADatabase: TMapDatabaseID;
+      ATargetDistance: TDistance): Double; virtual;
+
+    function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMap): Boolean;
+    { Return the route node for the given database offset }
+    function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean;
+
+    function GetWayByOffset(const AOffset: TMapDBFileOffset; AWay: TMapWay): Boolean;
+    fdggfh
   end;
 
   function RNode(const AId: TMapDBId;
@@ -154,6 +258,52 @@ begin
     Result := -1
   else
     Result := 0;
+end;
+
+{ TRoutePosition }
+
+procedure TRoutePosition.Init(const AObj: TObjectFileRef; ANodeIndex: Integer;
+  ADatabaseId: TMapDatabaseId);
+begin
+  Obj.Assign(AObj);
+  NodeIndex := ANodeIndex;
+  DatabaseId := ADatabaseId;
+end;
+
+function TRoutePosition.IsValid(): Boolean;
+begin
+  Result := Obj.IsValid();
+end;
+
+{ TRouterParameter }
+
+procedure TRouterParameter.Init();
+begin
+  IsDebugPerformance := False;
+end;
+
+{ TRoutingService }
+
+function TRoutingService.GetDataFilename(const AFilenameBase: string): string;
+begin
+  Result := AFilenameBase + '.dat';
+end;
+
+function TRoutingService.GetData2Filename(const AFilenameBase: string): string;
+begin
+  Result := AFilenameBase + '2.dat';
+end;
+
+function TRoutingService.GetIndexFilename(const AFilenameBase: string): string;
+begin
+  Result := AFilenameBase + '.idx';
+end;
+
+{ TRoutingResult }
+
+function TRoutingResult.Success(): Boolean;
+begin
+  Result := (not Route.IsEmpty());
 end;
 
 end.

@@ -40,7 +40,9 @@ FeatureReader:
 *)
 unit OsMapObjFeatures;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -194,14 +196,14 @@ type
 
   TAccessFeature = class(TFeature)
   public
-    class function CanRoute(AValue: Byte): Boolean;
+    class function CanRoute(AValue: Byte): Boolean; overload;
     class function CanRoute(AValue: Byte; AVehicle: TVehicleType): Boolean; overload;
     class function CanRoute(AValue: Byte; AVehicles: TVehicleTypes): Boolean; overload;
 
-    class function CanRouteForward(AValue: Byte): Boolean;
+    class function CanRouteForward(AValue: Byte): Boolean; overload;
     class function CanRouteForward(AValue: Byte; AVehicle: TVehicleType): Boolean; overload;
 
-    class function CanRouteBackward(AValue: Byte): Boolean;
+    class function CanRouteBackward(AValue: Byte): Boolean; overload;
     class function CanRouteBackward(AValue: Byte; AVehicle: TVehicleType): Boolean; overload;
 
     class function IsOneway(AValue: Byte): Boolean;
@@ -222,7 +224,7 @@ type
 
   TAccessRestrictedFeature = class(TFeature)
   public
-    class function CanAccess(AValue: Byte): Boolean;
+    class function CanAccess(AValue: Byte): Boolean; overload;
     class function CanAccess(AValue: Byte; AVehicle: TVehicleType): Boolean; overload;
     class function CanAccess(AValue: Byte; AVehicles: TVehicleTypes): Boolean; overload;
   end;
@@ -661,7 +663,7 @@ var
   i: Integer;
   MaxPrio, TagPrio: LongWord;
   IsTag: Boolean;
-  Value: TFeatureValue;
+  //Value: TFeatureValue;
 begin
   MaxPrio := 0;
   s := '';
@@ -673,12 +675,14 @@ begin
       for i := 0 to ATagMap.Count-1 do
       begin
         case AFeature.FeatureType of
-          ftName:    IsTag := ATagRegistry.IsNameTag(ATagMap.Keys[i], TagPrio);
-          ftNameAlt: IsTag := ATagRegistry.IsNameAltTag(ATagMap.Keys[i], TagPrio);
+          ftName:    IsTag := ATagRegistry.IsNameTag(ATagMap.GetKeyByIndex(i), TagPrio);
+          ftNameAlt: IsTag := ATagRegistry.IsNameAltTag(ATagMap.GetKeyByIndex(i), TagPrio);
+        else
+          IsTag := False;
         end;
         if IsTag and ((s = '') or (TagPrio > MaxPrio)) then
         begin
-          s := ATagMap.Data[i];
+          s := ATagMap.ValueFromIndex[i];
           MaxPrio := TagPrio;
         end;
       end;

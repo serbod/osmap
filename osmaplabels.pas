@@ -41,19 +41,30 @@ LabelLayouter:
 *)
 unit OsMapLabels;
 
-{$mode objfpc}{$H+}
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$else}
+  {$ZEROBASEDSTRINGS OFF}
+{$endif}
 
 {$define DEBUG_LABEL_TEXT}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapTypes, OsMapGeometry, OsMapStyles,
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$else}
+  System.Generics.Collections,
+  {$endif}
+  OsMapTypes, OsMapGeometry, OsMapStyles,
   OsMapParameters, OsMapProjection;
 
 
 type
-  TQWordArray = array of QWord;
+  TQWordArray = array of UInt64;
+  PQWordArray = ^TQWordArray;
 
   { TSegment }
 
@@ -218,7 +229,7 @@ type
     IsVisible: Boolean;
 
     procedure Init();
-    procedure Assign(AOther: TTextLabelElement);
+    procedure Assign(const AOther: TTextLabelElement);
   end;
 
   { TTextLabelElementList }
@@ -235,7 +246,7 @@ type
 
   { TTextLabel }
   { multi-line text label }
-  TTextLabel = class
+  TTextLabel = class(TObject)
   private
     FElements: TTextLabelElementList;
   public
@@ -246,9 +257,13 @@ type
     property Elements: TTextLabelElementList read FElements;
   end;
 
+  {$ifdef FPC}
   TTextLabelList = specialize TFPGObjectList<TTextLabel>;
+  {$else}
+  TTextLabelList = TObjectList<TTextLabel>;
+  {$endif}
 
-  TContourLabel = class
+  TContourLabel = class(TObject)
   public
     {$ifdef DEBUG_LABEL_TEXT}
     Text: string;
@@ -258,7 +273,11 @@ type
     Style: TPathTextStyle;
   end;
 
+  {$ifdef FPC}
   TContourLabelList = specialize TFPGObjectList<TContourLabel>;
+  {$else}
+  TContourLabelList = TObjectList<TContourLabel>;
+  {$endif}
 
   { TMapMask }
 
@@ -268,7 +287,7 @@ type
     CellTo: Integer;
     RowFrom: Integer;
     RowTo: Integer;
-    D: array of QWord;
+    D: array of UInt64;
 
     procedure Init(ARowSize: Integer);
     procedure Assign(const AOther: TMapMask);
@@ -374,7 +393,9 @@ begin
       Result := 1
     else
     if A.Elements.Items[0].X = B.Elements.Items[0].X then
-      Result := 0;
+      Result := 0
+    else
+      Result := -1;
   end
   else if (A.Priority < B.Priority) then
     Result := 1
@@ -392,7 +413,9 @@ begin
       Result := 1
     else
     if A.Glyphs[0].TrPosition.X = B.Glyphs[0].TrPosition.X then
-      Result := 0;
+      Result := 0
+    else
+      Result := -1;
   end
   else if (A.Priority < B.Priority) then
     Result := 1
@@ -649,7 +672,7 @@ procedure TMapMask.Prepare(const ARect: TIntRectangle);
 var
   c, iTo: Integer;
   CellFromBit, CellToBit: Word;
-  BitMask: QWord;
+  BitMask: UInt64;
 begin
   // clear
   for c := max(Low(D), CellFrom) to min(High(D), CellTo) do
@@ -797,14 +820,14 @@ var
   currentContourLabel: TContourLabel;
   //m: TMapMask;
   masks: array of TMapMask;
-  canvases: array of ^TQWordArray;
+  canvases: array of PQWordArray;
   eli, glyphCnt, gi: Integer;
   visibleElementsCount: Integer;
   element: TTextLabelElement;
   pRow: ^TMapMask;
   padding: Double;
   rectangle: TIntRectangle;
-  pCanvas: ^TQWordArray;
+  pCanvas: PQWordArray;
   IsCollision: Boolean;
   pGlyph: ^TMapGlyph;
 begin
@@ -815,8 +838,11 @@ begin
   overlayLabelPadding := AProjection.ConvertWidthToPixel(AParameter.OverlayLabelPadding);
 
   // sort labels by priority and position (to be deterministic)
+  {$ifdef FPC}
   FTextLabelList.Sort(@LabelInstanceSorter);
   FContourLabelList.Sort(@ContourLabelSorter);
+  {$else}
+  {$endif}
 
   // compute collisions, hide some labels
   rowSize := Trunc((FLayoutViewport.Width / 64)+1);
@@ -1336,7 +1362,7 @@ begin
   IsVisible := True;
 end;
 
-procedure TTextLabelElement.Assign(AOther: TTextLabelElement);
+procedure TTextLabelElement.Assign(const AOther: TTextLabelElement);
 begin
   LabelData := AOther.LabelData;
   MapLabel := AOther.MapLabel;

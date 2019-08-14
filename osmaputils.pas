@@ -29,7 +29,11 @@ Breaker:
 *)
 unit OsMapUtils;
 
-{$mode objfpc}{$H+}
+{$ifdef FPC}
+  {$mode objfpc}{$H+}
+{$else}
+  {$ZEROBASEDSTRINGS OFF}
+{$endif}
 
 interface
 
@@ -73,7 +77,7 @@ type
     Buckets: array of PHashItem;
   protected
     function Find(const Key: string): PHashItem;
-    function HashOf(const Key: string): Cardinal; virtual;
+    function HashOf(const Key: string): Cardinal;
   public
     procedure Init(Size: Cardinal = 256);
     procedure Add(const Key: string; Value: Integer);
@@ -109,7 +113,7 @@ function EncodeNumberSigned(ANum: Int64; var ABuffer): Integer;
   The current implementation requires the buffer to have at least space
   for sizeof(N)*8/7 bytes:
   This are 5 bytes for a 32bit value and 10 bytes for a 64bit value. }
-function EncodeNumberUnsigned(ANum: QWord; var ABuffer): Integer;
+function EncodeNumberUnsigned(ANum: UInt64; var ABuffer): Integer;
 
 { Encode a number into the given buffer using some variable length encoding.
   The methods returns the number of bytes written.
@@ -119,8 +123,8 @@ function EncodeNumberUnsigned(ANum: QWord; var ABuffer): Integer;
   and sizeof(N)*8/7 + 1/8 bytes for a signed number
 
   This are 5 bytes for a 32bit value and 10 bytes for a64bit value. }
-function EncodeNumber(ANum: Int64; var ABuffer): Integer;
-function EncodeNumber(ANum: QWord; var ABuffer): Integer; overload;
+function EncodeNumber(ANum: Int64; var ABuffer): Integer; overload;
+function EncodeNumber(ANum: UInt64; var ABuffer): Integer; overload;
 
 { Decode a signed variable length encoded number from the buffer back to
   the variable.
@@ -130,13 +134,13 @@ function DecodeNumberSigned(const ABuffer; var ANum: Int64): Integer;
 { Decode a unsigned variable length encoded number from the buffer back to
   the variable.
   The methods returns the number of bytes read. }
-function DecodeNumberUnsigned(const ABuffer; var ANum: QWord): Integer;
+function DecodeNumberUnsigned(const ABuffer; var ANum: UInt64): Integer;
 
 { Decode a variable length encoded number from the buffer back to
   the variable.
   The methods returns the number of bytes read. }
-function DecodeNumber(const ABuffer; var ANum: Int64): Integer;
-function DecodeNumber(const ABuffer; var ANum: QWord): Integer; overload;
+function DecodeNumber(const ABuffer; var ANum: Int64): Integer; overload;
+function DecodeNumber(const ABuffer; var ANum: UInt64): Integer; overload;
 
 { Returns the number of bytes needed to encode the number. The function calculates
   the number of bytes that contain information, dropping leading bytes that only
@@ -154,7 +158,7 @@ function BitsNeededToEncodeNumber(ANum: Int64): Byte;
   This can be used to convert two dimensional coordinates into
   one number, where coordinates close in 2D are close in the
   one dimensional projection, too. }
-function InterleaveNumbers(A, B: LongWord): QWord;
+function InterleaveNumbers(A, B: LongWord): UInt64;
 
 { Returns the number of bytes needed to encode the given number of bits. }
 function BitsToBytes(ABits: Integer): Integer;
@@ -172,7 +176,7 @@ procedure AppendToArray(var AArray; const AValue);
 
 implementation
 
-uses LazDbgLog; // eliminate "end of source not found"
+uses Math; // eliminate "end of source not found"
 
 function EncodeNumberSigned(ANum: Int64; var ABuffer): Integer;
 var
@@ -199,7 +203,7 @@ begin
   end;
 end;
 
-function EncodeNumberUnsigned(ANum: QWord; var ABuffer): Integer;
+function EncodeNumberUnsigned(ANum: UInt64; var ABuffer): Integer;
 var
   pBuf: PByte;
 begin
@@ -223,7 +227,7 @@ begin
   Result := EncodeNumberUnsigned(ANum, ABuffer);
 end;
 
-function EncodeNumber(ANum: QWord; var ABuffer): Integer;
+function EncodeNumber(ANum: UInt64; var ABuffer): Integer;
 begin
   Result := EncodeNumberSigned(ANum, ABuffer);
 end;
@@ -258,7 +262,7 @@ begin
   ANum := ANum or (Val shl Shift);
 end;
 
-function DecodeNumberUnsigned(const ABuffer; var ANum: QWord): Integer;
+function DecodeNumberUnsigned(const ABuffer; var ANum: UInt64): Integer;
 var
   pBuf: PByte;
   Shift: Integer;
@@ -270,7 +274,7 @@ begin
 
   while True do
   begin
-    ANum := ANum or (QWord(pBuf^ and $7F) shl Shift);
+    ANum := ANum or (UInt64(pBuf^ and $7F) shl Shift);
     if (pBuf^ or $80) = 0 then
       Break;
     Inc(pBuf);
@@ -284,7 +288,7 @@ begin
   Result := DecodeNumberSigned(ABuffer, ANum);
 end;
 
-function DecodeNumber(const ABuffer; var ANum: QWord): Integer;
+function DecodeNumber(const ABuffer; var ANum: UInt64): Integer;
 begin
   Result := DecodeNumberUnsigned(ABuffer, ANum);
 end;
@@ -315,7 +319,7 @@ begin
     Result := 1;
 end;
 
-function InterleaveNumbers(A, B: LongWord): QWord;
+function InterleaveNumbers(A, B: LongWord): UInt64;
 var
   i, nBit: Integer;
 begin
@@ -416,7 +420,7 @@ end;
 
 function TSimpleStringHash.Find(const Key: string): PHashItem;
 var
-  Hash: Integer;
+  Hash: Cardinal;
 begin
   Hash := HashOf(Key) mod Cardinal(Length(Buckets));
   Result := Buckets[Hash];
@@ -447,7 +451,7 @@ end;
 
 procedure TSimpleStringHash.Add(const Key: string; Value: Integer);
 var
-  Hash: Integer;
+  Hash: Cardinal;
   Bucket: PHashItem;
 begin
   Hash := HashOf(Key) mod Cardinal(Length(Buckets));

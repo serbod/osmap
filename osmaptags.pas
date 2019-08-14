@@ -29,12 +29,20 @@ util\TagErrorReporter
 *)
 unit OsMapTags;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
 uses
-  Classes, SysUtils, fgl, OsMapTypes;
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$else}
+  System.Generics.Collections,
+  {$endif}
+  OsMapTypes, OsMapUtils;
 
 const
   { Magic constant for an unresolved and to be ignored tag }
@@ -48,7 +56,15 @@ type
 
   TTagId = Word;
 
-  TTagMap = specialize TFPGMap<TTagId, string>;
+  //TTagMap = specialize TFPGMap<TTagId, string>;
+  TTagMap = class(TStringList)
+  public
+    function GetKeyByIndex(AIndex: Integer): TTagId;
+    procedure SetValue(ATagId: TTagId; AValue: string);
+    function GetValue(ATagId: TTagId): string;
+    function FindValue(ATagId: TTagId; out AIndex: Integer): Boolean;
+    property Values[ATagId: TTagId]: string read GetValue write SetValue; default;
+  end;
 
   { Enumeration of possible binary operators as used by the various parsers }
   TBinaryOperator = (
@@ -61,21 +77,23 @@ type
   );
 
   { Abstract base class for all tag based conditions }
-  TTagCondition = class
+  TTagCondition = class(TObject)
   public
     function Evaluate(ATagMap: TTagMap): Boolean; virtual; abstract;
   end;
 
-  { Reference counted reference to a tag condition }
-  TTagConditionRef = TTagCondition;
-  TTagConditionList = specialize TFPGList<TTagConditionRef>;
+  {$ifdef FPC}
+  TTagConditionList = specialize TFPGObjectList<TTagCondition>;
+  {$else}
+  TTagConditionList = TObjectList<TTagCondition>;
+  {$endif}
 
   { Negates the result of the given child condition }
   TTagNotCondition = class(TTagCondition)
   private
-    FCondition: TTagConditionRef;
+    FCondition: TTagCondition;
   public
-    constructor Create(ACondition: TTagConditionRef);
+    constructor Create(ACondition: TTagCondition);
     function Evaluate(ATagMap: TTagMap): Boolean; override;
   end;
 
@@ -90,7 +108,7 @@ type
   public
     constructor Create(ATagBoolType: TTagBoolType);
     destructor Destroy(); override;
-    procedure AddCondition(ACondition: TTagConditionRef);
+    procedure AddCondition(ACondition: TTagCondition);
     function Evaluate(ATagMap: TTagMap): Boolean; override;
   end;
 
@@ -120,11 +138,11 @@ type
   public
     constructor Create(ATagId: TTagId;
                        ABinaryOperator: TBinaryOperator;
-                       ATagValue: string);
+                       ATagValue: string); overload;
 
     constructor Create(ATagId: TTagId;
                        ABinaryOperator: TBinaryOperator;
-                       ATagValue: Integer);
+                       ATagValue: Integer); overload;
 
     function Evaluate(ATagMap: TTagMap): Boolean; override;
   end;
@@ -151,11 +169,23 @@ type
     Name: string;
   end;
 
-  TStringToTagMap = specialize TFPGMap<string, TTagId>;
-  TNameTagIdToPrioMap = specialize TFPGMap<TTagId, LongWord>;
-  TNameToMaxSpeedMap = specialize TFPGMap<string, Byte>;
-  TSurfaceToGradeMap = specialize TFPGMap<string, Integer>;
+  //TStringToTagMap = specialize TFPGMap<string, TTagId>;
+  //TNameTagIdToPrioMap = specialize TFPGMap<TTagId, LongWord>;
+  //TNameToMaxSpeedMap = specialize TFPGMap<string, Byte>;
+  //TSurfaceToGradeMap = specialize TFPGMap<string, Integer>;
   //TTagInfoList = specialize TFPGList<TTagInfo>;
+
+  TSurfaceToGradeMap = class(TStringList)
+  public
+    procedure SetValue(const AName: string; AValue: Integer);
+    function GetValue(const AName: string): Integer;
+  end;
+
+  TNameTagIdToPrioMap = class(TStringList)
+  public
+    procedure SetValue(ATagId: TTagId; AValue: LongWord);
+    function GetValue(ATagId: TTagId): LongWord;
+  end;
 
   { TTagRegistry }
 
@@ -164,10 +194,10 @@ type
     FTags: array of TTagInfo;
     FNextTagId: TTagId;
 
-    FStringToTagMap: TStringToTagMap;            //
+    FStringToTagMap: TSimpleStringHash;          //
     FNameTagIdToPrioMap: TNameTagIdToPrioMap;    //
     FNameAltTagIdToPrioMap: TNameTagIdToPrioMap; //
-    FNameToMaxSpeedMap: TNameToMaxSpeedMap;      // mappings for max speed alias and value
+    FNameToMaxSpeedMap: TSimpleStringHash;       // mappings for max speed alias and value
     FSurfaceToGradeMap: TSurfaceToGradeMap;      // mappings for surfaces and surface grades
   public
     constructor Create();
@@ -210,7 +240,7 @@ type
 
 implementation
 
-uses LazDbgLog; // eliminate "end of source not found"
+uses Math; // eliminate "end of source not found"
 
 function TagInfo(ATagId: TTagId; AName: string): TTagInfo;
 begin
@@ -233,10 +263,10 @@ begin
   //LogDebug('TTagRegistry.Create()');
 
   //FTags := TTagInfoList.Create();
-  FStringToTagMap := TStringToTagMap.Create();
+  FStringToTagMap.Init();
   FNameTagIdToPrioMap := TNameTagIdToPrioMap.Create();
   FNameAltTagIdToPrioMap := TNameTagIdToPrioMap.Create();
-  FNameToMaxSpeedMap := TNameToMaxSpeedMap.Create();
+  FNameToMaxSpeedMap.Init();
   FSurfaceToGradeMap := TSurfaceToGradeMap.Create();
 
   FNextTagId := 0;
@@ -257,10 +287,10 @@ destructor TTagRegistry.Destroy();
 begin
   //LogDebug('TTagRegistry.Destroy()');
   FreeAndNil(FSurfaceToGradeMap);
-  FreeAndNil(FNameToMaxSpeedMap);
+  FNameToMaxSpeedMap.Clear();
   FreeAndNil(FNameAltTagIdToPrioMap);
   FreeAndNil(FNameTagIdToPrioMap);
-  FreeAndNil(FStringToTagMap);
+  FStringToTagMap.Clear();
   //FreeAndNil(FTags);
   inherited Destroy;
 end;
@@ -270,9 +300,9 @@ var
   n: Integer;
   TmpTagInfo: TTagInfo;
 begin
-  FStringToTagMap.Sorted := True;
-  if FStringToTagMap.Find(ATagName, n) then
-    Result := FStringToTagMap.Data[n]
+  //FStringToTagMap.Sorted := True;
+  if FStringToTagMap.FindValue(ATagName, n) then
+    Result := FTags[n].TagId
   else
   begin
     TmpTagInfo.TagId := FNextTagId;
@@ -283,7 +313,7 @@ begin
     SetLength(FTags, n + 1);
     FTags[n] := TmpTagInfo;
 
-    FStringToTagMap.AddOrSetData(TmpTagInfo.Name, TmpTagInfo.TagId);
+    FStringToTagMap.Add(TmpTagInfo.Name, TmpTagInfo.TagId);
     Result := TmpTagInfo.TagId;
   end;
 end;
@@ -291,22 +321,21 @@ end;
 function TTagRegistry.RegisterNameTag(ATagName: string; APriority: LongWord): TTagId;
 begin
   Result := RegisterTag(ATagName);
-  FNameTagIdToPrioMap.AddOrSetData(Result, APriority);
+  FNameTagIdToPrioMap.SetValue(Result, APriority);
 end;
 
 function TTagRegistry.RegisterNameAltTag(ATagName: string; APriority: LongWord): TTagId;
 begin
   Result := RegisterTag(ATagName);
-  FNameAltTagIdToPrioMap.AddOrSetData(Result, APriority);
+  FNameAltTagIdToPrioMap.SetValue(Result, APriority);
 end;
 
 function TTagRegistry.GetTagId(AName: string): TTagId;
 var
   n: Integer;
 begin
-  FStringToTagMap.Sorted := True;
-  if FStringToTagMap.Find(AName, n) then
-    Result := FStringToTagMap.Data[n]
+  if FStringToTagMap.FindValue(AName, n) then
+    Result := FTags[n].TagId
   else
     Result := TAG_IGNORE;
 end;
@@ -316,9 +345,10 @@ var
   n: Integer;
 begin
   Result := False;
-  if FNameTagIdToPrioMap.Find(ATagId, n) then
+  n := FNameTagIdToPrioMap.IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
   begin
-    APriority := FNameTagIdToPrioMap.Data[n];
+    APriority := StrToIntDef(FNameTagIdToPrioMap.ValueFromIndex[n], 0);
     Result := True;
   end;
 end;
@@ -328,9 +358,10 @@ var
   n: Integer;
 begin
   Result := False;
-  if FNameAltTagIdToPrioMap.Find(ATagId, n) then
+  n := FNameAltTagIdToPrioMap.IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
   begin
-    APriority := FNameAltTagIdToPrioMap.Data[n];
+    APriority := StrToIntDef(FNameAltTagIdToPrioMap.ValueFromIndex[n], 0);
     Result := True;
   end;
 end;
@@ -338,7 +369,7 @@ end;
 procedure TTagRegistry.RegisterSurfaceToGradeMapping(ASurface: string;
   AGrade: Integer);
 begin
-  FSurfaceToGradeMap.AddOrSetData(ASurface, AGrade);
+  FSurfaceToGradeMap.SetValue(ASurface, AGrade);
 end;
 
 function TTagRegistry.ReadGradeForSurface(const ASurface: string;
@@ -346,9 +377,10 @@ function TTagRegistry.ReadGradeForSurface(const ASurface: string;
 var
   n: Integer;
 begin
-  if FSurfaceToGradeMap.Find(ASurface, n) then
+  n := FSurfaceToGradeMap.IndexOfName(ASurface);
+  if n <> -1 then
   begin
-    AGrade := FSurfaceToGradeMap.Data[n];
+    AGrade := StrToIntDef(FSurfaceToGradeMap.ValueFromIndex[n], 0);
     Result := True;
   end
   else
@@ -357,7 +389,8 @@ end;
 
 procedure TTagRegistry.RegisterMaxSpeedAlias(AAlias: string; AMaxSpeed: Byte);
 begin
-  FNameToMaxSpeedMap.AddOrSetData(AAlias, AMaxSpeed);
+  if FNameToMaxSpeedMap.ValueOf(AAlias) <> -1 then
+    FNameToMaxSpeedMap.Add(AAlias, AMaxSpeed);
 end;
 
 function TTagRegistry.ReadMaxSpeedFromAlias(const AAlias: string;
@@ -365,9 +398,9 @@ function TTagRegistry.ReadMaxSpeedFromAlias(const AAlias: string;
 var
   n: Integer;
 begin
-  if FNameToMaxSpeedMap.Find(AAlias, n) then
+  if FNameToMaxSpeedMap.FindValue(AAlias, n) then
   begin
-    AMaxSpeed := FNameToMaxSpeedMap.Data[n];
+    AMaxSpeed := Byte(n);
     Result := True;
   end
   else
@@ -399,9 +432,9 @@ var
   s: string;
 begin
   Result := False;
-  if ATagMap.Find(FTagId, n) then
+  if ATagMap.FindValue(FTagId, n) then
   begin
-    s := ATagMap.Data[n];
+    s := ATagMap.ValueFromIndex[n];
     Result := (FTagValues.IndexOf(s) >= 0);
   end;
 end;
@@ -434,10 +467,10 @@ var
 begin
   Result := False;
 
-  if not ATagMap.Find(FTagId, n) then
+  if not ATagMap.FindValue(FTagId, n) then
     Exit;
 
-  s := ATagMap.Data[n];
+  s := ATagMap.ValueFromIndex[n];
 
   if (FValueType = vtString) then
   begin
@@ -486,7 +519,7 @@ function TTagExistsCondition.Evaluate(ATagMap: TTagMap): Boolean;
 var
   n: Integer;
 begin
-  Result := ATagMap.Find(FTagId, n);
+  Result := ATagMap.FindValue(FTagId, n);
 end;
 
 { TTagBoolCondition }
@@ -504,7 +537,7 @@ begin
   inherited Destroy();
 end;
 
-procedure TTagBoolCondition.AddCondition(ACondition: TTagConditionRef);
+procedure TTagBoolCondition.AddCondition(ACondition: TTagCondition);
 begin
   FConditions.Add(ACondition);
 end;
@@ -512,7 +545,7 @@ end;
 function TTagBoolCondition.Evaluate(ATagMap: TTagMap): Boolean;
 var
   i: Integer;
-  Item: TTagConditionRef;
+  Item: TTagCondition;
 begin
   Result := False;
   case FTagBoolType of
@@ -545,7 +578,7 @@ end;
 
 { TTagNotCondition }
 
-constructor TTagNotCondition.Create(ACondition: TTagConditionRef);
+constructor TTagNotCondition.Create(ACondition: TTagCondition);
 begin
   inherited Create();
   FCondition := ACondition;
@@ -554,6 +587,83 @@ end;
 function TTagNotCondition.Evaluate(ATagMap: TTagMap): Boolean;
 begin
   Result := not FCondition.Evaluate(ATagMap);
+end;
+
+{ TTagMap }
+
+function TTagMap.FindValue(ATagId: TTagId; out AIndex: Integer): Boolean;
+begin
+  AIndex := IndexOfName(IntToStr(ATagId));
+  Result := (AIndex <> -1);
+end;
+
+function TTagMap.GetKeyByIndex(AIndex: Integer): TTagId;
+begin
+  Result := StrToIntDef(Names[AIndex], 0);
+end;
+
+function TTagMap.GetValue(ATagId: TTagId): string;
+var
+  n: Integer;
+begin
+  n := IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
+    Result := ValueFromIndex[n]
+  else
+    Result := '';
+end;
+
+procedure TTagMap.SetValue(ATagId: TTagId; AValue: string);
+var
+  n: Integer;
+begin
+  n := IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
+    ValueFromIndex[n] := AValue
+  else
+    Append(IntToStr(ATagId) + NameValueSeparator + AValue);
+end;
+
+{ TNameTagIdToPrioMap }
+
+function TNameTagIdToPrioMap.GetValue(ATagId: TTagId): LongWord;
+var
+  n: Integer;
+begin
+  n := IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
+    Result := StrToIntDef(ValueFromIndex[n], 0)
+  else
+    Result := 0;
+end;
+
+procedure TNameTagIdToPrioMap.SetValue(ATagId: TTagId; AValue: LongWord);
+var
+  n: Integer;
+begin
+  n := IndexOfName(IntToStr(ATagId));
+  if n <> -1 then
+    ValueFromIndex[n] := IntToStr(AValue)
+  else
+    Append(IntToStr(ATagId) + NameValueSeparator + IntToStr(AValue));
+end;
+
+{ TSurfaceToGradeMap }
+
+function TSurfaceToGradeMap.GetValue(const AName: string): Integer;
+var
+  n: Integer;
+begin
+  n := IndexOfName(AName);
+  if n <> -1 then
+    Result := StrToIntDef(ValueFromIndex[n], 0)
+  else
+    Result := 0;
+end;
+
+procedure TSurfaceToGradeMap.SetValue(const AName: string; AValue: Integer);
+begin
+  Values[AName] := IntToStr(AValue);
 end;
 
 end.

@@ -37,7 +37,9 @@ Pixel:
 *)
 unit OsMapTypes;
 
+{$ifdef FPC}
 {$mode objfpc}{$H+}
+{$endif}
 
 interface
 
@@ -73,8 +75,8 @@ type
   // Type to be used for OSM ids (signed numbers with 64 bit size).
   TOsmId = Int64;
   // Type to be used for libosmscout internal ids (unsigned numbers with 64 bit size).
-  TId = QWord;
-  TPageId = QWord;
+  TId = UInt64;
+  TPageId = UInt64;
   // Type for describing the position of data within a file.
   TFileOffset = Int64;
   // Type for describing a type of an way, area or node.
@@ -150,7 +152,7 @@ type
 
   TMagnificationConverter = object
   public
-    function Convert(const AName: string; var AMagnification: TMagnification): Boolean;
+    function Convert(const AName: string; var AMagnification: TMagnification): Boolean; overload;
     function Convert(const ALevel: TMagnificationLevel; var AName: string): Boolean; overload;
   end;
 
@@ -301,27 +303,43 @@ function TMagnificationConverter.Convert(const AName: string;
   var AMagnification: TMagnification): Boolean;
 begin
   Result := True;
-  case AName of
-    'world':     AMagnification.SetLevel(MAG_LEVEL_WORLD);
-    'continent': AMagnification.SetLevel(MAG_LEVEL_CONTINENT);
-    'state':     AMagnification.SetLevel(MAG_LEVEL_STATE);
-    'stateOver': AMagnification.SetLevel(MAG_LEVEL_STATE_OVER);
-    'county':    AMagnification.SetLevel(MAG_LEVEL_COUNTY);
-    'region':    AMagnification.SetLevel(MAG_LEVEL_REGION);
-    'proximity': AMagnification.SetLevel(MAG_LEVEL_PROXIMITY);
-    'cityOver':  AMagnification.SetLevel(MAG_LEVEL_CITY_OVER);
-    'city':      AMagnification.SetLevel(MAG_LEVEL_CITY);
-    'suburb':    AMagnification.SetLevel(MAG_LEVEL_SUBURB);
-    'detail':    AMagnification.SetLevel(MAG_LEVEL_DETAIL);
-    'close':     AMagnification.SetLevel(MAG_LEVEL_CLOSE);
-    'closer':    AMagnification.SetLevel(MAG_LEVEL_CLOSER);
-    'veryClose': AMagnification.SetLevel(MAG_LEVEL_VERY_CLOSE);
-    'block':     AMagnification.SetLevel(MAG_LEVEL_BLOCK);
-    'street':    AMagnification.SetLevel(MAG_LEVEL_STREET);
-    'house':     AMagnification.SetLevel(MAG_LEVEL_HOUSE);
+  // 'case <string> of' not supported by Delphi
+  if AName = 'world' then
+    AMagnification.SetLevel(MAG_LEVEL_WORLD)
+  else if AName = 'continent' then
+    AMagnification.SetLevel(MAG_LEVEL_CONTINENT)
+  else if AName = 'state' then
+    AMagnification.SetLevel(MAG_LEVEL_STATE)
+  else if AName = 'stateOver' then
+    AMagnification.SetLevel(MAG_LEVEL_STATE_OVER)
+  else if AName = 'county' then
+    AMagnification.SetLevel(MAG_LEVEL_COUNTY)
+  else if AName = 'region' then
+    AMagnification.SetLevel(MAG_LEVEL_REGION)
+  else if AName = 'proximity' then
+    AMagnification.SetLevel(MAG_LEVEL_PROXIMITY)
+  else if AName = 'cityOver' then
+    AMagnification.SetLevel(MAG_LEVEL_CITY_OVER)
+  else if AName = 'city' then
+    AMagnification.SetLevel(MAG_LEVEL_CITY)
+  else if AName = 'suburb' then
+    AMagnification.SetLevel(MAG_LEVEL_SUBURB)
+  else if AName = 'detail' then
+    AMagnification.SetLevel(MAG_LEVEL_DETAIL)
+  else if AName = 'close' then
+    AMagnification.SetLevel(MAG_LEVEL_CLOSE)
+  else if AName = 'closer' then
+    AMagnification.SetLevel(MAG_LEVEL_CLOSER)
+  else if AName = 'veryClose' then
+    AMagnification.SetLevel(MAG_LEVEL_VERY_CLOSE)
+  else if AName = 'block' then
+    AMagnification.SetLevel(MAG_LEVEL_BLOCK)
+  else if AName = 'street' then
+    AMagnification.SetLevel(MAG_LEVEL_STREET)
+  else if AName = 'house' then
+    AMagnification.SetLevel(MAG_LEVEL_HOUSE)
   else
     Result := False;
-  end;
 end;
 
 function TMagnificationConverter.Convert(const ALevel: TMagnificationLevel;
