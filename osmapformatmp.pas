@@ -193,13 +193,14 @@ begin
     $01, // place = city
     $02: // place = town
     begin
-      //
+      TmpArea := TMapArea.Create();
+      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('city'));
     end;
     $03, // landuse = residential
     $04: // landuse = military
     begin
-      //TmpArea := TMapArea.Create();
-      //TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_industrial'));
+      TmpArea := TMapArea.Create();
+      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_residential'));
     end;
     $05: // landuse = garages
     begin

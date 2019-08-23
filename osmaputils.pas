@@ -413,7 +413,7 @@ end;
 
 function TStopClock.ResultString(): string;
 begin
-  Result := FormatDateTime('[S].Z', (StopTime - StartTime));
+  Result := FormatDateTime('S.Z', (StopTime - StartTime));
 end;
 
 { TSimpleStringHash }

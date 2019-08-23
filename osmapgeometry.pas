@@ -1,4 +1,4 @@
-(*
+﻿(*
   OsMap components for offline rendering and routing functionalities
   based on OpenStreetMap data
 
@@ -51,7 +51,7 @@ unit OsMapGeometry;
 interface
 
 uses
-  Classes, SysUtils, OsMapTypes;
+  Classes, SysUtils, Math, OsMapTypes;
 
 const
   // Number of bytes needed to store a lat,lon coordinate pair.
@@ -362,7 +362,7 @@ var
 
 implementation
 
-uses Math, OsMapUtils;
+uses OsMapUtils;
 
 { For the calculations here see:
   http://en.wikipedia.org/wiki/Mercator_projection
@@ -757,7 +757,9 @@ end;
 
 function TGeoPoint.GetDisplayText(): string;
 begin
-  Result := Format('%.5d', [Abs(Lat)]);
+  Result := FloatToStrF(Lat, ffFixed, 5, 5)
+          + ' ' + FloatToStrF(Lon, ffFixed, 5, 5);
+  {Result := Format('%.5d', [Abs(Lat)]);
 
   if (Lat >= 0) then
     Result := Result + ' N '
@@ -769,7 +771,7 @@ begin
   if (Lon >= 0) then
     Result := Result + ' E'
   else
-    Result := Result + ' W';
+    Result := Result + ' W'; }
 end;
 
 function TGeoPoint.GetId(): TId;

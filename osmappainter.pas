@@ -123,6 +123,7 @@ type
   TWayPathData = record
     Ref: TObjectFileRef;
     pBuffer: ^TFeatureValueBuffer; // Features of the line segment
+    pDrawOptions: PMapItemDrawOptions;
     TransStart: Integer;         // Start of coordinates in transformation buffer
     TransEnd: Integer;           // End of coordinates in transformation buffer
   end;
@@ -153,6 +154,7 @@ type
     Ref: TObjectFileRef;
     TypeInfo: TTypeInfo;         //
     pBuffer: ^TFeatureValueBuffer; // Features of the line segment
+    pDrawOptions: PMapItemDrawOptions; // cached draw options
     FillStyle: TFillStyle;       // Fill style
     BorderStyle: TBorderStyle;   // Border style
     BoundingBox: TGeoBox;        // Bounding box of the area (in geo coordinates)
@@ -234,6 +236,8 @@ type
     FStandardFontHeight: Double; // Default font height in pixels
     FAreaMinDimension: Double;   // Minimal width or height in pixels for visible area
 
+    FOnLog: TGetStrProc;
+
   private
     { Debugging }
     procedure DumpDataStatistics(const AProjection: TProjection;
@@ -257,12 +261,12 @@ type
                      const AParameter: TMapParameter;
                      const AData: TMapData);
 
-    procedure CalculatePaths(const AStyleConfig: TStyleConfig;
+    function CalculatePaths(const AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
                      const AParameter: TMapParameter;
                      const ARef: TObjectFileRef;
                      const ABuffer: TFeatureValueBuffer;
-                     const AWay: TMapWay);
+                     const AWay: TMapWay): Boolean;
 
     procedure PrepareWays(const AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
@@ -300,14 +304,14 @@ type
       X, Y - position to place the label at (currently always the center of the area or the coordinate of the node)
       AObjectWidth - The (rough) width of the object
       AObjectHeight - The (rough) height of the object }
-    procedure LayoutPointLabels(const AProjection: TProjection;
+    function LayoutPointLabels(const AProjection: TProjection;
                      const AParameter: TMapParameter;
                      const ABuffer: TFeatureValueBuffer;
                      const AIconStyle: TIconStyle;
                      const ATextStyles: TTextStyleList;
                      X, Y: Double;
                      AObjectWidth: Double = 0;
-                     AObjectHeight: Double = 0);
+                     AObjectHeight: Double = 0): Boolean;
 
     function DrawWayDecoration(const AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
@@ -590,6 +594,7 @@ type
 
     property IsBusy: Boolean read FIsBusy;
     property CurrentStep: TRenderSteps read FCurStep;
+    property OnLog: TGetStrProc read FOnLog write FOnLog;
   end;
 
   {$ifdef FPC}
@@ -959,16 +964,16 @@ begin
   begin
     overallTime := times[i];
 
-    if (overallTime > 0.0) then
-      WriteLn('Node type ', AStyleConfig.TypeConfig.GetNodeTypeInfo(i).TypeName, ' ', times[i], ' nsecs');
+    if (overallTime > 0.0) and Assigned(OnLog) then
+      OnLog('Node type ' + AStyleConfig.TypeConfig.GetNodeTypeInfo(i).TypeName + ' ' + FloatToStr(times[i]) + ' nsecs');
   end;
 {$endif}
 end;
 
-procedure TMapPainter.CalculatePaths(const AStyleConfig: TStyleConfig;
+function TMapPainter.CalculatePaths(const AStyleConfig: TStyleConfig;
   const AProjection: TProjection; const AParameter: TMapParameter;
   const ARef: TObjectFileRef; const ABuffer: TFeatureValueBuffer;
-  const AWay: TMapWay);
+  const AWay: TMapWay): Boolean;
 var
   IsTransformed: Boolean;
   TransStart, TransEnd: Integer;
@@ -982,11 +987,18 @@ var
   WayPathData: TWayPathData;
   LanesSpace, LaneOffset: Double;
 begin
+  Result := False;
+  if (not IsVisibleWay(AProjection, AWay.GetBoundingBox(), 10)) then
+    Exit;
+
   FLineStyles.Clear();
   AStyleConfig.GetWayLineStyles(ABuffer, AProjection, FLineStyles);
 
   if (FLineStyles.Count = 0) then
+  begin
+    AWay.DrawOptions.IsStyleVisible := False;
     Exit;
+  end;
 
   IsTransformed := False;
 
@@ -1014,8 +1026,12 @@ begin
     if (lineStyle.Slot = '') then
       MainSlotWidth := LineWidth;
 
-    if (LineWidth = 0.0) then
+    //if (LineWidth = 0.0) then
+    if (LineWidth < AParameter.LineMinWidthPixel) then
       Continue;
+
+    if (not IsVisibleWay(AProjection, AWay.GetBoundingBox(), LineWidth / 2)) then
+      Exit;
 
     case LineStyle.OffsetRel of
       lorBase:         LineOffset := 0.0;
@@ -1026,7 +1042,10 @@ begin
         if (not FLanesReader.ReadValueByte(ABuffer, btLanesValue))
         and (not FAccessReader.ReadValueByte(ABuffer, btAccessValue))
         then
+        begin
+          AWay.DrawOptions.IsStyleVisible := False;
           Exit;
+        end;
       end;
     end;
 
@@ -1039,8 +1058,8 @@ begin
     WayData.Ref := ARef;
     WayData.LineWidth := LineWidth;
 
-    if (not IsVisibleWay(AProjection, AWay.GetBoundingBox(), LineWidth / 2)) then
-      Continue;
+    //if (not IsVisibleWay(AProjection, AWay.GetBoundingBox(), LineWidth / 2)) then
+    //  Continue;
 
     if (not IsTransformed) then
     begin
@@ -1080,6 +1099,7 @@ begin
 
       WayPathData.Ref := ARef;
       WayPathData.pBuffer := Addr(ABuffer);
+      WayPathData.pDrawOptions := Addr(AWay.DrawOptions);
       WayPathData.TransStart := TransStart;
       WayPathData.TransEnd := TransEnd;
 
@@ -1090,6 +1110,7 @@ begin
 
     WayData.Layer := 0;
     WayData.pBuffer := Addr(ABuffer);
+    //WayData.pDrawOptions := Addr(AWay.DrawOptions);
     WayData.LineStyle := LineStyle;
     WayData.WayPriority := AStyleConfig.GetWayPrio(ABuffer.TypeInfo);
     //WayData.IsStartClosed := (AWay.Nodes[0].Serial = 0);
@@ -1122,7 +1143,10 @@ begin
         btLanes := ABuffer.TypeInfo.Lanes;
 
       if (btLanes < 2) then
+      begin
+        AWay.DrawOptions.IsStyleVisible := False;
         Exit;
+      end;
 
       LanesSpace := MainSlotWidth / btLanes;
       LaneOffset := -MainSlotWidth / 2.0 + LanesSpace;
@@ -1138,6 +1162,8 @@ begin
     end
     else
       FWayDataList.Append(WayData);
+
+    Result := True;
   end;
 end;
 
@@ -1147,20 +1173,35 @@ procedure TMapPainter.PrepareWays(const AStyleConfig: TStyleConfig;
 var
   //timer: TStopClock;
   way: TMapWay;
+  ZoomLevel: Byte;
+  IsPathVisible: Boolean;
 begin
   FWayDataList.Clear();
   FWayPathDataList.Clear();
+
+  ZoomLevel := Byte(AProjection.Magnification.Level);
 
   FCurItemIndex := 0;
   FCurItemDesc := 'Way';
   for way in AData.WayList do
   begin
-    CalculatePaths(AStyleConfig, AProjection, AParameter,
-                   ObjectFileRef(way.FileOffset, refWay),
-                   way.FeatureValueBuffer,
-                   way);
+    if (way.DrawOptions.ZoomLevel <> ZoomLevel) then
+    begin
+      ResetMapItemDrawOptions(way.DrawOptions);
+      way.DrawOptions.ZoomLevel := ZoomLevel;
+    end;
+    if (way.DrawOptions.IsStyleVisible) then
+    begin
+      IsPathVisible := CalculatePaths(AStyleConfig, AProjection, AParameter,
+        ObjectFileRef(way.FileOffset, refWay),
+        way.FeatureValueBuffer, way);
+      if IsPathVisible and way.DrawOptions.IsTextLabelVisible then
+      begin
+        CalculateWayShieldLabels(AStyleConfig, AProjection, AParameter, way);
+      end;
 
-    CalculateWayShieldLabels(AStyleConfig, AProjection, AParameter, way);
+    end;
+
     Inc(FCurItemIndex);
   end;
 
@@ -1168,12 +1209,21 @@ begin
   FCurItemDesc := 'PoiWay';
   for way in AData.PoiWayList do
   begin
-    CalculatePaths(AStyleConfig, AProjection, AParameter,
-                   ObjectFileRef(way.FileOffset, refWay),
-                   way.FeatureValueBuffer,
-                   way);
-
-    CalculateWayShieldLabels(AStyleConfig, AProjection, AParameter, way);
+    if (way.DrawOptions.ZoomLevel <> ZoomLevel) then
+    begin
+      ResetMapItemDrawOptions(way.DrawOptions);
+      way.DrawOptions.ZoomLevel := ZoomLevel;
+    end;
+    if (way.DrawOptions.IsStyleVisible) then
+    begin
+      IsPathVisible := CalculatePaths(AStyleConfig, AProjection, AParameter,
+        ObjectFileRef(way.FileOffset, refWay),
+        way.FeatureValueBuffer, way);
+      if IsPathVisible and way.DrawOptions.IsTextLabelVisible then
+      begin
+        CalculateWayShieldLabels(AStyleConfig, AProjection, AParameter, way);
+      end;
+    end;
     Inc(FCurItemIndex);
   end;
 
@@ -1189,7 +1239,6 @@ var
   i, ii, j, idx: Integer;
   pRing: ^TMapAreaRing;
   nodes: TGeoPointArray;
-  Segment: TSegmentGeoBox;
   RingId, BorderStyleIndex: Integer;
   IsFoundRing: Boolean;
   TypeInfo: TTypeInfo;
@@ -1200,18 +1249,13 @@ var
   dBorderWidth, dOffset: Double;
   ClipCount: Integer;
   TransStart, TransEnd: Integer;
-begin
-  SetLength(td, Length(AArea.Rings));
-  FBorderStyles.Clear();
+  ZoomLevel: Byte;
 
-  for i := 0 to Length(AArea.Rings)-1 do
+  procedure _TransformAreaRing();
+  var
+    Segment: TSegmentGeoBox;
+    ii: Integer;
   begin
-    pRing := Addr(AArea.Rings[i]);
-    // The master ring does not have any nodes, so we skip it
-    // Rings with less than 3 nodes should be skipped, too (no area)
-    if pRing^.IsMasterRing() or (Length(pRing^.Nodes) < 3) then
-      Continue;
-
     if (Length(pRing^.Segments) <= 1) then
     begin
       FTransBuffer.TransformArea(AProjection,
@@ -1246,8 +1290,23 @@ begin
     end;
   end;
 
+begin
+  SetLength(td, Length(AArea.Rings));
+  FBorderStyles.Clear();
+
+  {for i := 0 to Length(AArea.Rings)-1 do
+  begin
+    pRing := Addr(AArea.Rings[i]);
+    // The master ring does not have any nodes, so we skip it
+    // Rings with less than 3 nodes should be skipped, too (no area)
+    if pRing^.IsMasterRing() or (Length(pRing^.Nodes) < 3) then
+      Continue;
+    _TransformAreaRing();
+  end; }
+
   RingId := OUTER_RING_ID;
   IsFoundRing := True;
+  ZoomLevel := Byte(AProjection.Magnification.Level);
 
   while (IsFoundRing) do
   begin
@@ -1257,13 +1316,33 @@ begin
     begin
       pRing := Addr(AArea.Rings[i]);
 
+      if pRing^.DrawOptions.ZoomLevel <> ZoomLevel then
+      begin
+        ResetMapItemDrawOptions(pRing^.DrawOptions);
+        pRing^.DrawOptions.ZoomLevel := ZoomLevel;
+      end;
+
+      if not pRing^.DrawOptions.IsStyleVisible then
+        Continue;
+
       if (pRing^.Ring <> RingId) then
         Continue;
 
-      if (not pRing^.IsOuterRing()) and pRing^.GetType().IsIgnore then
+      AreaData.IsOuter := pRing^.IsOuterRing();
+      if (not AreaData.IsOuter) and pRing^.GetType().IsIgnore then
         Continue;
 
-      if (pRing^.IsOuterRing()) then
+      // The master ring does not have any nodes, so we skip it
+      // Rings with less than 3 nodes should be skipped, too (no area)
+      if pRing^.IsMasterRing() or (Length(pRing^.Nodes) < 3) then
+        Continue;
+
+      AreaData.BoundingBox := pRing^.GetBoundingBox();
+      // 10 pixels tolerance around area
+      if (not IsVisibleArea(AProjection, AreaData.BoundingBox, 10)) then
+        Continue;
+
+      if (AreaData.IsOuter) then
         TypeInfo := AArea.GetType()
       else
         TypeInfo := pRing^.GetType();
@@ -1280,7 +1359,12 @@ begin
       AStyleConfig.GetAreaBorderStyles(pRing^.FeatureValueBuffer, AProjection, FBorderStyles);
 
       if (not Assigned(FillStyle)) and (FBorderStyles.Count = 0) then
+      begin
+        pRing^.DrawOptions.IsStyleVisible := False;
         Continue;
+      end;
+
+      _TransformAreaRing();
 
       borderStyleIndex := 0;
 
@@ -1301,11 +1385,8 @@ begin
       else
         dBorderWidth := 0.0;
 
-      AreaData.BoundingBox := pRing^.GetBoundingBox();
-      AreaData.IsOuter := pRing^.IsOuterRing();
-
-      if (not IsVisibleArea(AProjection, AreaData.BoundingBox, dBorderWidth / 2.0)) then
-        Continue;
+      {if (not IsVisibleArea(AProjection, AreaData.BoundingBox, dBorderWidth / 2.0)) then
+        Continue;  }
 
       // Collect possible clippings. We only take into account inner rings of the next level
       // that do not have AreaData type and thus act as AreaData clipping region. If AreaData inner pRing^ has AreaData type,
@@ -1330,6 +1411,7 @@ begin
       AreaData.Ref := AArea.GetObjectFileRef();
       AreaData.TypeInfo := TypeInfo;
       AreaData.pBuffer := Addr(pRing^.FeatureValueBuffer);
+      AreaData.pDrawOptions := Addr(pRing^.DrawOptions);
       AreaData.FillStyle := FillStyle;
       AreaData.BorderStyle := BorderStyle;
       AreaData.TransStart := td[i].TransStart;
@@ -1360,6 +1442,7 @@ begin
         AreaData.Ref := AArea.GetObjectFileRef();
         AreaData.TypeInfo := TypeInfo;
         AreaData.pBuffer := nil;
+        AreaData.pDrawOptions := Addr(pRing^.DrawOptions);
         AreaData.FillStyle := nil;
         AreaData.BorderStyle := BorderStyle;
         AreaData.TransStart := TransStart;
@@ -1387,7 +1470,10 @@ begin
   AStyleConfig.GetAreaTextStyles(AAreaData.pBuffer^, AProjection, FTextStyles);
 
   if (not Assigned(IconStyle)) and (FTextStyles.Count = 0) then
+  begin
+    AAreaData.pDrawOptions^.IsTextLabelVisible := False;
     Exit;
+  end;
 
   AProjection.GeoToPixel(AAreaData.BoundingBox.MinCoord,
                         x1, y1);
@@ -1397,16 +1483,15 @@ begin
 
   AreaCenter := FTransBuffer.Polylabel(AAreaData.TransStart, AAreaData.TransEnd);
 
-  LayoutPointLabels(AProjection,
-                    AParameter,
-                    AAreaData.pBuffer^,
-                    IconStyle,
-                    FTextStyles,
+  if not LayoutPointLabels(AProjection, AParameter, AAreaData.pBuffer^,
+                    IconStyle, FTextStyles,
                     //(x1 + x2) / 2, (y1 + y2) / 2,
                     AreaCenter.X, AreaCenter.Y,
                     max(x1, x2) - min(x1, x2),
-                    max(y1, y2) - min(y1, y2));
-
+                    max(y1, y2) - min(y1, y2)) then
+  begin
+    AAreaData.pDrawOptions^.IsTextLabelVisible := False;
+  end;
 end;
 
 procedure TMapPainter.PrepareAreas(const AStyleConfig: TStyleConfig;
@@ -1422,6 +1507,7 @@ begin
   for i := 0 to AData.AreaList.Count-1 do
   begin
     FCurItemIndex := i;
+
     if AProjection.GeoBoxIsIn(AData.AreaList[i].GetBoundingBox()) then
       PrepareArea(AStyleConfig, AProjection, AParameter, AData.AreaList[i]);
   end;
@@ -1476,14 +1562,14 @@ begin
   end;
 end;
 
-procedure TMapPainter.LayoutPointLabels(const AProjection: TProjection;
+function TMapPainter.LayoutPointLabels(const AProjection: TProjection;
   const AParameter: TMapParameter;
   const ABuffer: TFeatureValueBuffer;
   const AIconStyle: TIconStyle;
   const ATextStyles: TTextStyleList;
   X, Y: Double;
   AObjectWidth: Double;
-  AObjectHeight: Double);
+  AObjectHeight: Double): Boolean;
 var
   LbLayoutData: TLabelDataList;
   LbData: TLabelData;
@@ -1492,6 +1578,7 @@ var
   dFactor: Double;
   dHeight, dAlpha, dMaxHeight, dMinAlpha, dNormHeight: Double;
 begin
+  Result := False;
   if Assigned(AIconStyle) then
   begin
     if (AIconStyle.IconName <> '')
@@ -1594,7 +1681,9 @@ begin
   end;
 
   if (LbLayoutData.Count = 0) then
+  begin
     Exit;
+  end;
 
   { TODO : sort }
   {std::stable_sort(LbLayoutData.begin(),
@@ -1602,6 +1691,7 @@ begin
                    LabelLayoutDataSorter); }
 
   RegisterRegularLabel(AProjection, AParameter, LbLayoutData, Vertex2D(X, Y), AObjectWidth);
+  Result := True;
 end;
 
 function TMapPainter.DrawWayDecoration(const AStyleConfig: TStyleConfig;
@@ -1658,12 +1748,18 @@ begin
   ShieldStyle := AStyleConfig.GetWayPathShieldStyle(AData.FeatureValueBuffer, AProjection);
 
   if not Assigned(ShieldStyle) then
+  begin
+    AData.DrawOptions.IsTextLabelVisible := False;
     Exit;
+  end;
 
   sLabel := GetLabelText(ShieldStyle.ShieldStyle.FeatureType, AParameter, AData.FeatureValueBuffer);
 
   if (sLabel = '') or (Length(AData.Nodes) < 2) then
+  begin
+    AData.DrawOptions.IsTextLabelVisible := False;
     Exit;
+  end;
 
   RegisterPointWayLabel(AProjection,
                         AParameter,
@@ -1687,10 +1783,14 @@ var
   j: Integer;
 begin
   Result := False;
+
   PathTextStyle := AStyleConfig.GetWayPathTextStyle(AData.pBuffer^, AProjection);
 
   if (not Assigned(PathTextStyle)) then
+  begin
+    AData.pDrawOptions^.IsTextLabelVisible := False;
     Exit;
+  end;
 
   lineOffset := 0.0;
   transStart := AData.TransStart;
@@ -1698,7 +1798,10 @@ begin
   sLabel := GetLabelText(PathTextStyle.FeatureType, AParameter, AData.pBuffer^);
 
   if (sLabel = '') then
+  begin
+    AData.pDrawOptions^.IsTextLabelVisible := False;
     Exit;
+  end;
 
   if (PathTextStyle.Offset <> 0.0) then
     lineOffset := lineOffset + GetProjectedWidth(AProjection, PathTextStyle.Offset);
@@ -1751,7 +1854,10 @@ begin
   BorderTextStyle := AStyleConfig.GetAreaBorderTextStyle(AAreaData.pBuffer^, AProjection);
 
   if (not Assigned(borderTextStyle)) then
+  begin
+    AAreaData.pDrawOptions^.IsBorderLabelVisible := False;
     Exit;
+  end;
 
   lineOffset := 0.0;
   transStart := AAreaData.TransStart;
@@ -1759,7 +1865,10 @@ begin
   sLabel := GetLabelText(BorderTextStyle.FeatureType, AParameter, AAreaData.pBuffer^);
 
   if (sLabel = '') then
+  begin
+    AAreaData.pDrawOptions^.IsBorderLabelVisible := False;
     Exit;
+  end;
 
   if (BorderTextStyle.Offset <> 0.0) then
     lineOffset := lineOffset + GetProjectedWidth(AProjection, BorderTextStyle.Offset);
@@ -1987,11 +2096,11 @@ begin
   // Optional callback after preprocessing data
   AfterPreprocessing(FStyleConfig, AProjection, AParameter, AData);
 
-  if AParameter.IsDebugPerformance
+  if AParameter.IsDebugPerformance and Assigned(OnLog)
   and (prepareWaysTimer.IsSignificant() or prepareAreasTimer.IsSignificant())
   then
   begin
-    WriteLn('Prep: ', prepareWaysTimer.ResultString(), ' (sec) ', prepareAreasTimer.ResultString(), ' (sec)');
+    OnLog('Prep ways: ' + prepareWaysTimer.ResultString() + ' (sec), areas: ' + prepareAreasTimer.ResultString() + ' (sec)');
   end;
 end;
 
@@ -2002,13 +2111,13 @@ var
 begin
   BeforeDrawing(FStyleConfig, AProjection, AParameter, AData);
 
-  if (AParameter.IsDebugPerformance) then
+  if (AParameter.IsDebugPerformance) and Assigned(OnLog) then
   begin
     boundingBox := AProjection.GetDimensions();
 
-    WriteLn('Draw: ', boundingBox.GetDisplayText(),
-      ' ', AProjection.Magnification.Magnification, 'x/', AProjection.Magnification.Level,
-      ' ', AProjection.Width, 'x', AProjection.Height, ' ', AProjection.DPI, ' DPI');
+    OnLog('Draw: ' + boundingBox.GetDisplayText()
+      + ' zoom: ' + FloatToStr(AProjection.Magnification.Magnification) + 'x/' + IntToStr(AProjection.Magnification.Level)
+      + ' screen: ' + IntToStr(AProjection.Width) + 'x' + IntToStr(AProjection.Height) + ' ' + FloatToStr(AProjection.DPI) + ' DPI');
   end;
 
 end;
@@ -2285,8 +2394,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw areas: ', FAreaDataList.Count, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw areas: ' + IntToStr(FAreaDataList.Count) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2308,8 +2417,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw ways: ', FWayDataList.Count, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw ways: ' + IntToStr(FWayDataList.Count) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2333,8 +2442,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw way decorations: ', n, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw way decorations: ' + IntToStr(n) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2344,7 +2453,6 @@ var
   Timer: TStopClock;
   i, n: Integer;
 begin
-  { TODO: Draw labels only if there is a style for the current zoom level that requires labels }
   if AParameter.IsDebugPerformance then
     Timer.Init();
 
@@ -2352,6 +2460,9 @@ begin
   for i := 0 to FWayPathDataList.Count-1 do
   begin
     FCurItemIndex := i;
+    if not FWayPathDataList.Items[i].pDrawOptions^.IsTextLabelVisible then
+      Continue;
+
     if DrawWayContourLabel(FStyleConfig, AProjection, AParameter, FWayPathDataList.Items[i]) then
       Inc(n);
   end;
@@ -2359,8 +2470,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw way contour labels: ', n, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw way contour labels: ' + IntToStr(n) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2369,6 +2480,7 @@ procedure TMapPainter.PrepareAreaLabels(const AProjection: TProjection;
 var
   Timer: TStopClock;
   i, n: Integer;
+  pAreaData: ^TAreaData;
 begin
   if AParameter.IsDebugPerformance then
     Timer.Init();
@@ -2377,9 +2489,10 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    if Assigned(FAreaDataList.Items[i].pBuffer) then
+    pAreaData := Addr(FAreaDataList.Items[i]);
+    if Assigned(pAreaData^.pBuffer) and pAreaData^.pDrawOptions^.IsTextLabelVisible then
     begin
-      PrepareAreaLabel(FStyleConfig, AProjection, AParameter, FAreaDataList.Items[i]);
+      PrepareAreaLabel(FStyleConfig, AProjection, AParameter, pAreaData^);
       Inc(n);
     end;
   end;
@@ -2387,8 +2500,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Prepare area labels: ', n, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Prepare area labels: ' + IntToStr(n) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2405,7 +2518,7 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    if Assigned(FAreaDataList.Items[i].pBuffer) then
+    if Assigned(FAreaDataList.Items[i].pBuffer) and FAreaDataList.Items[i].pDrawOptions^.IsBorderLabelVisible then
     begin
       if DrawAreaBorderLabel(FStyleConfig, AProjection, AParameter, FAreaDataList.Items[i]) then
         Inc(n);
@@ -2415,8 +2528,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw area border labels: ', n, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw area border labels: ' + IntToStr(n) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2443,8 +2556,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Draw area border symbols: ', n, ' (pcs) ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Draw area border symbols: ' + IntToStr(n) + ' (pcs) ' + Timer.ResultString() + ' (s)');
   end;
 end;
 
@@ -2461,8 +2574,8 @@ begin
   if AParameter.IsDebugPerformance then
   begin
     Timer.Stop();
-    if Timer.IsSignificant() then
-      WriteLn('Prepare node labels: ', Timer.ResultString(), ' (s)');
+    if Timer.IsSignificant() and Assigned(OnLog) then
+      OnLog('Prepare node labels: ' + Timer.ResultString() + ' (s)');
   end;
 end;
 

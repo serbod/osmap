@@ -125,19 +125,19 @@ type
     procedure ResetToDefaults();
 
     // Name of the font to use
-    property FontName: string read FFontName;
+    property FontName: string read FFontName write FFontName;
     // Metric size of base font (aka font size 100%) in millimeter
-    property FontSize: Double read FFontSize;
+    property FontSize: Double read FFontSize write FFontSize;
 
-    // Minimum width of an line to be drawn
-    property LineMinWidthPixel: Double read FLineMinWidthPixel;
-    // Minimum dimension (either width or height) of an area in mm
-    property AreaMinDimensionMM: Double read FAreaMinDimensionMM;
+    // Minimum width of an line to be drawn, default 0.2
+    property LineMinWidthPixel: Double read FLineMinWidthPixel write FLineMinWidthPixel;
+    // Minimum dimension (either width or height) of an area in mm, default 2.0
+    property AreaMinDimensionMM: Double read FAreaMinDimensionMM write FAreaMinDimensionMM;
 
-    // Try to reduce the number of nodes for
-    property OptimizeWayNodes: TTransOptimizeMethod read FOptimizeWayNodes;
-    // Try to reduce the number of nodes for
-    property OptimizeAreaNodes: TTransOptimizeMethod read FOptimizeAreaNodes;
+    // Try to reduce the number of nodes for nodes, default: tomNone
+    property OptimizeWayNodes: TTransOptimizeMethod read FOptimizeWayNodes write FOptimizeWayNodes;
+    // Try to reduce the number of nodes for areas, default: tomNone
+    property OptimizeAreaNodes: TTransOptimizeMethod read FOptimizeAreaNodes write FOptimizeAreaNodes;
     // The maximum error to allow when optimizing lines, in mm
     property IsOptimizeErrorToleranceMm: Double read FOptimizeErrorToleranceMm;
     // Draw label fadings (default: true)
@@ -145,7 +145,7 @@ type
     // Draw ways using the size of the style sheet, if if the way has a width explicitly given
     property IsDrawWaysWithFixedWidth: Boolean read FDrawWaysWithFixedWidth;
     // Draw border for ways
-    property IsDrawWaysBorder: Boolean read FDrawWaysBorder;
+    property IsDrawWaysBorder: Boolean read FDrawWaysBorder write FDrawWaysBorder;
 
     // Node and area labels, icons
 
@@ -197,9 +197,9 @@ type
     property IsRenderUnknowns: Boolean read FRenderUnknowns;
 
     // Print out some performance relvant information about the data
-    property IsDebugData: Boolean read FDebugData;
+    property IsDebugData: Boolean read FDebugData write FDebugData;
     // Print out some performance information
-    property IsDebugPerformance: Boolean read FDebugPerformance;
+    property IsDebugPerformance: Boolean read FDebugPerformance write FDebugPerformance;
 
     // Limit for objects/type. If limit is reached a warning is created
     property WarningObjectCountLimit: Integer read FWarnObjectCountLimit;
@@ -238,8 +238,8 @@ begin
   FLineMinWidthPixel := 0.2;          // Minimum width of an line to be drawn
   FAreaMinDimensionMM := 2.0;         // Minimum dimension (either width or height) of an area in mm
 
-  FOptimizeWayNodes := tomNone;       // Try to reduce the number of nodes for
-  FOptimizeAreaNodes := tomNone;      // Try to reduce the number of nodes for
+  FOptimizeWayNodes := tomNone;       // Try to reduce the number of nodes for ways
+  FOptimizeAreaNodes := tomNone;      // Try to reduce the number of nodes for areas
   FOptimizeErrorToleranceMm := 0.5;   // The maximum error to allow when optimizing lines, in mm
   FDrawFadings := True;               // Draw label fadings (default: true)
   FDrawWaysWithFixedWidth := False;   // Draw ways using the size of the style sheet, if if the way has a width explicitly given

@@ -63,6 +63,17 @@ const
 
 type
 
+  { Cached options for drawable item
+    prevent repeated calculations for invisible objects
+    Actual for same zoom level. If zoom level changed, must be recalculated }
+  TMapItemDrawOptions = packed record
+    ZoomLevel: Byte;
+    IsStyleVisible: Boolean;
+    IsTextLabelVisible: Boolean;
+    IsBorderLabelVisible: Boolean;
+  end;
+  PMapItemDrawOptions = ^TMapItemDrawOptions;
+
   { TMapNode }
 
   TMapNode = class
@@ -119,6 +130,8 @@ type
     Segments: TSegmentGeoBoxArray;
     { Precomputed (cache) bounding box }
     BBox: TGeoBox;
+    { Cached options for same zoom level }
+    DrawOptions: TMapItemDrawOptions;
 
     procedure Init();
 
@@ -209,6 +222,8 @@ type
     { Offset after this node }
     NextFileOffset: TFileOffset;
 
+    { Cached options for same zoom level }
+    DrawOptions: TMapItemDrawOptions;
     { The array of coordinates }
     Nodes: TGeoPointArray;
     { Precomputed (cache) segment bounding boxes for optimisation }
@@ -356,9 +371,19 @@ type
 
 //function MapNode();
 
+  procedure ResetMapItemDrawOptions(var AValue: TMapItemDrawOptions);
+
 implementation
 
 uses Math; // eliminate "end of source not found"
+
+procedure ResetMapItemDrawOptions(var AValue: TMapItemDrawOptions);
+begin
+  AValue.ZoomLevel := 0;
+  AValue.IsStyleVisible := True;
+  AValue.IsTextLabelVisible := True;
+  AValue.IsBorderLabelVisible := True;
+end;
 
 { TMapNode }
 
@@ -930,6 +955,7 @@ end;
 
 procedure TMapWay.SetType(const AValue: TTypeInfo);
 begin
+  ResetMapItemDrawOptions(DrawOptions);
   FeatureValueBuffer.SetType(AValue);
 end;
 

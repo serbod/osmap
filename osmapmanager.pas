@@ -66,6 +66,8 @@ type
     // assigned
     FMapProjection: TMercatorProjection;
     FMapPainter: TMapPainter;
+
+    FOnAfterRender: TNotifyEvent;
   public
     Busy: Boolean;
     procedure AfterConstruction; override;
@@ -85,6 +87,8 @@ type
 
     property MapProjection: TMercatorProjection read FMapProjection write FMapProjection;
     property MapPainter: TMapPainter read FMapPainter write FMapPainter;
+
+    property OnAfterRender: TNotifyEvent read FOnAfterRender write FOnAfterRender;
   end;
 
 implementation
@@ -484,6 +488,8 @@ begin
       if ini.ValueExists(sSect, 'FillColor') then
       begin
         TmpStyle := TFillStyle.Create();
+        TmpStyle.MinZoom := ini.ReadInteger(sSect, 'MinZoom', TmpStyle.MinZoom);
+        TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         TmpStyle.Name := TmpType.TypeName + '_Fill';
         _ReadColor(sSect, 'FillColor', (TmpStyle as TFillStyle).FillColor);
         MapStyleConfig.AddStyle(TmpType, TmpStyle);
@@ -493,6 +499,8 @@ begin
       if ini.ValueExists(sSect, 'BorderColor') then
       begin
         TmpStyle := TBorderStyle.Create();
+        TmpStyle.MinZoom := ini.ReadInteger(sSect, 'MinZoom', TmpStyle.MinZoom);
+        TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         TmpStyle.Name := TmpType.TypeName + '_Border';
         _ReadColor(sSect, 'BorderColor', (TmpStyle as TBorderStyle).Color);
         _ReadColor(sSect, 'BorderGapColor', (TmpStyle as TBorderStyle).GapColor);
@@ -506,6 +514,8 @@ begin
       then
       begin
         TmpStyle := TTextStyle.Create();
+        TmpStyle.MinZoom := ini.ReadInteger(sSect, 'MinZoom', TmpStyle.MinZoom);
+        TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         TmpStyle.Name := TmpType.TypeName + '_Text';
         (TmpStyle as TTextStyle).FeatureType := ftName;
         (TmpStyle as TTextStyle).Size := ini.ReadFloat(sSect, 'TextSize', (TmpStyle as TTextStyle).Size);
@@ -521,6 +531,8 @@ begin
       then
       begin
         TmpStyle := TLineStyle.Create();
+        TmpStyle.MinZoom := ini.ReadInteger(sSect, 'MinZoom', TmpStyle.MinZoom);
+        TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         TmpStyle.Name := TmpType.TypeName + '_Line';
         _ReadColor(sSect, 'LineColor', (TmpStyle as TLineStyle).LineColor);
         _ReadColor(sSect, 'LineGapColor', (TmpStyle as TLineStyle).GapColor);
@@ -537,6 +549,8 @@ begin
       then
       begin
         TmpStyle := TPathTextStyle.Create();
+        TmpStyle.MinZoom := ini.ReadInteger(sSect, 'MinZoom', TmpStyle.MinZoom);
+        TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         with (TmpStyle as TPathTextStyle) do
         begin
           Name := TmpType.TypeName + '_PathText';
@@ -570,7 +584,9 @@ begin
   if Assigned(MapProjection) and Assigned(MapPainter) then
   begin
     MapPainter.DrawMap(MapProjection, MapParameter, MapData);
-  end
+  end;
+  if Assigned(OnAfterRender) then
+    OnAfterRender(Self);
 end;
 
 { TMapRenderThread }

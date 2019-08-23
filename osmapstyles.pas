@@ -141,6 +141,8 @@ type
   TStyle = class(TObject)
   public
     Name: string;
+    MinZoom: Integer;
+    MaxZoom: Integer;
     {
     procedure SetBoolValue(AAttrIndex: Integer; AValue: Boolean); virtual;
     procedure SetStringValue(AAttrIndex: Integer; const AValue: string); virtual;
@@ -322,7 +324,7 @@ type
   TLabelStyle = class(TStyle)
   public
     Priority: Integer;
-    Size: Double;
+    Size: Double;          // font height in mm
   end;
 
   TTextStyleStyle = (tssNormal, tssEmphasize);

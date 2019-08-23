@@ -471,7 +471,12 @@ begin
   s := ABuffer.TypeInfo.TypeName + '_Line';
   if FNamedStyleMap.TryGetData(s, TmpStyle)
   and Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
-    ALineStyles.Add(TmpStyle as TLineStyle)
+  begin
+    if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
+    or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
+      Exit;
+    ALineStyles.Add(TmpStyle as TLineStyle);
+  end
   else
   begin
     // create default style
@@ -494,7 +499,13 @@ begin
   s := ABuffer.TypeInfo.TypeName + '_PathText';
   if FNamedStyleMap.TryGetData(s, TmpStyle)
   and Assigned(TmpStyle) and (TmpStyle is TPathTextStyle) then
-    Result := (TmpStyle as TPathTextStyle)
+  begin
+    if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
+    or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
+      Result := nil
+    else
+      Result := (TmpStyle as TPathTextStyle);
+  end
   else
   begin
     // create default style
@@ -556,7 +567,13 @@ begin
   s := ABuffer.TypeInfo.TypeName + '_Fill';
   if FNamedStyleMap.TryGetData(s, TmpStyle)
   and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
-    Result := (TmpStyle as TFillStyle)
+  begin
+    if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
+    or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
+      Result := nil
+    else
+      Result := (TmpStyle as TFillStyle);
+  end
   else
   begin
     // create default style
@@ -577,7 +594,12 @@ begin
   ABorderStyles.Clear();
   if FNamedStyleMap.TryGetData(s, TmpStyle)
   and Assigned(TmpStyle) and (TmpStyle is TBorderStyle) then
-    ABorderStyles.Add(TmpStyle as TBorderStyle)
+  begin
+    if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
+    or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
+      Exit;
+    ABorderStyles.Add(TmpStyle as TBorderStyle);
+  end
   else
   begin
     // create default style
@@ -607,7 +629,13 @@ begin
   ATextStyles.Clear();
   if FNamedStyleMap.TryGetData(s, TmpStyle)
   and Assigned(TmpStyle) and (TmpStyle is TTextStyle) then
-    ATextStyles.Add(TmpStyle as TTextStyle)
+  begin
+    if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
+    or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
+      Exit;
+
+    ATextStyles.Add(TmpStyle as TTextStyle);
+  end
   else
   begin
     // create default style
