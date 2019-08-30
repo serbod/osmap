@@ -103,6 +103,8 @@ type
     procedure Init(ADatabaseId: TMapDatabaseId; AOffset: TFileOffset);
   end;
 
+  TMapDBFileOffsetArray = array of TMapDBFileOffset;
+
 { Description of a route, enhanced with information that are required to
   give a human textual (or narrative) drive instructions;
 

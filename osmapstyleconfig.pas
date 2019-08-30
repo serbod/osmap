@@ -51,16 +51,26 @@ unit OsMapStyleConfig;
 interface
 
 uses
-  Classes, SysUtils, {fgl,} OsMapTypes, OsMapObjTypes, OsMapStyles, OsMapGeometry,
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$else}
+  System.Generics.Collections,
+  {$endif}
+  OsMapTypes, OsMapObjTypes, OsMapStyles, OsMapGeometry,
   OsMapObjFeatures, OsMapProjection, OsMapUtils;
 
 type
-  //TNamedStyleMap = specialize TFPGMap<string, TStyle>;
-  TNamedStyleMap = class(TStringList)
+  {$ifdef FPC}
+  TNamedStyleMap = specialize TFPGMap<string, TStyle>;
+  {$else}
+  TNamedStyleMap = TDictionary<string, TStyle>;
+  {$endif}
+  {TNamedStyleMap = class(TStringList)
   public
     function TryGetData(AName: string; out AValue: TStyle): Boolean;
     procedure AddOrSetData(AName: string; AValue: TStyle);
-  end;
+  end; }
 
   { TODO : remove this crutch }
 
@@ -167,6 +177,9 @@ type
     FWayPrio: array of Integer;
 
     FFillProcessors: array of TFillStyleProcessor;
+
+    function GetStyleByName(const AName: string): TStyle;
+    procedure AddStyleByName(const AName: string; AStyle: TStyle);
 
   public
     constructor Create(ATypeConfig: TTypeConfig);
@@ -392,22 +405,29 @@ end;
 procedure TStyleConfig.AddStyle(ATypeInfo: TTypeInfo; AStyle: TStyle; const AName: string);
 begin
   if AName <> '' then
-    FNamedStyleMap.AddObject(AName, AStyle)
+    FNamedStyleMap.AddOrSetValue(AName, AStyle)
   else
-    FNamedStyleMap.AddObject(AStyle.Name, AStyle);
+    FNamedStyleMap.AddOrSetValue(AStyle.Name, AStyle);
+end;
+
+procedure TStyleConfig.AddStyleByName(const AName: string; AStyle: TStyle);
+begin
+  if AName <> '' then
+    FNamedStyleMap.AddOrSetValue(AName, AStyle);
 end;
 
 function TStyleConfig.GetObjTypeStyle(ATypeInfo: TTypeInfo): TStyle;
-var
-  n: Integer;
 begin
   Assert(Assigned(ATypeInfo));
-  n := FNamedStyleMap.IndexOf(ATypeInfo.TypeName);
-  if n <> -1 then
-    Result := (FNamedStyleMap.Objects[n] as TStyle)
-  else
+  if not FNamedStyleMap.TryGetValue(ATypeInfo.TypeName, Result) then
     Result := nil;
   //case ATypeInfo.TypeName;
+end;
+
+function TStyleConfig.GetStyleByName(const AName: string): TStyle;
+begin
+  if not FNamedStyleMap.TryGetValue(AName, Result) then
+    Result := nil;
 end;
 
 function TStyleConfig.HasNodeTextStyles(ATypeInfo: TTypeInfo;
@@ -415,10 +435,12 @@ function TStyleConfig.HasNodeTextStyles(ATypeInfo: TTypeInfo;
 var
   s: string;
   //Level: TMagnificationLevel;
-  n: Integer;
+  //n: Integer;
+  //TmpStyle:
 begin
   s := ATypeInfo.TypeName + '_Text';
-  Result := FNamedStyleMap.Find(s, n);
+  Result := FNamedStyleMap.ContainsKey(s);
+  //Result := FNamedStyleMap.Find(s, n);
   (*
   Level := AMagnification.Level;
   nodeTextStyleSelectors;
@@ -449,8 +471,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_Icon';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TIconStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TIconStyle) then
     Result := (TmpStyle as TIconStyle)
   else
   begin
@@ -458,7 +480,7 @@ begin
     Result := TIconStyle.Create();
     Result.Name := s;
     Result.IconName := ABuffer.TypeInfo.TypeName;
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -469,8 +491,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_Line';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
   begin
     if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
     or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
@@ -485,7 +507,7 @@ begin
     (TmpStyle as TLineStyle).LineColor.InitRandom();
     (TmpStyle as TLineStyle).Width := DEF_LINE_WIDTH;
     (TmpStyle as TLineStyle).DisplayWidth := DEF_LINE_DISPLAY_WIDTH;
-    FNamedStyleMap.AddOrSetData(s, TmpStyle);
+    AddStyleByName(s, TmpStyle);
     ALineStyles.Add(TmpStyle as TLineStyle);
   end;
 end;
@@ -497,8 +519,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_PathText';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TPathTextStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TPathTextStyle) then
   begin
     if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
     or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
@@ -512,7 +534,7 @@ begin
     Result := TPathTextStyle.Create();
     Result.Name := s;
     Result.TextColor.Init(0, 0, 0, 1);
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -523,15 +545,15 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_PathSymbol';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TPathSymbolStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TPathSymbolStyle) then
     Result := (TmpStyle as TPathSymbolStyle)
   else
   begin
     // create default style
     Result := TPathSymbolStyle.Create();
     Result.Name := s;
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -542,8 +564,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_PathShield';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TPathShieldStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TPathShieldStyle) then
     Result := (TmpStyle as TPathShieldStyle)
   else
   begin
@@ -554,7 +576,7 @@ begin
     Result.ShieldStyle.BgColor.InitRandom();
     Result.ShieldStyle.BorderColor.InitRandom();
     Result.ShieldStyle.TextColor.InitRandom();
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -565,8 +587,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_Fill';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
   begin
     if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
     or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
@@ -580,7 +602,7 @@ begin
     Result := TFillStyle.Create();
     Result.Name := s;
     Result.FillColor.InitRandom();
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -592,8 +614,8 @@ var
 begin
   s := ABuffer.TypeInfo.TypeName + '_Border';
   ABorderStyles.Clear();
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TBorderStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TBorderStyle) then
   begin
     if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
     or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
@@ -606,17 +628,15 @@ begin
     TmpStyle := TBorderStyle.Create();
     TmpStyle.Name := s;
     (TmpStyle as TBorderStyle).Color.InitRandom();
-    FNamedStyleMap.AddOrSetData(s, TmpStyle);
+    AddStyleByName(s, TmpStyle);
     ABorderStyles.Add(TmpStyle as TBorderStyle);
   end;
 end;
 
 function TStyleConfig.HasAreaTextStyles(ATypeInfo: TTypeInfo;
   const AMagnification: TMagnification): Boolean;
-var
-  n: Integer;
 begin
-  Result := FNamedStyleMap.Find(ATypeInfo.TypeName, n);
+  Result := FNamedStyleMap.ContainsKey(ATypeInfo.TypeName);
 end;
 
 procedure TStyleConfig.GetAreaTextStyles(const ABuffer: TFeatureValueBuffer;
@@ -627,8 +647,8 @@ var
 begin
   s := ABuffer.TypeInfo.TypeName + '_Text';
   ATextStyles.Clear();
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TTextStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TTextStyle) then
   begin
     if ((TmpStyle.MinZoom <> 0) and (AProjection.Magnification.Level < TmpStyle.MinZoom))
     or ((TmpStyle.MaxZoom <> 0) and (AProjection.Magnification.Level > TmpStyle.MaxZoom)) then
@@ -643,7 +663,7 @@ begin
     TmpStyle.Name := s;
     (TmpStyle as TTextStyle).TextColor.InitRandom();
     (TmpStyle as TTextStyle).IsAutoSize := True;
-    FNamedStyleMap.AddOrSetData(s, TmpStyle);
+    AddStyleByName(s, TmpStyle);
     ATextStyles.Add(TmpStyle as TTextStyle);
   end;
 end;
@@ -655,15 +675,15 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_Icon';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TIconStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TIconStyle) then
     Result := (TmpStyle as TIconStyle)
   else
   begin
     // create default style
     Result := TIconStyle.Create();
     Result.Name := s;
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -674,8 +694,8 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_PathText';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TPathTextStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TPathTextStyle) then
     Result := (TmpStyle as TPathTextStyle)
   else
   begin
@@ -683,7 +703,7 @@ begin
     Result := TPathTextStyle.Create();
     Result.Name := s;
     Result.TextColor.Init(0, 0, 0, 1);
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
@@ -694,89 +714,99 @@ var
   s: string;
 begin
   s := ABuffer.TypeInfo.TypeName + '_PathSymbol';
-  if FNamedStyleMap.TryGetData(s, TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TPathSymbolStyle) then
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TPathSymbolStyle) then
     Result := (TmpStyle as TPathSymbolStyle)
   else
   begin
     // create default style
     Result := TPathSymbolStyle.Create();
     Result.Name := s;
-    FNamedStyleMap.AddOrSetData(s, Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
 function TStyleConfig.GetLandFillStyle(const AProjection: TProjection): TFillStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('land_fill', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
+  s := 'land_fill';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
     Result := (TmpStyle as TFillStyle)
   else
   begin
     // create default style
     Result := TFillStyle.Create();
-    Result.Name := 'land_fill';
+    Result.Name := s;
     Result.FillColor.InitFromBytes(254, 254, 229, 255);
-    FNamedStyleMap.AddOrSetData('land_fill', Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
 function TStyleConfig.GetSeaFillStyle(const AProjection: TProjection): TFillStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('sea_fill', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
+  s := 'sea_fill';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
     Result := (TmpStyle as TFillStyle)
   else
   begin
     // create default style
     Result := TFillStyle.Create();
     Result.FillColor.InitFromBytes(169, 210, 222, 255);
-    FNamedStyleMap.AddOrSetData('sea_fill', Result);
+    AddStyleByName(s, Result);
   end;
 end;
 
 function TStyleConfig.GetCoastFillStyle(const AProjection: TProjection): TFillStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('coast_fill', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
+  s := 'coast_fill';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
     Result := (TmpStyle as TFillStyle)
   else
   begin
     // create default style
     Result := TFillStyle.Create();
     Result.FillColor.InitFromBytes(141, 174, 183, 255);
-    FNamedStyleMap.AddOrSetData('coast_fill', Result);
+    AddStyleByName('coast_fill', Result);
   end;
 end;
 
 function TStyleConfig.GetUnknownFillStyle(const AProjection: TProjection): TFillStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('unknown_fill', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
+  s := 'unknown_fill';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TFillStyle) then
     Result := (TmpStyle as TFillStyle)
   else
   begin
     // create default style
     Result := TFillStyle.Create();
     Result.FillColor.InitFromBytes(250, 250, 250, 255);
-    FNamedStyleMap.AddOrSetData('unknown_fill', Result);
+    AddStyleByName('unknown_fill', Result);
   end;
 end;
 
 function TStyleConfig.GetCoastlineLineStyle(const AProjection: TProjection): TLineStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('coast_line', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
+  s := 'coast_line';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
     Result := (TmpStyle as TLineStyle)
   else
   begin
@@ -784,16 +814,18 @@ begin
     Result := TLineStyle.Create();
     Result.Width := DEF_LINE_WIDTH;
     Result.LineColor.InitFromBytes(141, 174, 183, 255);
-    FNamedStyleMap.AddOrSetData('coast_line', Result);
+    AddStyleByName('coast_line', Result);
   end;
 end;
 
 function TStyleConfig.GetOSMTileBorderLineStyle(const AProjection: TProjection): TLineStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('osm_tile_border', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
+  s := 'osm_tile_border';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
     Result := (TmpStyle as TLineStyle)
   else
   begin
@@ -802,16 +834,18 @@ begin
     Result.Name := 'osm_tile_border';
     Result.Width := DEF_LINE_WIDTH;
     Result.LineColor.InitFromBytes(172, 172, 172, 255);
-    FNamedStyleMap.AddOrSetData('osm_tile_border', Result);
+    AddStyleByName('osm_tile_border', Result);
   end;
 end;
 
 function TStyleConfig.GetOSMSubTileBorderLineStyle(const AProjection: TProjection): TLineStyle;
 var
   TmpStyle: TStyle;
+  s: string;
 begin
-  if FNamedStyleMap.TryGetData('osm_sub_tile_border', TmpStyle)
-  and Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
+  s := 'osm_sub_tile_border';
+  TmpStyle := GetStyleByName(s);
+  if Assigned(TmpStyle) and (TmpStyle is TLineStyle) then
     Result := (TmpStyle as TLineStyle)
   else
   begin
@@ -820,7 +854,7 @@ begin
     Result.Name := 'osm_sub_tile_border';
     Result.Width := DEF_LINE_WIDTH;
     Result.LineColor.InitFromBytes(172, 172, 172, 255);
-    FNamedStyleMap.AddOrSetData('osm_sub_tile_border', Result);
+    AddStyleByName('osm_sub_tile_border', Result);
   end;
 end;
 
@@ -910,7 +944,7 @@ end;
 
 { TNamedStyleMap }
 
-procedure TNamedStyleMap.AddOrSetData(AName: string; AValue: TStyle);
+{procedure TNamedStyleMap.AddOrSetData(AName: string; AValue: TStyle);
 var
   n: Integer;
 begin
@@ -929,7 +963,7 @@ begin
   Result := (n <> -1);
   if Result then
     AValue := Objects[n] as TStyle;
-end;
+end;  }
 
 end.
 

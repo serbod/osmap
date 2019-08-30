@@ -280,6 +280,7 @@ type
 
   {$ifdef FPC}
   TMapWayList = specialize TFPGList<TMapWay>;
+  TMapWayDict = specialize TFPGMap<string, TMapWay>;
   {$else}
   TMapWayList = TList<TMapWay>;
   {$endif}

@@ -68,7 +68,7 @@ type
 
   { TSegment }
 
-  TSegment = object
+  TLabelPathSegment = object
     Start: TVertex2D;
     Offset: Double;
     Length: Double;
@@ -77,20 +77,20 @@ type
     procedure Init(const AStart: TVertex2D; AOffset, ALength, AAngle: Double); inline;
   end;
 
-  TSegmentArray = array of TSegment;
+  TLabelPathSegmentArray = array of TLabelPathSegment;
 
   { TLabelPath }
 
   TLabelPath = object
   private
     FLength: Double;
-    FSegments: TSegmentArray;
+    FSegments: TLabelPathSegmentArray;
     FOffsetIndexArr: array of Integer;  // segment offset by length 100
     FMinSegmentLength: Double;
     FEnd: TVertex2D;
     FEndDistance: Double;
 
-    function SegmentBefore(AOffset: Double): TSegment;
+    function SegmentBefore(AOffset: Double): TLabelPathSegment;
   public
     procedure Init(AMinSegmentLength: Double = 5); inline;
     procedure AddPoint(X, Y: Double);
@@ -103,6 +103,9 @@ type
       if angle between first path segment (on startOffset) and any
       following (until endOffset) is lesser than required maximum. }
     function TestAngleVariance(AStartOffset, AEndOffset, AMaximumAngle: Double): Boolean;
+
+    property Segments: TLabelPathSegmentArray read FSegments;
+
   end;
 
   { TDoubleRectangle }
@@ -270,6 +273,7 @@ type
     {$endif}
     Priority: Integer;      // -1 = not visible
     Glyphs: TMapGlyphArray;
+    Path: TVertex2DArray;
     Style: TPathTextStyle;
   end;
 
@@ -312,6 +316,8 @@ type
       AEnableWrapping: Boolean = False;
       AContourLabel: Boolean = False) of object;
 
+  TLabelPathLayoutMode = (lplmGlyphs, lplmPath);
+
   { TLabelLayouter }
   { TextLayouter is built-in, and must be overriden in decent classes }
   TLabelLayouter = class
@@ -322,6 +328,7 @@ type
     FVisibleViewport: TDoubleRectangle;
     FLayoutViewport: TDoubleRectangle;
     FLayoutOverlap: Double;  // overlap ratio used for label layouting
+    FLabelPathLayoutMode: TLabelPathLayoutMode;
 
     //FOnGlyphBoundingBox: TOnGlyphBoundingBox;
     FOnTextLayout: TOnTextLayout;
@@ -364,6 +371,11 @@ type
     property VisibleViewport: TDoubleRectangle read FVisibleViewport;
     property TextLabels: TTextLabelList read FTextLabelList;
     property ContourLabels: TContourLabelList read FContourLabelList;
+
+    { Layout mode for curved labels
+      lplmGlyphs - place and tilt every glyph of text label
+      lplmPath - render can draw curved text on path }
+    property LabelPathLayoutMode: TLabelPathLayoutMode read FLabelPathLayoutMode write FLabelPathLayoutMode;
 
     //property OnGlyphBoundingBox: TOnGlyphBoundingBox read FOnGlyphBoundingBox write FOnGlyphBoundingBox;
     property OnTextLayout: TOnTextLayout read FOnTextLayout write FOnTextLayout;
@@ -425,7 +437,7 @@ end;
 
 { TSegment }
 
-procedure TSegment.Init(const AStart: TVertex2D; AOffset, ALength,
+procedure TLabelPathSegment.Init(const AStart: TVertex2D; AOffset, ALength,
   AAngle: Double);
 begin
   Start.Assign(AStart);
@@ -436,7 +448,7 @@ end;
 
 { TLabelPath }
 
-function TLabelPath.SegmentBefore(AOffset: Double): TSegment;
+function TLabelPath.SegmentBefore(AOffset: Double): TLabelPathSegment;
 var
   i, iHundred: Integer;
 begin
@@ -471,7 +483,7 @@ end;
 procedure TLabelPath.AddPoint(X, Y: Double);
 var
   n, i: Integer;
-  LastSeg: TSegment;
+  LastSeg: TLabelPathSegment;
   endDistance: Double;
 begin
   if Length(FSegments) = 0 then
@@ -515,7 +527,7 @@ end;
 
 function TLabelPath.PointAtLength(AOffset: Double): TVertex2D;
 var
-  RelSeg: TSegment;
+  RelSeg: TLabelPathSegment;
   p, VtAdd: TVertex2D;
   mul: Double;
 begin
@@ -725,6 +737,7 @@ begin
   FVisibleViewport.Init(0, 0, 0, 0);
   FLayoutViewport.Init(0, 0, 0, 0);
   FLayoutOverlap := 0;
+  FLabelPathLayoutMode := lplmGlyphs;
 end;
 
 destructor TLabelLayouter.Destroy;
@@ -1168,8 +1181,9 @@ var
   diagonal, FontHeight: Double;
   sinA, cosA, ox, oy: Double;
   XArr, YArr: array [0..3] of Double;
-  i, GlyphIndex: Integer;
+  i, iDelta, GlyphIndex: Integer;
   minX, maxX, minY, maxY: Double;
+  Seg: TLabelPathSegment;
 begin
   // TODO: cache label for string and font parameters
   FontHeight := AProjection.ConvertWidthToPixel(ALabelData.Style.Size);
@@ -1211,98 +1225,130 @@ begin
     initialAngle := abs(ALabelPath.AngleAtLengthDeg(offset));
     IsUpwards := (initialAngle > 90) and (initialAngle < 270);
 
-    SetLength(ContLabel.Glyphs, Length(TmpLabel.Glyphs));
-    GlyphIndex := -1;
-
-    for glyph in TmpLabel.Glyphs do
+    if LabelPathLayoutMode = lplmGlyphs then
     begin
-      if IsUpwards then
-        glyphOffset := offset - glyph.Position.X + TmpLabel.Width
-      else
-        glyphOffset := offset + glyph.Position.X;
+      SetLength(ContLabel.Glyphs, Length(TmpLabel.Glyphs));
+      GlyphIndex := -1;
 
-      point := ALabelPath.PointAtLength(glyphOffset);
-
-      //OnGlyphBoundingBox(glyph, textBoundingBox);
-      w := glyph.Width;
-      h := glyph.Height;
-      tl.Assign(glyph.Position);
-
-      // glyph angle in radians
-      if IsUpwards then
-        angle := ALabelPath.AngleAtLength(glyphOffset - w/2) * -1
-      else
-        angle := ALabelPath.AngleAtLength(glyphOffset + w/2) * -1;
-
-      // it is not real diagonal, but maximum distance from glyph
-      // point that can be covered after treansformantions
-      diagonal := w + h + abs(textBaselineOffset);
-
-      // fast check if current glyph can be visible
-      GlyphRect.Init(point.X-diagonal, point.Y-diagonal, 2*diagonal, 2*diagonal);
-      if (not FLayoutViewport.Intersects(GlyphRect)) then
-        Continue;
-
-      if IsUpwards then
-        angle := angle - M_PI;
-
-      sinA := sin(angle);
-      cosA := cos(angle);
-
-      glyphCopy := glyph;
-      glyphCopy.Position.X := point.X - textBaselineOffset * sinA;
-      glyphCopy.Position.Y := point.Y + textBaselineOffset * cosA;
-      glyphCopy.Angle := angle;
-
-      // four coordinates of glyph bounding box; x,y of top-left, top-right, bottom-right, bottom-left
-      XArr[0] := tl.X;
-      XArr[1] := tl.X + w;
-      XArr[2] := tl.X + w;
-      XArr[3] := tl.X;
-
-      YArr[0] := tl.Y;
-      YArr[1] := tl.Y;
-      YArr[2] := tl.Y + h;
-      YArr[3] := tl.Y + h;
-
-      // rotate
-      for i := 0 to 3 do
+      for glyph in TmpLabel.Glyphs do
       begin
-        ox := XArr[i];
-        oy := YArr[i];
-        XArr[i] := (ox * cosA) - (oy * sinA);
-        YArr[i] := (ox * sinA) + (oy * cosA);
+        if IsUpwards then
+          glyphOffset := offset - glyph.Position.X + TmpLabel.Width
+        else
+          glyphOffset := offset + glyph.Position.X;
+
+        point := ALabelPath.PointAtLength(glyphOffset);
+
+        //OnGlyphBoundingBox(glyph, textBoundingBox);
+        w := glyph.Width;
+        h := glyph.Height;
+        tl.Assign(glyph.Position);
+
+        // glyph angle in radians
+        if IsUpwards then
+          angle := ALabelPath.AngleAtLength(glyphOffset - w/2) * -1
+        else
+          angle := ALabelPath.AngleAtLength(glyphOffset + w/2) * -1;
+
+        // it is not real diagonal, but maximum distance from glyph
+        // point that can be covered after treansformantions
+        diagonal := w + h + abs(textBaselineOffset);
+
+        // fast check if current glyph can be visible
+        GlyphRect.Init(point.X-diagonal, point.Y-diagonal, 2*diagonal, 2*diagonal);
+        if (not FLayoutViewport.Intersects(GlyphRect)) then
+          Continue;
+
+        if IsUpwards then
+          angle := angle - M_PI;
+
+        sinA := sin(angle);
+        cosA := cos(angle);
+
+        glyphCopy := glyph;
+        glyphCopy.Position.X := point.X - textBaselineOffset * sinA;
+        glyphCopy.Position.Y := point.Y + textBaselineOffset * cosA;
+        glyphCopy.Angle := angle;
+
+        // four coordinates of glyph bounding box; x,y of top-left, top-right, bottom-right, bottom-left
+        XArr[0] := tl.X;
+        XArr[1] := tl.X + w;
+        XArr[2] := tl.X + w;
+        XArr[3] := tl.X;
+
+        YArr[0] := tl.Y;
+        YArr[1] := tl.Y;
+        YArr[2] := tl.Y + h;
+        YArr[3] := tl.Y + h;
+
+        // rotate
+        for i := 0 to 3 do
+        begin
+          ox := XArr[i];
+          oy := YArr[i];
+          XArr[i] := (ox * cosA) - (oy * sinA);
+          YArr[i] := (ox * sinA) + (oy * cosA);
+        end;
+
+        // bounding box after rotation
+        minX := XArr[0];
+        maxX := XArr[0];
+        minY := YArr[0];
+        maxY := YArr[0];
+        for i := 1 to 3 do
+        begin
+          minX := min(minX, XArr[i]);
+          maxX := max(maxX, XArr[i]);
+          minY := min(minY, YArr[i]);
+          maxY := max(maxY, YArr[i]);
+        end;
+        // setup glyph top-left position and dimension after rotation
+        glyphCopy.trPosition.SetValue(minX + glyphCopy.Position.X, minY + glyphCopy.Position.Y);
+        glyphCopy.trWidth  := maxX - minX;
+        glyphCopy.trHeight := maxY - minY;
+
+        Inc(GlyphIndex);
+        ContLabel.Glyphs[GlyphIndex] := glyphCopy;
       end;
 
-      // bounding box after rotation
-      minX := XArr[0];
-      maxX := XArr[0];
-      minY := YArr[0];
-      maxY := YArr[0];
-      for i := 1 to 3 do
+      if GlyphIndex <> -1 then // is some glyph visible?
       begin
-        minX := min(minX, XArr[i]);
-        maxX := max(maxX, XArr[i]);
-        minY := min(minY, YArr[i]);
-        maxY := max(maxY, YArr[i]);
-      end;
-      // setup glyph top-left position and dimension after rotation
-      glyphCopy.trPosition.SetValue(minX + glyphCopy.Position.X, minY + glyphCopy.Position.Y);
-      glyphCopy.trWidth  := maxX - minX;
-      glyphCopy.trHeight := maxY - minY;
-
-      Inc(GlyphIndex);
-      ContLabel.Glyphs[GlyphIndex] := glyphCopy;
-    end;
-
-    if GlyphIndex <> -1 then // is some glyph visible?
-    begin
-      SetLength(ContLabel.Glyphs, GlyphIndex+1);
-      FContourLabelList.Add(ContLabel);
+        SetLength(ContLabel.Glyphs, GlyphIndex+1);
+        FContourLabelList.Add(ContLabel);
+      end
+      else
+        ContLabel.Free();
+      offset := offset + TmpLabel.Width + ALabelData.ContourLabelSpace;
     end
     else
-      ContLabel.Free();
-    offset := offset + TmpLabel.Width + ALabelData.ContourLabelSpace;
+    if LabelPathLayoutMode = lplmPath then
+    begin
+      if ALabelPath.GetLength < TmpLabel.Width then
+      begin
+        ContLabel.Free();
+        Continue;
+      end;
+
+      SetLength(ContLabel.Path, Length(ALabelPath.Segments));
+      if IsUpwards then
+      begin
+        iDelta := 1;
+        i := 0;
+      end
+      else
+      begin
+        iDelta := -1;
+        i := Length(ALabelPath.Segments) - 1;
+      end;
+      for Seg in ALabelPath.Segments do
+      begin
+        ContLabel.Path[i].Assign(Seg.Start);
+        i := i + iDelta;
+      end;
+
+      FContourLabelList.Add(ContLabel);
+    end;
+
   end;
 end;
 

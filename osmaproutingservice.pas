@@ -35,6 +35,9 @@ routing\RoutingService
     RNodeCostCompare -> CompareRNodes()
     VNode
     ClosedNodeHasher
+    OpenList
+    OpenMap
+    ClosedSet
 routing\AbstractRoutingService
   RoutingResult
   RoutePoints
@@ -142,6 +145,10 @@ type
     ClosedSet: TVNodeList;
   end;
 
+  TOpenList = TRNodeList;
+  TOpenMap = specialize TFPGMap<TMapDBId, Integer>; // map to index in TOpenList
+  TClosedSet = TVNodeList;
+
   { Abstract algorithms for routing }
 
   { TRoutingService }
@@ -217,12 +224,107 @@ type
     function GetCostLimit(AState: TRoutingState; ADatabase: TMapDatabaseID;
       ATargetDistance: TDistance): Double; virtual;
 
-    function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMap): Boolean;
+    function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMap): Boolean; virtual;
     { Return the route node for the given database offset }
-    function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean;
+    function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; virtual;
 
-    function GetWayByOffset(const AOffset: TMapDBFileOffset; AWay: TMapWay): Boolean;
-    fdggfh
+    function GetWayByOffset(const AOffset: TMapDBFileOffset; AWay: TMapWay): Boolean; virtual;
+    function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; virtual;
+
+    function GetAreaByOffset(const AOffset: TMapDBFileOffset; AArea: TMapArea): Boolean; virtual;
+    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual;
+
+    procedure ResolveRNodeChainToList(AFinalRouteNode: TMapDBId;
+      const AClosedSet: TClosedSet;
+      const AClosedRestrictedSet: TClosedSet;
+      var ANodes: TVNodeList);
+
+    function ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean; virtual;
+
+    function GetNodeTwins(const AState: TRoutingState;
+      const ADatabase: TMapDatabaseID;
+      AId: TId): TMapDBIdArray; virtual;
+
+    procedure GetStartForwardRouteNode(const AState: TRoutingState;
+      const ADatabase: TMapDatabaseID;
+      const AWay: TMapWay;
+      ANodeIndex: Integer;
+      var ARouteNode: TRouteNode;
+      var ARouteNodeIndex: Integer);
+    procedure GetStartBackwardRouteNode(const AState: TRoutingState;
+      const ADatabase: TMapDatabaseID;
+      const AWay: TMapWay;
+      ANodeIndex: Integer;
+      var ARouteNode: TRouteNode);
+    procedure GetTargetBackwardRouteNode(const AState: TRoutingState;
+      const ADatabase: TMapDatabaseID;
+      const AWay: TMapWay;
+      ANodeIndex: Integer;
+      var ARouteNode: TRouteNode);
+
+    function GetStartNodes(const AState: TRoutingState;
+      const APosition: TRoutePosition;
+      var AStartCoord: TGeoPoint;
+      const ATargetCoord: GeoPoint;
+      var AForwardRouteNode: TRouteNode;
+      var ABackwardRouteNode: TRouteNode;
+      var AForwardRNode: TRNode;
+      var ABackwardRNode: TRNode): Boolean;
+
+    function GetWayTargetNodes(const AState: TRoutingState;
+      const APosition: TRoutePosition;
+      var ATargetCoord: GeoPoint;
+      var AForwardNode: TRouteNode;
+      var ABackwardNode: TRouteNode): Boolean;
+
+    function GetTargetNodes(const AState: TRoutingState;
+      const APosition: TRoutePosition;
+      var ATargetCoord: GeoPoint;
+      var AForwardNode: TRouteNode;
+      var ABackwardNode: TRouteNode): Boolean;
+
+    function GetRNode(const AState: TRoutingState;
+      const APosition: TRoutePosition;
+      const AWay: TMapWay;
+      ARouteNodeIndex: Integer;
+      const ARouteNode: TRouteNode;
+      const AStartCoord: TGeoPoint;
+      const ATargetCoord: GeoPoint;
+      var ARNode: TRNode): Boolean;
+
+    procedure AddNodes(var ARute: TRouteData;
+      ADatabase: TMapDatabaseId;
+      AStartNodeId: TId;
+      AStartNodeIndex: Integer;
+      const AObject: TObjectFileRef;
+      AIdCount: integer;
+      AIsOneway: Boolean;
+      ATargetNodeIndex: Integer);
+
+    function GetWayStartNodes(const AState: TRoutingState;
+      const APosition: TRoutePosition;
+      var AStartCoord: TGeoPoint;
+      const ATargetCoord: GeoPoint;
+      var AForwardRouteNode: TRouteNode;
+      var ABackwardRouteNode: TRouteNode;
+      var AForwardRNode: TRNode;
+      var ABackwardRNode: TRNode): Boolean;
+
+    function ResolveRNodesToRouteData(const AState: TRoutingState;
+      const ANodes: TVNodeList;
+      const AStart: TRoutePosition;
+      const ATarget: TRoutePosition;
+      var ARoute: TRouteData): Boolean;
+
+    function WalkToOtherDatabases(const AState: TRoutingState;
+      var ACurrent: TRNode;
+      var ACurrentRouteNode: TRouteNode;
+      var AOpenList: TOpenList;
+      var AOpenMap: TOpenMap;
+      const AClosedSet: TClosedSet;
+      const AClosedRestrictedSet: TClosedSet): Boolean; virtual;
+
+    dgfdf
   end;
 
   function RNode(const AId: TMapDBId;

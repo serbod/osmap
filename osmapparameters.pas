@@ -77,6 +77,7 @@ type
     FLabelLineMaxCharCount: Integer;    // Labels will be word wrapped if they are longer then the given characters
     FLabelLineFitToArea: Boolean;       // Labels will be word wrapped to fit object area
     FLabelLineFitToWidth: Double;       // Labels will be word wrapped to fit given width in pixels
+    FLabelIncludesAddress: Boolean;
 
     FLabelPadding: Double;              // Space around point labels in mm (default 1).
     FPlateLabelPadding: Double;         // Space around plates in mm (default 5).
@@ -157,6 +158,9 @@ type
     property LabelLineFitToArea: Boolean read FLabelLineFitToArea;
     // Labels will be word wrapped to fit given width in pixels
     property LabelLineFitToWidth: Double read FLabelLineFitToWidth;
+    // Label includes address
+    property LabelIncludesAddress: Boolean read FLabelIncludesAddress write FLabelIncludesAddress;
+
 
     // Space around point labels in mm (default 1).
     property LabelPadding: Double read FLabelPadding;

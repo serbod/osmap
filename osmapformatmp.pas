@@ -475,6 +475,9 @@ begin
   end
   else
   begin
+    if not FileExists(AFileName) then
+      Exit;
+
     //ResStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
     ResStream := TFileStream.Create(AFileName, fmOpenRead);
   end;

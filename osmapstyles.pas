@@ -141,8 +141,8 @@ type
   TStyle = class(TObject)
   public
     Name: string;
-    MinZoom: Integer;
-    MaxZoom: Integer;
+    MinZoom: TMagnificationLevel;
+    MaxZoom: TMagnificationLevel;
     {
     procedure SetBoolValue(AAttrIndex: Integer; AValue: Boolean); virtual;
     procedure SetStringValue(AAttrIndex: Integer; const AValue: string); virtual;

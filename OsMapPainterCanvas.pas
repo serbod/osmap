@@ -12,7 +12,7 @@ interface
 uses
   Classes, SysUtils, SyncObjs,
   {$ifndef FPC}
-  UITypes, FMX.Graphics, Types, FMX.Types,
+  UITypes, FMX.Graphics, Types, FMX.Types, Math.Vectors,
   {$endif}
   OsMapPainter, OsMapLabels, OsMapParameters, OsMapStyles,
   OsMapTypes, OsMapTransform, OsMapGeometry, OsMapStyleConfig, OsMapProjection,
@@ -63,6 +63,10 @@ type
       AParameter: TMapParameter;
       AStyle: TPathTextStyle;
       const AGlyphs: TMapGlyphArray);
+
+    {procedure DrawTextPath(AProjection: TProjection;
+      AParameter: TMapParameter;
+      const AContourLabel: TContourLabel); }
 
     { ex-DrawFill(), set fill and border style }
     procedure DrawFillStyle(AProjection: TProjection; AParameter: TMapParameter;
@@ -236,10 +240,13 @@ procedure TMapPainterCanvas.DrawGlyphs(AProjection: TProjection;
   const AGlyphs: TMapGlyphArray);
 var
   //matrix: TAggTransAffine;
+  SaveMatrix: TMatrix;
+  m: TMatrix;
   layoutGlyph: TMapGlyph;
   //i: Integer;
   TextColor: TMapColor;
   r: TRectF;
+  pd: TPathData;
 begin
   Assert(Assigned(AStyle));
   TextColor.Init(0, 0, 0, 1);
@@ -248,11 +255,13 @@ begin
   FCanvas.Stroke.Kind := TBrushKind.Solid;
   FCanvas.Stroke.Thickness := 1;
   FCanvas.Fill.Color := GetAlphaColor(TextColor);
+  FCanvas.Fill.Kind := TBrushKind.Solid;
   //FCanvas.NoLine();
   //FAgg2D.FlipText := True;
   //FAgg2D.LineColor := GetAggRgba8(AStyle.TextColor);
 
   //matrix := TAggTransAffine.Create();
+  pd := TPathData.Create();
 
   //for i := 0 to Length(AGlyphs)-1 do
   for layoutGlyph in AGlyphs do
@@ -275,23 +284,45 @@ begin
                           *scanlineP8,
                           *renderer_aa);   }
 
-    r.Left := layoutGlyph.Position.X;
-    r.Top := layoutGlyph.Position.Y;
+    //r.Left := layoutGlyph.Position.X;
+    //r.Top := layoutGlyph.Position.Y;
+    //r.Width := layoutGlyph.Width + 5;
+    //r.Height := layoutGlyph.Height + 5;
+    r.Left := 0;
+    r.Top := -layoutGlyph.Height;
     r.Width := layoutGlyph.Width;
     r.Height := layoutGlyph.Height;
 
+    {SaveMatrix := FCanvas.Matrix;
+    m := TMatrix.CreateRotation(layoutGlyph.Angle);
+    m.m31 := layoutGlyph.Position.X;
+    m.m32 := layoutGlyph.Position.Y;
+    FCanvas.SetMatrix(m);
+
+
     FCanvas.FillText(r,
       layoutGlyph.TextChar,
-      False, 100,
+      False, 1,
       [TFillTextFlag.RightToLeft],
       TTextAlign.Center,
       TTextAlign.Center);
+
+    FCanvas.SetMatrix(SaveMatrix);}
 
     {TextAngle := layoutGlyph.Angle;
     FCanvas.Text(layoutGlyph.Position.X,
       layoutGlyph.Position.Y,
       layoutGlyph.TextChar); }
+
+    pd.Clear();
+    FCanvas.TextToPath(pd, r, layoutGlyph.TextChar, False, TTextAlign.Center, TTextAlign.Center);
+    m := TMatrix.CreateRotation(layoutGlyph.Angle);
+    m.m31 := layoutGlyph.Position.X;
+    m.m32 := layoutGlyph.Position.Y;
+    pd.ApplyMatrix(m);
+    FCanvas.FillPath(pd, 1);
   end;
+  pd.Free();
   FCanvas.EndScene();
 end;
 
@@ -501,6 +532,44 @@ begin
   end;
 end;
 
+{procedure TMapPainterCanvas.DrawTextPath(AProjection: TProjection;
+  AParameter: TMapParameter;
+  const AContourLabel: TContourLabel);
+var
+  TextColor: TMapColor;
+  PathData: TPathData;
+  r: TRectF;
+  tp: TPointF;
+  //i: Integer;
+  PathPoint: TVertex2D;
+  IsFirstPoint: Boolean;
+begin
+  TextColor := AContourLabel.Style.TextColor;
+  FCanvas.Fill.Color := GetAlphaColor(TextColor);
+  FCanvas.Font.Size := AContourLabel.Style.Size;
+
+  PathData := TPathData.Create();
+
+  IsFirstPoint := True;
+  for PathPoint in AContourLabel.Path do
+  begin
+    if IsFirstPoint then
+    begin
+      IsFirstPoint := False;
+      PathData.MoveTo(TPointF.Create(PathPoint.X, PathPoint.Y));
+    end
+    else
+    begin
+      PathData.LineTo(TPointF.Create(PathPoint.X, PathPoint.Y));
+    end;
+  end;
+
+  r := PathData.GetBounds;
+
+  FCanvas.TextToPath(PathData, r, AContourLabel.Text, False, TTextAlign.Leading)
+
+end;  }
+
 procedure TMapPainterCanvas.DrawLabel(AProjection: TProjection;
   AParameter: TMapParameter; X, Y: Double; const AMapLabel: TMapLabel;
   const ALabel: TLabelData);
@@ -544,12 +613,13 @@ begin
     //FCanvas.TextAngle := 0;
     //FCanvas.Text(X, Y, UTF8ToUTF16(AMapLabel.Text));
 
-    r.SetLocation(X, Y);
-    r.Width := AMapLabel.Width;
-    r.Height := AMapLabel.Height;
+    r.Left := X;
+    r.Top := Y;
+    r.Width := AMapLabel.Width + 10;
+    r.Height := AMapLabel.Height + 10;
     FCanvas.FillText(r,
       AMapLabel.Text,
-      False, 100, [],
+      False, 1, [],
       TTextAlign.Leading,
       TTextAlign.Leading);
 

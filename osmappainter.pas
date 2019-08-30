@@ -1619,12 +1619,19 @@ begin
   for TextStyle in ATextStyles do
   begin
     //sLabel := GetLabelText(TextStyle.FeatureType, AParameter, ABuffer);
-    sLabel := GetLabelText(ftAddress, AParameter, ABuffer);
-    s := GetLabelText(ftName, AParameter, ABuffer);
-    if (sLabel <> '') and (s <> '') then
-      sLabel := sLabel + ' ' + s
+    if AParameter.LabelIncludesAddress then
+    begin
+      sLabel := GetLabelText(ftAddress, AParameter, ABuffer);
+      s := GetLabelText(ftName, AParameter, ABuffer);
+      if (sLabel <> '') and (s <> '') then
+        sLabel := sLabel + ' ' + s
+      else
+        slabel := sLabel + s;
+    end
     else
-      slabel := sLabel + s;
+    begin
+      sLabel := GetLabelText(TextStyle.FeatureType, AParameter, ABuffer);
+    end;
 
     if (sLabel = '') then
       Continue;
@@ -1672,6 +1679,10 @@ begin
       LbData.FontSize := TextStyle.Size;
       LbData.Alpha := TextStyle.TextColor.A;
     end;
+
+    { TODO : from parameters }
+    if LbData.FontSize < 8 then
+      Continue;
 
     LbData.Position := TextStyle.Position;
     LbData.Text := sLabel;
