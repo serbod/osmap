@@ -322,8 +322,12 @@ function OSMTileId(AX, AY: LongWord): TOSMTileId;
 
 function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileId;
 
+{ Calculating basic cost for the A* algorithm based on the
+  spherical distance of two points on Earth. }
+function GetSphericalDistance(const A, B: TGeoPoint): TDistance;
+
 { Calculating Vincenty's inverse for getting the ellipsoidal distance
-  of two points on earth. }
+  of two points on Earth. }
 function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance; overload;
 
 function GetEllipsoidalDistance(const A, B: TGeoPoint): TDistance; overload;
@@ -430,6 +434,28 @@ begin
   Result.Y := LongWord(Floor((1.0 - ln( tan(LatRad) + 1.0 / cos(LatRad)) / M_PI) / 2.0 * AMagnification.Magnification));
 end;
 
+function GetSphericalDistance(const A, B: TGeoPoint): TDistance;
+var
+  r: TDistance;
+  aLatRad, bLatRad, dLat, dLon: Double;
+  sindLonDiv2, aa, c: Double;
+begin
+  r := 6371010.0; // Average radius of Earth
+  aLatRad := DegToRad(a.Lat);
+  bLatRad := DegToRad(b.Lat);
+  dLat := DegToRad(b.Lat - a.Lat);
+  dLon := DegToRad(b.Lon - a.Lon);
+
+  sindLonDiv2 := sin(dLon / 2);
+
+  aa := sin(dLat / 2) * sin(dLat / 2)
+      + cos(aLatRad) * cos(bLatRad) * sindLonDiv2 * sindLonDiv2;
+
+  c := 2 * arctan2(sqrt(aa), sqrt(1-aa));
+
+  Result := r * c;
+end;
+
 function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance;
 var
   a, b, f, phi1, phi2, lambda1, lambda2, a2b2b2: Double;
@@ -441,7 +467,7 @@ var
   ul2, cos2sigmam2, A1, B1, C1: Double;
   i: Integer;
 begin
-  a := 6378137.0;          // length of semi-major axis of the ellipsoid (radius at equator)
+  a := EarthRadiusMeter;   // length of semi-major axis of the ellipsoid (radius at equator)
   b := 6356752.314245;     // length of semi-minor axis of the ellipsoid (radius at the poles)
   f := 1 / 298.257223563;  // WGS-84 ellipsiod
   phi1 := aLat * M_PI / 180;
@@ -548,9 +574,9 @@ begin
   lon1 := lon1 * M_PI / 180;
 
   // WGS-84 ellipsiod
-  a := 6378137.0;       // length of semi-major axis of the ellipsoid (radius at equator)
-  b := 6356752.314245;  // length of semi-minor axis of the ellipsoid (radius at the poles)
-  f := 1/298.257223563; // flattening of the ellipsoid
+  a := EarthRadiusMeter; // length of semi-major axis of the ellipsoid (radius at equator)
+  b := 6356752.314245;   // length of semi-minor axis of the ellipsoid (radius at the poles)
+  f := 1/298.257223563;  // flattening of the ellipsoid
   distanceAsMeter := ADistance;
 
   alpha1 := ABearing * M_PI / 180;

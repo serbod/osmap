@@ -404,30 +404,52 @@ end;
 
 procedure TStyleConfig.AddStyle(ATypeInfo: TTypeInfo; AStyle: TStyle; const AName: string);
 begin
+  {$ifdef FPC}
+  if AName <> '' then
+    FNamedStyleMap.AddOrSetData(AName, AStyle)
+  else
+    FNamedStyleMap.AddOrSetData(AStyle.Name, AStyle);
+  {$else}
   if AName <> '' then
     FNamedStyleMap.AddOrSetValue(AName, AStyle)
   else
     FNamedStyleMap.AddOrSetValue(AStyle.Name, AStyle);
+  {$endif}
 end;
 
 procedure TStyleConfig.AddStyleByName(const AName: string; AStyle: TStyle);
 begin
+  {$ifdef FPC}
+  if AName <> '' then
+    FNamedStyleMap.AddOrSetData(AName, AStyle)
+  {$else}
   if AName <> '' then
     FNamedStyleMap.AddOrSetValue(AName, AStyle);
+  {$endif}
 end;
 
 function TStyleConfig.GetObjTypeStyle(ATypeInfo: TTypeInfo): TStyle;
 begin
   Assert(Assigned(ATypeInfo));
+  {$ifdef FPC}
+  if not FNamedStyleMap.TryGetData(ATypeInfo.TypeName, Result) then
+    Result := nil;
+  {$else}
   if not FNamedStyleMap.TryGetValue(ATypeInfo.TypeName, Result) then
     Result := nil;
+  {$endif}
   //case ATypeInfo.TypeName;
 end;
 
 function TStyleConfig.GetStyleByName(const AName: string): TStyle;
 begin
+  {$ifdef FPC}
+  if not FNamedStyleMap.TryGetData(AName, Result) then
+    Result := nil;
+  {$else}
   if not FNamedStyleMap.TryGetValue(AName, Result) then
     Result := nil;
+  {$endif}
 end;
 
 function TStyleConfig.HasNodeTextStyles(ATypeInfo: TTypeInfo;
@@ -439,7 +461,11 @@ var
   //TmpStyle:
 begin
   s := ATypeInfo.TypeName + '_Text';
+  {$ifdef FPC}
+  Result := (FNamedStyleMap.IndexOf(s) <> -1);
+  {$else}
   Result := FNamedStyleMap.ContainsKey(s);
+  {$endif}
   //Result := FNamedStyleMap.Find(s, n);
   (*
   Level := AMagnification.Level;
@@ -636,7 +662,11 @@ end;
 function TStyleConfig.HasAreaTextStyles(ATypeInfo: TTypeInfo;
   const AMagnification: TMagnification): Boolean;
 begin
+  {$ifdef FPC}
+  Result := (FNamedStyleMap.IndexOf(ATypeInfo.TypeName) <> -1);
+  {$else}
   Result := FNamedStyleMap.ContainsKey(ATypeInfo.TypeName);
+  {$endif}
 end;
 
 procedure TStyleConfig.GetAreaTextStyles(const ABuffer: TFeatureValueBuffer;

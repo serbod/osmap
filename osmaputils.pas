@@ -173,6 +173,8 @@ procedure SetBit(var Value; BitIndex: Integer; BitValue: Boolean);
 
 procedure AppendToArray(var AArray; const AValue);
 
+var
+  LogFile: TextFile;
 
 implementation
 

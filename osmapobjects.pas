@@ -248,7 +248,7 @@ type
     // Nodes[Count-1].GetId()
     function GetBackId(): TId;
     // Nodes[AIndex]
-    //function GetPoint(AIndex: Integer): TGeoPoint;
+    function GetPoint(AIndex: Integer): TGeoPoint;
     // Nodes[AIndex].Coord
     function GetCoord(AIndex: Integer): TGeoPoint;
 
@@ -281,9 +281,11 @@ type
   {$ifdef FPC}
   TMapWayList = specialize TFPGList<TMapWay>;
   TMapWayDict = specialize TFPGMap<string, TMapWay>;
+  TMapAreaDict = specialize TFPGMap<string, TMapArea>;
   {$else}
   TMapWayList = TList<TMapWay>;
   {$endif}
+
 
   { Ground tiles }
 
@@ -892,10 +894,10 @@ begin
     Result := 0;
 end;
 
-{function TMapWay.GetPoint(AIndex: Integer): TGeoPoint;
+function TMapWay.GetPoint(AIndex: Integer): TGeoPoint;
 begin
   Result := Nodes[AIndex];
-end; }
+end;
 
 function TMapWay.GetCoord(AIndex: Integer): TGeoPoint;
 begin

@@ -45,6 +45,12 @@ routing\RouteNode
 routing\RouteData
   RouteData
   RouteEntry
+
+routing\RoutingProfile
+  RoutingProfile -> TAbstractRoutingProfile
+  AbstractRoutingProfile -> TRoutingProfile
+  ShortestPathRoutingProfile -> TRoutingProfile
+  FastestPathRoutingProfile
 *)
 unit OsMapRouting;
 
@@ -55,8 +61,12 @@ unit OsMapRouting;
 interface
 
 uses
-  Classes, SysUtils, OsMapTypes, OsMapGeometry, OsMapUtils, OsMapObjTypes,
-  OsMapFiles;
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$endif}
+  OsMapTypes, OsMapGeometry, OsMapUtils, OsMapObjTypes, OsMapObjects,
+  OsMapObjFeatures, OsMapFiles;
 
 const
   NODE_START_DESC        = 'NodeStart';       // start node (StartDescription)
@@ -89,10 +99,15 @@ type
     DatabaseId: TMapDatabaseId;
     Id: TId;
 
-    procedure Init(ADatabaseId: TMapDatabaseId; AId: TId);
+    procedure Init(ADatabaseId: TMapDatabaseId = 0; AId: TId = 0);
+    function IsValid(): Boolean;
+    function IsEqual(const AValue: TMapDBId): Boolean;
+    function AsStr(): string;
   end;
 
   TMapDBIdArray = array of TMapDBId;
+
+  TMapDatabaseIdMap = specialize TFPGMap<TMapDatabaseId, string>; // DatabaseId : string
 
   { TMapDBFileOffset }
 
@@ -101,6 +116,8 @@ type
     Offset: TFileOffset;
 
     procedure Init(ADatabaseId: TMapDatabaseId; AOffset: TFileOffset);
+    function AsStr(): string;
+    function IsEqual(const AValue: TMapDBFileOffset): Boolean;
   end;
 
   TMapDBFileOffsetArray = array of TMapDBFileOffset;
@@ -268,7 +285,10 @@ type
   TRouteDescription = class
   private
     FNodes: TRouteItemList;
-    FDatabaseMapping: TStringList; // DatabaseId : string
+
+  protected
+    // assigned
+    FDatabaseMapping: TMapDatabaseIdMap; // DatabaseId : string
 
   public
     procedure AfterConstruction; override;
@@ -284,7 +304,7 @@ type
       ATargetNodeIndex: Integer);
 
     property Nodes: TRouteItemList read FNodes;
-    property DatabaseMapping: TStringList read FDatabaseMapping;
+    property DatabaseMapping: TMapDatabaseIdMap read FDatabaseMapping write FDatabaseMapping;
   end;
 
   { For every unique combination of object attributes that are routing
@@ -302,6 +322,8 @@ type
     { Write the data to the given FileWriter. }
     procedure Write(AWriter: TFileWriter);
   end;
+
+  TObjectVariantDataArray = array of TObjectVariantData;
 
   { DataFile class for loading the object variant data, which is part of the
     routing graph. The object variat data contains a lookup table for path
@@ -336,16 +358,22 @@ type
 
   { A single path that starts at the given route node. A path contains a number of information
     that are relevant for the router. }
-  TRouteNodePath = record
+
+  { TRouteNodePath }
+
+  TRouteNodePath = object
     Distance: TDistance;  // Distance from the current route node to the target route node
     Id: TId;              // id of the targeting route node
     ObjectIndex: Integer; // The index of the way to use from this route node to the target route node
     Flags: TVehicleTypes; // Certain flags
+
+    // AVehicle in Flags
+    function IsRestricted(AVehicle: TVehicleType): Boolean;
   end;
 
   { TRouteNode }
 
-  TRouteNode = object
+  TRouteNode = class
   private
     FFileOffset: TFileOffset;
     FPoint: TGeoPoint;
@@ -355,9 +383,11 @@ type
     Paths: array of TRouteNodePath;
     Excludes: array of TRouteNodeExclude;
 
-    procedure Init(const AFileOffset: TFileOffset; const APoint: TGeoPoint);
+    procedure Create(const AFileOffset: TFileOffset; const APoint: TGeoPoint);
 
     function AddObject(const AObj: TObjectFileRef; AObjVariantIndex: Integer): Integer;
+    function GetId(): TId; // Point.GetId()
+    //function GetCoord(): TGeoPoint; // Point.GetCoord()
 
     procedure Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
     procedure Write(AWriter: TFileWriter);
@@ -409,9 +439,169 @@ type
     function IsEmpty(): Boolean;
   end;
 
+  { Abstract interface for a routing profile. A routing profile decides about the costs
+    of taking a certain way. It thus may hold information about how fast ways can be used,
+    maximum speed of the traveling device etc... }
+  TAbstractRoutingProfile = class
+  public
+    function GetVehicle(): TVehicleType; virtual; abstract;
+    function GetCostLimitDistance(): TDistance; virtual; abstract;
+    function GetCostLimitFactor(): Double; virtual; abstract;
+
+    function CanUse(const ACurrentNode: TRouteNode;
+      const AObjectVariantDataArr: TObjectVariantDataArray;
+      APathIndex: Integer): Boolean; virtual; abstract;
+    function CanUse(AArea: TMapArea): Boolean; virtual; abstract; overload;
+    function CanUse(AWay: TMapWay): Boolean; virtual; abstract; overload;
+    function CanUseForward(AWay: TMapWay): Boolean; virtual; abstract;
+    function CanUseBackward(AWay: TMapWay): Boolean; virtual; abstract;
+
+    function GetCosts(const ACurrentNode: TRouteNode;
+      const AObjectVariantDataArr: TObjectVariantDataArray;
+      APathIndex: Integer): Double; virtual; abstract; overload;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; virtual; abstract; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; virtual; abstract; overload;
+    function GetCosts(const ADistance: TDistance): Double; virtual; abstract; overload;
+
+    function GetTime(AArea: TMapArea; const ADistance: TDistance): TDateTime; virtual; abstract;
+    function GetTime(AWay: TMapWay; const ADistance: TDistance): TDateTime; virtual; abstract; overload;
+  end;
+
+  TSpeedMap = specialize TFPGMap<string, Double>;
+
+  { Common base class for our concrete profile instantiations. Offers a number of profile
+    type independent interface implementations and helper methods. }
+
+  { TRoutingProfile }
+
+  TRoutingProfile = class(TAbstractRoutingProfile)
+  protected
+    FTypeConfig: TTypeConfig;
+    //FAccessReader: TFeatureValueReader;
+    //FMaxSpeedReader: TFeatureValueReader;
+    FVehicle: TVehicleType;
+    FVehicleRouteNodeMask: TVehicleMask;
+    FCostLimitDistance: TDistance;
+    FCostLimitFactor: Double;
+    FSpeeds: array of Double;
+    FMinSpeed: Double;
+    FMaxSpeed: Double;
+    FVehicleMaxSpeed: Double;
+
+    procedure SetVehicle(const AValue: TVehicleType);
+  public
+    constructor Create(ATypeConfig: TTypeConfig);
+
+    function GetVehicle(): TVehicleType; override;
+    function GetCostLimitDistance(): TDistance; override;
+    function GetCostLimitFactor(): Double; override;
+
+    procedure ParametrizeForFoot(ATypeConfig: TTypeConfig; AMaxSpeed: Double);
+    procedure ParametrizeForBicycle(ATypeConfig: TTypeConfig; AMaxSpeed: Double);
+    function ParametrizeForCar(ATypeConfig: TTypeConfig;
+      const ASpeedMap: TSpeedMap;
+      AMaxSpeed: Double): Boolean;
+
+    procedure AddType(const AType: TTypeInfo; ASpeed: Double);
+
+    function CanUse(const ACurrentNode: TRouteNode;
+      const AObjectVariantDataArr: TObjectVariantDataArray;
+      APathIndex: Integer): Boolean; override;
+    function CanUse(AArea: TMapArea): Boolean; override; overload;
+    function CanUse(AWay: TMapWay): Boolean; override; overload;
+    function CanUseForward(AWay: TMapWay): Boolean; override;
+    function CanUseBackward(AWay: TMapWay): Boolean; override;
+
+    function GetTime(AArea: TMapArea; const ADistance: TDistance): TDateTime; override;
+    function GetTime(AWay: TMapWay; const ADistance: TDistance): TDateTime; override; overload;
+
+    { for shortest path by default }
+    function GetCosts(const ACurrentNode: TRouteNode;
+      const AObjectVariantDataArr: TObjectVariantDataArray;
+      APathIndex: Integer): Double; override;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; override; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; override; overload;
+    function GetCosts(const ADistance: TDistance): Double; override; overload;
+
+    property Vehicle: TVehicleType read GetVehicle write SetVehicle;
+    property VehicleMaxSpeed: Double read FVehicleMaxSpeed write FVehicleMaxSpeed;
+    { static distance value added to the maximum cost }
+    property CostLimitDistance: TDistance read GetCostLimitDistance write FCostLimitDistance;
+
+    { The router tries to minimize the actual costs of the route. There is a lower limit
+      defined by GetCosts(double distance). Applying the given factor to the minimal cost
+      results in a upper limit for the costs.
+
+      Increasing the factor results in the router trying harder to find a route by looking for
+      bigger and even bigger detours, decreasing the factor result in the router either finding a rather direct
+      route or none. Setting the factor below 1.0 should result in the router not finding any route at all.
+
+      If there is a router the current router will find it and the router will look for the optimal route first.
+      So, if there is a route the limit could be set to std::limits<double>::max(). If there is no route though
+      the limit will stop the router to search for all possible detours, walking the whole graph in the end.
+      Since this might take for ever the limit should be reasonable high.
+
+      The actual maximum cost limit is calculated based on a constant limit distance (default 10.0 Km)
+      and a cost factor applied to the minimum costs 8default 5.0).
+
+      So the resulting maxium cost are profile.GetCosts(profile.GetCostLimitDistance())+
+      profile.GetCosts(distance)*profile.GetCostLimitFactor(). }
+    property CostLimitFactor: Double read GetCostLimitFactor write FCostLimitFactor;
+  end;
+
+  { Profile that defines costs base of the time the traveling device needs
+    for a certain way resulting in the fastest path chosen (cost=distance/speedForWayType). }
+
+  { TFastestPathRoutingProfile }
+
+  TFastestPathRoutingProfile = class(TRoutingProfile)
+  public
+    function GetCosts(const ACurrentNode: TRouteNode;
+      const AObjectVariantDataArr: TObjectVariantDataArray;
+      APathIndex: Integer): Double; override;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; override; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; override; overload;
+    function GetCosts(const ADistance: TDistance): Double; override; overload;
+  end;
+
+
+  function MapDBId(ADatabaseId: TMapDatabaseId; AId: TId): TMapDBId;
+
+  function MapDBFileOffset(ADatabaseId: TMapDatabaseId; AOffset: TFileOffset): TMapDBFileOffset;
+
+  function MapDBIdArrayAppend(var AArray: TMapDBIdArray; const AValue: TMapDBId): Integer;
+
+  function MapDBFileOffsetArrayAppend(var AArray: TMapDBFileOffsetArray; const AValue: TMapDBFileOffset): Integer;
+
 implementation
 
 uses Math;
+
+function MapDBId(ADatabaseId: TMapDatabaseId; AId: TId): TMapDBId;
+begin
+  Result.DatabaseId := ADatabaseId;
+  Result.Id := AId;
+end;
+
+function MapDBFileOffset(ADatabaseId: TMapDatabaseId; AOffset: TFileOffset): TMapDBFileOffset;
+begin
+  Result.DatabaseId := ADatabaseId;
+  Result.Offset := AOffset;
+end;
+
+function MapDBIdArrayAppend(var AArray: TMapDBIdArray; const AValue: TMapDBId): Integer;
+begin
+  Result := Length(AArray);
+  SetLength(AArray, Result + 1);
+  AArray[Result] := AValue;
+end;
+
+function MapDBFileOffsetArrayAppend(var AArray: TMapDBFileOffsetArray; const AValue: TMapDBFileOffset): Integer;
+begin
+  Result := Length(AArray);
+  SetLength(AArray, Result + 1);
+  AArray[Result] := AValue;
+end;
 
 { TMapDBId }
 
@@ -421,6 +611,21 @@ begin
   Id := AId;
 end;
 
+function TMapDBId.IsValid(): Boolean;
+begin
+  Result := (Id <> 0);
+end;
+
+function TMapDBId.IsEqual(const AValue: TMapDBId): Boolean;
+begin
+  Result := (AValue.Id = Id) and (AValue.DatabaseId = DatabaseId);
+end;
+
+function TMapDBId.AsStr(): string;
+begin
+  Result := IntToStr(Id);
+end;
+
 { TMapDBFileOffset }
 
 procedure TMapDBFileOffset.Init(ADatabaseId: TMapDatabaseId;
@@ -428,6 +633,16 @@ procedure TMapDBFileOffset.Init(ADatabaseId: TMapDatabaseId;
 begin
   DatabaseId := ADatabaseId;
   Offset := AOffset;
+end;
+
+function TMapDBFileOffset.AsStr(): string;
+begin
+  Result := IntToHex(Offset, 2) + ':' + IntToHex(DatabaseId, 2);
+end;
+
+function TMapDBFileOffset.IsEqual(const AValue: TMapDBFileOffset): Boolean;
+begin
+  Result := (AValue.Offset = Offset) and (AValue.DatabaseId = DatabaseId);
 end;
 
 { TRouteItemDescription }
@@ -800,12 +1015,12 @@ procedure TRouteDescription.AfterConstruction;
 begin
   inherited AfterConstruction;
   FNodes := TRouteItemList.Create();
-  FDatabaseMapping := TStringList.Create(); // DatabaseId : string
+  //FDatabaseMapping := TMapDatabaseIdMap.Create(); // DatabaseId : string
 end;
 
 procedure TRouteDescription.BeforeDestruction;
 begin
-  FreeAndNil(FDatabaseMapping);
+  //FreeAndNil(FDatabaseMapping);
   FreeAndNil(FNodes);
   inherited BeforeDestruction;
 end;
@@ -829,9 +1044,10 @@ end;
 
 { TRouteNode }
 
-procedure TRouteNode.Init(const AFileOffset: TFileOffset;
+procedure TRouteNode.Create(const AFileOffset: TFileOffset;
   const APoint: TGeoPoint);
 begin
+  inherited Create();
   FFileOffset := AFileOffset;
   FPoint.Assign(APoint);
 end;
@@ -843,6 +1059,11 @@ begin
   SetLength(Objects, Result+1);
   Objects[Result].Obj := AObj;
   Objects[Result].ObjVariantIndex := AObjVariantIndex;
+end;
+
+function TRouteNode.GetId(): TId;
+begin
+  Result := FPoint.GetId();
 end;
 
 procedure TRouteNode.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
@@ -1078,6 +1299,363 @@ begin
   AWriter.WriteNumber(LongWord(TypeInfo.Index));
   AWriter.Write(MaxSpeed);
   AWriter.Write(Grade);
+end;
+
+{ TRouteNodePath }
+
+function TRouteNodePath.IsRestricted(AVehicle: TVehicleType): Boolean;
+begin
+  Result := AVehicle in Flags;
+end;
+
+{ TRoutingProfile }
+
+function TRoutingProfile.GetCostLimitDistance(): TDistance;
+begin
+  Result := FCostLimitDistance;
+end;
+
+function TRoutingProfile.GetCostLimitFactor(): Double;
+begin
+  Result := FCostLimitFactor;
+end;
+
+function TRoutingProfile.GetVehicle(): TVehicleType;
+begin
+  Result := FVehicle;
+end;
+
+procedure TRoutingProfile.SetVehicle(const AValue: TVehicleType);
+begin
+  FVehicle := AValue;
+  case FVehicle of
+    vehicleFoot: FVehicleRouteNodeMask := VEHICLE_FOOT;
+    vehicleBicycle: FVehicleRouteNodeMask := VEHICLE_BICYCLE;
+    vehicleCar: FVehicleRouteNodeMask := VEHICLE_CAR;
+  end;
+end;
+
+constructor TRoutingProfile.Create(ATypeConfig: TTypeConfig);
+begin
+  FTypeConfig := ATypeConfig;
+  //FAccessReader.;
+  //FMaxSpeedReader;
+  FVehicle := vehicleCar;
+  FVehicleRouteNodeMask := VEHICLE_CAR;
+  FCostLimitDistance := 10000.0; // 10 km
+  FCostLimitFactor := 5.0;
+  FMinSpeed := 0.0;
+  FMaxSpeed := 0.0;
+  FVehicleMaxSpeed := MaxDouble;
+end;
+
+procedure TRoutingProfile.ParametrizeForFoot(ATypeConfig: TTypeConfig;
+  AMaxSpeed: Double);
+var
+  ti: TTypeInfo;
+begin
+  SetLength(FSpeeds, 0);
+  Vehicle := vehicleFoot;
+  VehicleMaxSpeed := AMaxSpeed;
+  for ti in FTypeConfig.Types do
+  begin
+    if (not ti.IsIgnore) and (ti.CanRouteFoot) then
+      AddType(ti, AMaxSpeed);
+  end;
+end;
+
+procedure TRoutingProfile.ParametrizeForBicycle(ATypeConfig: TTypeConfig;
+  AMaxSpeed: Double);
+var
+  ti: TTypeInfo;
+begin
+  SetLength(FSpeeds, 0);
+  Vehicle := vehicleBicycle;
+  VehicleMaxSpeed := AMaxSpeed;
+  for ti in FTypeConfig.Types do
+  begin
+    if (not ti.IsIgnore) and (ti.CanRouteBicycle) then
+      AddType(ti, AMaxSpeed);
+  end;
+end;
+
+function TRoutingProfile.ParametrizeForCar(ATypeConfig: TTypeConfig;
+  const ASpeedMap: TSpeedMap; AMaxSpeed: Double): Boolean;
+var
+  ti: TTypeInfo;
+  speed: Double;
+begin
+  Result := True;
+  SetLength(FSpeeds, 0);
+  Vehicle := vehicleCar;
+  VehicleMaxSpeed := AMaxSpeed;
+  for ti in FTypeConfig.Types do
+  begin
+    if (not ti.IsIgnore) and (ti.CanRouteCar) then
+    begin
+      if ASpeedMap.TryGetData(ti.TypeName, speed) then
+        AddType(ti, speed)
+      else
+      begin
+        Result := False;
+        WriteLn(LogFile, 'ERROR: No speed for type=', ti.TypeName, 'defined!');
+        Continue;
+      end;
+    end;
+  end;
+end;
+
+procedure TRoutingProfile.AddType(const AType: TTypeInfo; ASpeed: Double);
+var
+  n, i: Integer;
+begin
+  n := Length(FSpeeds);
+  if n = 0 then
+  begin
+    FMinSpeed := ASpeed;
+    FMaxSpeed := ASpeed;
+  end
+  else
+  begin
+    FMinSpeed := Min(FMinSpeed, ASpeed);
+    FMaxSpeed := Max(FMaxSpeed, ASpeed);
+  end;
+
+  if (AType.Index >= n) then
+  begin
+    SetLength(FSpeeds, AType.Index + 1);
+    for i := n to Length(FSpeeds)-1 do
+      FSpeeds[i] := 0.0;
+  end;
+
+  FSpeeds[AType.Index] := ASpeed;
+end;
+
+function TRoutingProfile.CanUse(const ACurrentNode: TRouteNode;
+  const AObjectVariantDataArr: TObjectVariantDataArray;
+  APathIndex: Integer): Boolean;
+var
+  objIndex, typeIndex: Integer;
+  ti: TTypeInfo;
+begin
+
+  if (Vehicle in ACurrentNode.Paths[APathIndex].Flags) then
+  begin
+    objIndex := ACurrentNode.Paths[APathIndex].ObjectIndex;
+    ti := AObjectVariantDataArr[ACurrentNode.Objects[objIndex].ObjVariantIndex].TypeInfo;
+    typeIndex := ti.Index;
+
+    Result := (typeIndex < Length(FSpeeds)) and (FSpeeds[typeIndex] > 0.0);
+  end
+  else
+    Result := False
+end;
+
+function TRoutingProfile.CanUse(AArea: TMapArea): Boolean;
+var
+  typeIndex: Integer;
+begin
+  if Length(AArea.Rings) = 1 then
+  begin
+    typeIndex := AArea.rings[0].GetType().Index;
+
+    Result := (typeIndex < Length(FSpeeds)) and (FSpeeds[typeIndex] > 0.0);
+  end
+  else
+    Result := False;
+end;
+
+function TRoutingProfile.CanUse(AWay: TMapWay): Boolean;
+var
+  typeIndex: Integer;
+  accessValue: Byte;
+begin
+  typeIndex := AWay.GetType().Index;
+
+  Result := (typeIndex < Length(FSpeeds)) and (FSpeeds[typeIndex] > 0.0);
+  if not Result then
+    Exit;
+
+  accessValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftAccess), 0);
+
+  if (accessValue <> 0) then
+    Result := TAccessFeature.CanRoute(accessValue, Vehicle)
+  else
+    Result := AWay.GetType().CanRouteBy(Vehicle);
+end;
+
+function TRoutingProfile.CanUseForward(AWay: TMapWay): Boolean;
+var
+  typeIndex: Integer;
+  accessValue: Byte;
+begin
+  typeIndex := AWay.GetType().Index;
+
+  Result := (typeIndex < Length(FSpeeds)) and (FSpeeds[typeIndex] > 0.0);
+  if not Result then
+    Exit;
+
+  accessValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftAccess), 0);
+
+  if (accessValue <> 0) then
+    Result := TAccessFeature.CanRouteForward(accessValue, Vehicle)
+  else
+    Result := AWay.GetType().CanRouteBy(Vehicle);
+end;
+
+function TRoutingProfile.CanUseBackward(AWay: TMapWay): Boolean;
+var
+  typeIndex: Integer;
+  accessValue: Byte;
+begin
+  typeIndex := AWay.GetType().Index;
+
+  Result := (typeIndex < Length(FSpeeds)) and (FSpeeds[typeIndex] > 0.0);
+  if not Result then
+    Exit;
+
+  accessValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftAccess), 0);
+
+  if (accessValue <> 0) then
+    Result := TAccessFeature.CanRouteBackward(accessValue, Vehicle)
+  else
+    Result := AWay.GetType().CanRouteBy(Vehicle);
+end;
+
+function TRoutingProfile.GetTime(AArea: TMapArea;
+  const ADistance: TDistance): TDateTime;
+var
+  speed: Double;
+begin
+  speed := FSpeeds[AArea.GetType().Index];
+
+  speed := Min(FVehicleMaxSpeed, speed);
+
+  if speed <> 0.0 then
+    Result := ((ADistance / 1000) / speed) / HoursPerDay
+  else
+    Result := 0.0;
+end;
+
+function TRoutingProfile.GetTime(AWay: TMapWay;
+  const ADistance: TDistance): TDateTime;
+var
+  speed: Double;
+  maxSpeedValue: Byte;
+begin
+  maxSpeedValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftMaxSpeed), 0);
+  if maxSpeedValue <> 0 then
+    speed := maxSpeedValue
+  else
+    speed := FSpeeds[AWay.GetType().Index];
+
+  speed := Min(FVehicleMaxSpeed, speed);
+
+  if speed <> 0.0 then
+    Result := ((ADistance / 1000) / speed) / HoursPerDay
+  else
+    Result := 0.0;
+end;
+
+function TRoutingProfile.GetCosts(const ACurrentNode: TRouteNode;
+  const AObjectVariantDataArr: TObjectVariantDataArray;
+  APathIndex: Integer): Double;
+begin
+  Result := ACurrentNode.Paths[APathIndex].Distance / 1000;
+end;
+
+function TRoutingProfile.GetCosts(AArea: TMapArea;
+  const ADistance: TDistance): Double;
+begin
+  Result := ADistance / 1000;
+end;
+
+function TRoutingProfile.GetCosts(AWay: TMapWay;
+  const ADistance: TDistance): Double;
+begin
+  Result := ADistance / 1000;
+end;
+
+function TRoutingProfile.GetCosts(const ADistance: TDistance): Double;
+begin
+  Result := ADistance / 1000;
+end;
+
+{ TFastestPathRoutingProfile }
+
+function TFastestPathRoutingProfile.GetCosts(const ACurrentNode: TRouteNode;
+  const AObjectVariantDataArr: TObjectVariantDataArray;
+  APathIndex: Integer): Double;
+var
+  speed: Double;
+  objIndex: Integer;
+  ti: TTypeInfo;
+begin
+  //Result := inherited GetCosts(ACurrentNode, AObjectVariantDataArr, APathIndex);
+  objIndex := ACurrentNode.Paths[APathIndex].ObjectIndex;
+
+  if (AObjectVariantDataArr[ACurrentNode.Objects[objIndex].ObjVariantIndex].MaxSpeed > 0) then
+    speed := AObjectVariantDataArr[ACurrentNode.Objects[objIndex].ObjVariantIndex].MaxSpeed
+  else
+  begin
+    ti := AObjectVariantDataArr[ACurrentNode.Objects[objIndex].ObjVariantIndex].TypeInfo;
+
+    speed := FSpeeds[ti.Index];
+  end;
+
+  speed := Min(VehicleMaxSpeed, speed);
+
+  if speed <> 0.0 then
+    Result := ((ACurrentNode.Paths[APathIndex].Distance / 1000) / speed)
+  else
+    Result := 0.0;
+end;
+
+function TFastestPathRoutingProfile.GetCosts(AArea: TMapArea;
+  const ADistance: TDistance): Double;
+var
+  speed: Double;
+begin
+  speed := FSpeeds[AArea.GetType().Index];
+
+  speed := Min(FVehicleMaxSpeed, speed);
+
+  if speed <> 0.0 then
+    Result := ((ADistance / 1000) / speed)
+  else
+    Result := 0.0;
+end;
+
+function TFastestPathRoutingProfile.GetCosts(AWay: TMapWay;
+  const ADistance: TDistance): Double;
+var
+  speed: Double;
+  maxSpeedValue: Byte;
+begin
+  maxSpeedValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftMaxSpeed), 0);
+  if maxSpeedValue <> 0 then
+    speed := maxSpeedValue
+  else
+    speed := FSpeeds[AWay.GetType().Index];
+
+  speed := Min(FVehicleMaxSpeed, speed);
+
+  if speed <> 0.0 then
+    Result := ((ADistance / 1000) / speed)
+  else
+    Result := 0.0;
+end;
+
+function TFastestPathRoutingProfile.GetCosts(const ADistance: TDistance): Double;
+var
+  speed: Double;
+begin
+  speed := Min(FVehicleMaxSpeed, FMaxSpeed);
+
+  if speed <> 0.0 then
+    Result := ((ADistance / 1000) / speed)
+  else
+    Result := 0.0;
 end;
 
 end.

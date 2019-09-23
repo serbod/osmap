@@ -178,6 +178,9 @@ type
 
   { Reference to an libosmscout internal object by its type (area, way, node)
     and by its file offset within its data file. }
+
+  { TObjectFileRef }
+
   TObjectFileRef = object
   public
     Offset: TFileOffset;
@@ -187,6 +190,7 @@ type
     procedure SetValue(AOffset: TFileOffset; ARefType: TRefType);
     procedure Invalidate();
     function IsValid(): Boolean;
+    function IsEqual(const AValue: TObjectFileRef): Boolean;
 
     function GetName(): string;
     function GetTypeName(): string;
@@ -428,6 +432,11 @@ end;
 function TObjectFileRef.IsValid(): Boolean;
 begin
   Result := (RefType <> refNone);
+end;
+
+function TObjectFileRef.IsEqual(const AValue: TObjectFileRef): Boolean;
+begin
+  Result := (AValue.Offset = Offset) and (AValue.RefType = RefType);
 end;
 
 function TObjectFileRef.GetName(): string;

@@ -54,7 +54,11 @@ unit OsMapRoutingService;
 interface
 
 uses
-  Classes, SysUtils, OsMapTypes, OsMapGeometry, OsMapUtils, OsMapObjTypes,
+  Classes, SysUtils,
+  {$ifdef FPC}
+  fgl,
+  {$endif}
+  OsMapTypes, OsMapGeometry, OsMapUtils, OsMapObjTypes,
   OsMapObjects, OsMapRouting;
 
 const
@@ -103,7 +107,10 @@ type
 
   {  A path in the routing graph from one node to the next (expressed via the target object)
      with additional information as required by the A* algorithm. }
-  TRNode = record
+
+  { TRNode }
+
+  TRNode = object
     Id: TMapDBId;      // The file offset of the current route node
     Node: TRouteNode;  // The current route node
     Prev: TMapDBId;    // The file offset of the previous route node
@@ -114,13 +121,35 @@ type
     OverallCost: Double;  // The overall costs (currentCost+estimateCost)
 
     IsAccess: Boolean;    // Flags to signal, if we had access ("access restrictions") to this node
+
+    procedure Init(const AId: TMapDBId;
+      const ANode: TRouteNode;
+      const AObj: TObjectFileRef);
+
+    procedure Init(const AId: TMapDBId;
+      const ANode: TRouteNode;
+      const AObj: TObjectFileRef;
+      const APrev: TMapDBId); overload;
+
+    procedure Init(); overload;
+
+    function IsValid(): Boolean;
   end;
+
+  { TRNodeList }
 
   TRNodeList = object
   private
     FHash: TSimpleStringHash;
+    procedure UpdateHash();
   public
     Items: array of TRNode;
+    procedure Clear();
+    procedure Reserve(AValue: Integer);
+    function Count(): Integer;
+    function Append(const AValue: TRNode): Integer;
+    procedure Delete(AIndex: Integer);
+    function FindById(const AId: TMapDBId; out AIndex: Integer): Boolean;
   end;
 
   { Minimum required data for a node in the ClosedSet.
@@ -134,8 +163,16 @@ type
     Obj: TObjectFileRef; // The object (way/area) visited from the current route node
   end;
 
+  { TVNodeList }
+
   TVNodeList = object
     Items: array of TVNode;
+    procedure Clear();
+    procedure Reserve(AValue: Integer);
+    function Count(): Integer;
+    function Append(const AValue: TVNode): Integer;
+    function IndexOf(const AValue: TVNode): Integer;
+    procedure Reverse();
   end;
 
   { Helper class for calculating hash codes for
@@ -146,7 +183,8 @@ type
   end;
 
   TOpenList = TRNodeList;
-  TOpenMap = specialize TFPGMap<TMapDBId, Integer>; // map to index in TOpenList
+  // map to index in TOpenList (not used, TOpenList have built-in map)
+  TOpenMap = specialize TFPGMap<TMapDBId, Integer>;
   TClosedSet = TVNodeList;
 
   { Abstract algorithms for routing }
@@ -175,6 +213,7 @@ type
     CurrentMaxDistance: TDistance;
     OverallDistance: TDistance;
 
+    procedure Init();
     function Success(): Boolean;
   end;
 
@@ -182,7 +221,8 @@ type
     Points: TGeoPointArray;
   end;
 
-  TRoutePointsResult = record
+  { TODO: Replace to function(var Items): Boolean }
+  {TRoutePointsResult = record
     IsSuccess: Boolean;
     Points: TGeoPointArray;
   end;
@@ -194,15 +234,14 @@ type
 
   TRouteWayResult = record
     IsSuccess: Boolean;
-    Way: TMapWay;
-  end;
+    MapWay: TMapWay;
+  end;  }
 
-  TRouteNodeMap = class(TStringList)
-    procedure SetValue(const AKey: TMapDBId; const AValue: TRouteNode);
-    function FindValue(const AKey: TMapDBId; out AValue: TRouteNode): Boolean;
-  end;
+  TRouteNodeMap = specialize TFPGMap<TMapDBId, TRouteNode>;
 
-  TRoutingState = class;
+  TRoutingState = TRoutingService;
+
+  { TAbstractRoutingService }
 
   TAbstractRoutingService = class(TRoutingService)
   protected
@@ -210,7 +249,7 @@ type
 
     function GetVehicle(AState: TRoutingState): TVehicleType; virtual;
 
-    function CanUse(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
+    function CanUse(AState: TRoutingState; ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode; APathIndex: Integer): Boolean; virtual;
     function CanUseForward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
     function CanUseBackward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
 
@@ -228,10 +267,10 @@ type
     { Return the route node for the given database offset }
     function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; virtual;
 
-    function GetWayByOffset(const AOffset: TMapDBFileOffset; AWay: TMapWay): Boolean; virtual;
+    function GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay; virtual;
     function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; virtual;
 
-    function GetAreaByOffset(const AOffset: TMapDBFileOffset; AArea: TMapArea): Boolean; virtual;
+    function GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea; virtual;
     function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual;
 
     procedure ResolveRNodeChainToList(AFinalRouteNode: TMapDBId;
@@ -255,31 +294,82 @@ type
       const ADatabase: TMapDatabaseID;
       const AWay: TMapWay;
       ANodeIndex: Integer;
+      var ARouteNode: TRouteNode;
+      var ARouteNodeIndex: Integer);
+
+    { Return the route node that allows navigating to the given node
+      in forward direction. In result the returned routing node
+      will have a smaller index then the given node index. }
+    procedure GetTargetForwardRouteNode(const AState: TRoutingState;
+      const ADatabase: TMapDatabaseID;
+      const AWay: TMapWay;
+      ANodeIndex: Integer;
       var ARouteNode: TRouteNode);
+    { Return the route node that allows navigating to the given node
+      in backward direction. In result the returned routing node
+      will have a bigger or equal index then the given node index. }
     procedure GetTargetBackwardRouteNode(const AState: TRoutingState;
       const ADatabase: TMapDatabaseID;
       const AWay: TMapWay;
       ANodeIndex: Integer;
       var ARouteNode: TRouteNode);
 
+    { The start position is at the given position defined by an object and the index of the node within
+      the object. Return the closest route node and routing node either in the
+      forward or backward direction or both.
+
+     AState - The routing state
+     APosition - The start position
+     AStartCoord - The coordinate of the start position
+     ATargetCoord - The coordinate of the target position
+     AForwardRouteNode - Optional route node in the forward direction
+     ABackwardRouteNode - Optional route node in the backward direction
+     AForwardRNode - Optional prefilled routing node for the forward direction
+                     to be used as part of the routing process
+     ABackwardRNode - Optional prefilled routing node for the backward direction
+                      to be used as part of the routing process
+     Result - True, if at least one route node was found. If not or in case of
+              technical errors false is returned. }
     function GetStartNodes(const AState: TRoutingState;
       const APosition: TRoutePosition;
       var AStartCoord: TGeoPoint;
-      const ATargetCoord: GeoPoint;
+      const ATargetCoord: TGeoPoint;
       var AForwardRouteNode: TRouteNode;
       var ABackwardRouteNode: TRouteNode;
       var AForwardRNode: TRNode;
       var ABackwardRNode: TRNode): Boolean;
 
+    { The target position is at the given position defined by an object and the index of the node within
+     the object. Return the closest route node and routing node either in the
+     forward or backward direction or both.
+
+     AState - The routing state
+     APosition - The start position
+     ATargetCoord - The coordinate of the target position
+     AForwardNode - Optional route node in the forward direction
+     ABackwardNode - Optional route node in the backward direction
+     Result - True, if at least one route node was found. If not or in case of
+              technical errors false is returned. }
     function GetWayTargetNodes(const AState: TRoutingState;
       const APosition: TRoutePosition;
-      var ATargetCoord: GeoPoint;
+      var ATargetCoord: TGeoPoint;
       var AForwardNode: TRouteNode;
       var ABackwardNode: TRouteNode): Boolean;
 
+    { The target position is at the given position defined by an object and the index of the node within
+     the object. Return the closest route node and routing node either in the
+     forward or backward direction or both.
+
+     AState - The routing state
+     APosition - The start position
+     ATargetCoord - The coordinate of the target position
+     AForwardNode - Optional route node in the forward direction
+     ABackwardNode - Optional route node in the backward direction
+     Result - True, if at least one route node was found. If not or in case of
+              technical errors false is returned. }
     function GetTargetNodes(const AState: TRoutingState;
       const APosition: TRoutePosition;
-      var ATargetCoord: GeoPoint;
+      var ATargetCoord: TGeoPoint;
       var AForwardNode: TRouteNode;
       var ABackwardNode: TRouteNode): Boolean;
 
@@ -289,10 +379,10 @@ type
       ARouteNodeIndex: Integer;
       const ARouteNode: TRouteNode;
       const AStartCoord: TGeoPoint;
-      const ATargetCoord: GeoPoint;
+      const ATargetCoord: TGeoPoint;
       var ARNode: TRNode): Boolean;
 
-    procedure AddNodes(var ARute: TRouteData;
+    procedure AddNodes(var ARoute: TRouteData;
       ADatabase: TMapDatabaseId;
       AStartNodeId: TId;
       AStartNodeIndex: Integer;
@@ -301,10 +391,26 @@ type
       AIsOneway: Boolean;
       ATargetNodeIndex: Integer);
 
+    { The start position is at the given way and the index of the node within
+     the object. Return the closest route node and routing node either in the
+     forward or backward direction or both.
+
+     AState - The routing state
+     APosition - The start position
+     AStartCoord - The coordinate of the start position
+     ATargetCoord - The coordinate of the target position
+     AForwardRouteNode - Optional route node in the forward direction
+     ABackwardRouteNode - Optional route node in the backward direction
+     AForwardRNode - Optional prefilled routing node for the forward direction
+                     to be used as part of the routing process
+     ABackwardRNode - Optional prefilled routing node for the backward direction
+                      to be used as part of the routing process
+     Result - True, if at least one route node was found. If not or in case of
+              technical errors false is returned. }
     function GetWayStartNodes(const AState: TRoutingState;
       const APosition: TRoutePosition;
       var AStartCoord: TGeoPoint;
-      const ATargetCoord: GeoPoint;
+      const ATargetCoord: TGeoPoint;
       var AForwardRouteNode: TRouteNode;
       var ABackwardRouteNode: TRouteNode;
       var AForwardRNode: TRNode;
@@ -320,11 +426,53 @@ type
       var ACurrent: TRNode;
       var ACurrentRouteNode: TRouteNode;
       var AOpenList: TOpenList;
-      var AOpenMap: TOpenMap;
+      //var AOpenMap: TOpenMap;
       const AClosedSet: TClosedSet;
       const AClosedRestrictedSet: TClosedSet): Boolean; virtual;
 
-    dgfdf
+    function WalkPaths(const AState: TRoutingState;
+      var ACurrent: TRNode;
+      var ACurrentRouteNode: TRouteNode;
+      var AOpenList: TOpenList;
+      //var AOpenMap: TOpenMap;
+      var AClosedSet: TClosedSet;
+      var AClosedRestrictedSet: TClosedSet;
+      var AResult: TRoutingResult;
+      const AParameter: TRoutingParameter;
+      const ATargetCoord: TGeoPoint;
+      const AVehicle: TVehicleType;
+      var ANodesIgnoredCount: Integer;
+      var ACurrentMaxDistance: TDistance;
+      const AOverallDistance: TDistance;
+      const ACostLimit: Double): Boolean; virtual;
+
+  public
+    constructor Create(const AParameter: TRouterParameter);
+
+    { Calculate a route
+      AState - State to use
+      AStart - Start of the route
+      ATarget - Target of teh route
+      AProgress - Optional callback for handling routing progress
+      Result - The route object holding the resulting route on success }
+    function CalculateRoute(var AState: TRoutingState;
+      const AStart: TRoutePosition;
+      const ATarget: TRoutePosition;
+      const AParameter: TRoutingParameter): TRoutingResult;
+
+    { Transform the route into a RouteDescription. The RouteDescription can be further transformed
+      to enhanced textual and/or visual description of the route containing additional information.
+      AData - Route data
+      ADescription - An initialized description on success }
+    function TransformRouteDataToRouteDescription(const AData: TRouteData; ADescription: TRouteDescription): Boolean;
+    { Transforms the route into a list of points. }
+    function TransformRouteDataToPoints(const AData: TRouteData; var APoints: TGeoPointArray): Boolean;
+    { Transforms the route into a Way (with empty type) }
+    function TransformRouteDataToWay(const AData: TRouteData; AMapWay: TMapWay): Boolean;
+
+    { Get current mapping of DatabaseId to database path than be used
+      later for lookup objects in description }
+    function GetDatabaseMapping(): TMapDatabaseIdMap; virtual; abstract;
   end;
 
   function RNode(const AId: TMapDBId;
@@ -332,9 +480,22 @@ type
     const AObj: TObjectFileRef;
     const APrev: TMapDBId): TRNode;
 
+  { Simple inline constructor for searching for VNodes in the
+    ClosedSet. }
+  function VNode(const ACurrentNode: TMapDBId): TVNode;
+  { Full featured constructor
+    ACurrentNode - FileOffset of the current route node
+    AObject - Type of object used to navigate to this route node
+    APreviousNode - FileOffset of the previous route node visited }
+  function VNode(const ACurrentNode: TMapDBId;
+    const AObject: TObjectFileRef;
+    const APreviousNode: TMapDBId): TVNode; overload;
+
   function CompareRNodes(const A, B: TRNode): Integer;
 
 implementation
+
+uses Math;
 
 function RNode(const AId: TMapDBId;
   const ANode: TRouteNode;
@@ -349,6 +510,22 @@ begin
   Result.EstimateCost := 0;
   Result.OverallCost := 0;
   Result.IsAccess := True;
+end;
+
+function VNode(const ACurrentNode: TMapDBId): TVNode;
+begin
+  Result.CurNode := ACurrentNode;
+  Result.Obj.Invalidate();
+  Result.PrevNode.Init();
+end;
+
+function VNode(const ACurrentNode: TMapDBId;
+  const AObject: TObjectFileRef;
+  const APreviousNode: TMapDBId): TVNode; overload;
+begin
+  Result.CurNode := ACurrentNode;
+  Result.Obj.Assign(AObject);
+  Result.PrevNode := APreviousNode;
 end;
 
 function CompareRNodes(const A, B: TRNode): Integer;
@@ -406,6 +583,1637 @@ end;
 function TRoutingResult.Success(): Boolean;
 begin
   Result := (not Route.IsEmpty());
+end;
+
+{ TAbstractRoutingService }
+
+function TAbstractRoutingService.GetVehicle(AState: TRoutingState): TVehicleType;
+begin
+
+end;
+
+function TAbstractRoutingService.CanUse(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode; APathIndex: Integer): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.CanUseForward(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.CanUseBackward(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.GetCosts(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode;
+  APathIndex: Integer): Double;
+begin
+
+end;
+
+function TAbstractRoutingService.GetCosts(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): Double;
+begin
+
+end;
+
+function TAbstractRoutingService.GetEstimateCosts(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+begin
+
+end;
+
+function TAbstractRoutingService.GetCostLimit(AState: TRoutingState;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+begin
+
+end;
+
+function TAbstractRoutingService.GetRouteNodes(const ARouteNodeIds: TMapDBIdArray;
+  ARouteNodeMap: TRouteNodeMap): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.GetRouteNode(const AId: TMapDBId; out
+  ANode: TRouteNode): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay;
+begin
+
+end;
+
+function TAbstractRoutingService.GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray;
+  AWayMap: TMapWayDict): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea;
+begin
+
+end;
+
+function TAbstractRoutingService.GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray;
+  AAreaMap: TMapAreaDict): Boolean;
+begin
+
+end;
+
+procedure TAbstractRoutingService.ResolveRNodeChainToList(AFinalRouteNode: TMapDBId;
+  const AClosedSet: TClosedSet; const AClosedRestrictedSet: TClosedSet;
+  var ANodes: TVNodeList);
+var
+  IsRestricted: Boolean;
+  curIndex, prevIndex: Integer;
+  CurVNode, prevVNode: TVNode;
+begin
+  IsRestricted := False;
+  curIndex := AClosedSet.IndexOf(VNode(AFinalRouteNode));
+
+  if curIndex = -1 then
+  begin
+    curIndex := AClosedRestrictedSet.IndexOf(VNode(AFinalRouteNode));
+    Assert(curIndex <> -1);
+    CurVNode := AClosedRestrictedSet.Items[curIndex];
+    IsRestricted := True;
+  end
+  else
+    CurVNode := AClosedSet.Items[curIndex];
+
+  while CurVNode.PrevNode.IsValid() do
+  begin
+    {$ifdef DEBUG_ROUTING}
+    WriteLn(LogFile, 'Chain item ', CurVNode.CurNode, ' -> ', CurVNode.PrevNode);
+    {$endif}
+    //ClosedSet::const_iterator prev;
+    if (not IsRestricted) then
+    begin
+      prevIndex := AClosedSet.IndexOf(VNode(CurVNode.PrevNode));
+      if prevIndex = -1 then
+      begin
+        prevIndex := AClosedRestrictedSet.IndexOf(VNode(CurVNode.PrevNode));
+        Assert(prevIndex <> -1);
+        prevVNode := AClosedRestrictedSet.Items[prevIndex];
+        IsRestricted := True;
+      end
+      else
+        prevVNode := AClosedSet.Items[prevIndex];
+    end
+    else
+    begin
+      prevIndex := AClosedRestrictedSet.IndexOf(VNode(CurVNode.PrevNode));
+      if prevIndex = -1 then
+      begin
+        prevIndex := AClosedSet.IndexOf(VNode(CurVNode.PrevNode));
+        Assert(prevIndex <> -1);
+        prevVNode := AClosedSet.Items[prevIndex];
+        IsRestricted := False;
+      end;
+    end;
+
+
+    ANodes.Append(CurVNode);
+
+    CurVNode := prevVNode;
+  end;
+
+  ANodes.Append(CurVNode);
+
+  ANodes.Reverse();
+end;
+
+function TAbstractRoutingService.ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean;
+begin
+
+end;
+
+function TAbstractRoutingService.GetNodeTwins(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; AId: TId): TMapDBIdArray;
+begin
+
+end;
+
+procedure TAbstractRoutingService.GetStartForwardRouteNode(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; const AWay: TMapWay; ANodeIndex: Integer;
+  var ARouteNode: TRouteNode; var ARouteNodeIndex: Integer);
+var
+  i: Integer;
+begin
+  ARouteNode := nil;
+
+  if (not CanUseForward(AState, ADatabase, AWay)) then
+    Exit;
+
+  // TODO: What if the way is a roundabout?
+
+  for i := ANodeIndex to Length(AWay.Nodes)-1 do
+  begin
+    if GetRouteNode(MapDBId(ADatabase, AWay.GetId(i)), ARouteNode) then
+    begin
+      ARouteNodeIndex := i;
+      Exit;
+    end;
+  end;
+end;
+
+procedure TAbstractRoutingService.GetStartBackwardRouteNode(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; const AWay: TMapWay; ANodeIndex: Integer;
+  var ARouteNode: TRouteNode; var ARouteNodeIndex: Integer);
+var
+  i: Integer;
+begin
+  ARouteNode := nil;
+
+  if (ANodeIndex >= Length(AWay.Nodes)) then
+    Exit;
+
+  if (not CanUseBackward(AState, ADatabase, AWay)) then
+    Exit;
+
+  for i := ANodeIndex-1 downto 0 do
+  begin
+    if GetRouteNode(MapDBId(ADatabase, AWay.GetId(i)), ARouteNode) then
+    begin
+      ARouteNodeIndex := i;
+      Exit;
+    end;
+  end;
+end;
+
+procedure TAbstractRoutingService.GetTargetForwardRouteNode(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; const AWay: TMapWay; ANodeIndex: Integer;
+  var ARouteNode: TRouteNode);
+var
+  i: Integer;
+begin
+  ARouteNode := nil;
+
+  if (ANodeIndex >= Length(AWay.Nodes)) then
+    Exit;
+
+  if (not CanUseForward(AState, ADatabase, AWay)) then
+    Exit;
+
+  for i := ANodeIndex-1 downto 0 do
+  begin
+    if GetRouteNode(MapDBId(ADatabase, AWay.GetId(i)), ARouteNode) then
+      Exit;
+  end;
+end;
+
+procedure TAbstractRoutingService.GetTargetBackwardRouteNode(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; const AWay: TMapWay; ANodeIndex: Integer;
+  var ARouteNode: TRouteNode);
+var
+  i: Integer;
+begin
+  ARouteNode := nil;
+
+  if (ANodeIndex >= Length(AWay.Nodes)) then
+    Exit;
+
+  if (not CanUseBackward(AState, ADatabase, AWay)) then
+    Exit;
+
+  // TODO: What if the way is a roundabout?
+
+  for i := ANodeIndex to Length(AWay.Nodes)-1 do
+  begin
+    if GetRouteNode(MapDBId(ADatabase, AWay.GetId(i)), ARouteNode) then
+      Exit;
+  end;
+end;
+
+function TAbstractRoutingService.GetStartNodes(const AState: TRoutingState;
+  const APosition: TRoutePosition; var AStartCoord: TGeoPoint;
+  const ATargetCoord: TGeoPoint; var AForwardRouteNode: TRouteNode;
+  var ABackwardRouteNode: TRouteNode; var AForwardRNode: TRNode;
+  var ABackwardRNode: TRNode): Boolean;
+begin
+  if (APosition.Obj.RefType = refWay) then
+  begin
+    Result := GetWayStartNodes(AState, APosition, AStartCoord, ATargetCoord, AForwardRouteNode, ABackwardRouteNode, AForwardRNode, ABackwardRNode);
+  end
+  else
+  begin
+    WriteLn(LogFile, 'ERROR: Unsupported object type "', APosition.Obj.GetTypeName(), '" for source!');
+    Result := False;
+  end;
+end;
+
+function TAbstractRoutingService.GetWayTargetNodes(const AState: TRoutingState;
+  const APosition: TRoutePosition; var ATargetCoord: TGeoPoint;
+  var AForwardNode: TRouteNode; var ABackwardNode: TRouteNode): Boolean;
+var
+  TmpWay: TMapWay;
+begin
+  Result := False;
+  Assert(APosition.Obj.RefType = refWay);
+
+  TmpWay := GetWayByOffset(MapDBFileOffset(APosition.DatabaseId, APosition.Obj.Offset));
+  if (not Assigned(TmpWay)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Cannot get end way!');
+    Exit;
+  end;
+
+  if (APosition.NodeIndex >= Length(TmpWay.Nodes)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Given target node index ', APosition.NodeIndex, ' is not within valid range [0, ', Length(TmpWay.Nodes)-1);
+    Exit;
+  end;
+
+  ATargetCoord := TmpWay.Nodes[APosition.NodeIndex];
+
+  // Check, if the current node is already the route node
+  if (not GetRouteNode(MapDBId(APosition.DatabaseId, TmpWay.GetId(APosition.NodeIndex)), AForwardNode)) then
+  begin
+    GetTargetForwardRouteNode(AState,
+      APosition.DatabaseId,
+      TmpWay,
+      APosition.NodeIndex,
+      AForwardNode);
+
+    GetTargetBackwardRouteNode(AState,
+      APosition.DatabaseId,
+      TmpWay,
+      APosition.NodeIndex,
+      ABackwardNode);
+  end;
+
+  if (not Assigned(AForwardNode)) and (not Assigned(ABackwardNode)) then
+  begin
+    WriteLn(LogFile, 'ERROR: No route node found for target way');
+    Exit;
+  end;
+
+  Result := True;
+end;
+
+function TAbstractRoutingService.GetTargetNodes(const AState: TRoutingState;
+  const APosition: TRoutePosition; var ATargetCoord: TGeoPoint;
+  var AForwardNode: TRouteNode; var ABackwardNode: TRouteNode): Boolean;
+begin
+  if (APosition.Obj.RefType = refWay) then
+  begin
+    Result := GetWayTargetNodes(AState, APosition, ATargetCoord, AForwardNode, ABackwardNode);
+  end
+  else
+  begin
+    WriteLn(LogFile, 'ERROR: Unsupported object type "', APosition.Obj.GetTypeName(), '" for target!');
+    Result := False;
+  end;
+end;
+
+function TAbstractRoutingService.GetRNode(const AState: TRoutingState;
+  const APosition: TRoutePosition; const AWay: TMapWay;
+  ARouteNodeIndex: Integer; const ARouteNode: TRouteNode;
+  const AStartCoord: TGeoPoint; const ATargetCoord: TGeoPoint;
+  var ARNode: TRNode): Boolean;
+begin
+  ARNode.Init(MapDBId(APosition.DatabaseId, ARouteNode.GetId()),
+    ARouteNode,
+    APosition.Obj);
+
+  ARNode.CurrentCost := GetCosts(AState, APosition.DatabaseId, AWay,
+    GetSphericalDistance(AStartCoord, AWay.Nodes[ARouteNodeIndex]));
+
+  ARNode.EstimateCost := GetEstimateCosts(AState, APosition.DatabaseId,
+    GetSphericalDistance(AWay.Nodes[ARouteNodeIndex], ATargetCoord));
+
+  ARNode.OverallCost := ARNode.CurrentCost + ARNode.EstimateCost;
+
+  Result := True;
+end;
+
+procedure TAbstractRoutingService.AddNodes(var ARoute: TRouteData;
+  ADatabase: TMapDatabaseId; AStartNodeId: TId; AStartNodeIndex: Integer;
+  const AObject: TObjectFileRef; AIdCount: integer; AIsOneway: Boolean;
+  ATargetNodeIndex: Integer);
+var
+  i, iPos, iNext: Integer;
+
+begin
+  Assert(AStartNodeIndex < AIdCount);
+  Assert(ATargetNodeIndex < AIdCount);
+
+  if (Max(AStartNodeIndex, ATargetNodeIndex) - Min(AStartNodeIndex, ATargetNodeIndex) = 1) then
+  begin
+    // From one node to the neighbour node (+1 or -1)
+    ARoute.AddEntry(ADatabase,
+      AStartNodeId,
+      AStartNodeIndex,
+      AObject,
+      ATargetNodeIndex);
+  end
+  else if (AStartNodeIndex < ATargetNodeIndex) then
+  begin
+    // Following the way
+    ARoute.AddEntry(ADatabase, AStartNodeId, AStartNodeIndex, AObject, AStartNodeIndex+1);
+
+    for i := AStartNodeIndex+1 to ATargetNodeIndex-2 do
+    begin
+      ARoute.AddEntry(ADatabase, 0, i, AObject, i+1);
+    end;
+
+    ARoute.AddEntry(ADatabase, 0, ATargetNodeIndex-1, AObject, ATargetNodeIndex);
+  end
+  else
+  if AIsOneway then
+  begin
+    // startNodeIndex>tragetNodeIndex, but this is a oneway we assume
+    // that the way is either an area or is a roundabound
+    // TODO: proof this using the right assertions or checks
+    iPos := AStartNodeIndex + 1;
+
+    if (iPos >= AIdCount) then
+      iPos := 0;
+
+    iNext := iPos + 1;
+    if (iNext >= AIdCount) then
+      iNext := 0;
+
+    ARoute.AddEntry(ADatabase, AStartNodeId, AStartNodeIndex, AObject, iPos);
+
+    while (iNext <> ATargetNodeIndex) do
+      ARoute.AddEntry(ADatabase, 0, iPos, AObject, iNext);
+
+      Inc(iPos);
+    if (iPos >= AIdCount) then
+      iPos := 0;
+
+    iNext := iPos + 1;
+    if (iNext >= AIdCount) then
+      iNext := 0;
+
+    ARoute.AddEntry(ADatabase, 0, iPos, AObject, ATargetNodeIndex);
+  end
+  else
+  begin
+    // We follow the way in the opposite direction
+    ARoute.AddEntry(ADatabase, AStartNodeId, AStartNodeIndex, AObject, AStartNodeIndex-1);
+
+    for i := AStartNodeIndex-1 downto ATargetNodeIndex+2 do
+    begin
+      ARoute.AddEntry(ADatabase, 0, i, AObject, i-1);
+    end;
+
+    ARoute.AddEntry(ADatabase, 0, ATargetNodeIndex+1, AObject, ATargetNodeIndex);
+  end;
+end;
+
+function TAbstractRoutingService.GetWayStartNodes(const AState: TRoutingState;
+  const APosition: TRoutePosition; var AStartCoord: TGeoPoint;
+  const ATargetCoord: TGeoPoint; var AForwardRouteNode: TRouteNode;
+  var ABackwardRouteNode: TRouteNode; var AForwardRNode: TRNode;
+  var ABackwardRNode: TRNode): Boolean;
+var
+  TmpWay: TMapWay;
+  forwardNodePos, backwardNodePos: Integer;
+begin
+  Result := False;
+  Assert(APosition.Obj.RefType = refWay);
+
+  TmpWay := GetWayByOffset(MapDBFileOffset(APosition.DatabaseId, APosition.Obj.Offset));
+  if (not Assigned(TmpWay)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Cannot get start way!');
+    Exit;
+  end;
+
+  if APosition.NodeIndex >= Length(TmpWay.Nodes) then
+  begin
+    WriteLn(LogFile, 'ERROR: Given start node index ', APosition.NodeIndex, ' is not within valid range [0,', Length(TmpWay.Nodes)-1);
+    Exit;
+  end;
+
+  AStartCoord := TmpWay.Nodes[APosition.NodeIndex];
+  forwardNodePos := -1;
+  backwardNodePos := -1;
+
+  // Check, if the current node is already the route node
+  if GetRouteNode(MapDBId(APosition.DatabaseId, TmpWay.GetId(APosition.NodeIndex)), AForwardRouteNode) then
+    forwardNodePos := APosition.NodeIndex
+  else
+  begin
+    GetStartForwardRouteNode(AState,
+      APosition.DatabaseId,
+      TmpWay,
+      APosition.NodeIndex,
+      AForwardRouteNode,
+      forwardNodePos);
+
+    GetStartBackwardRouteNode(AState,
+      APosition.DatabaseId,
+      TmpWay,
+      APosition.NodeIndex,
+      ABackwardRouteNode,
+      backwardNodePos);
+  end;
+
+  if (not Assigned(AForwardRouteNode)) and (not Assigned(ABackwardRouteNode)) then
+  begin
+    WriteLn(LogFile, 'ERROR: No route node found for start way');
+    Exit;
+  end;
+
+  if Assigned(AForwardRouteNode)
+  and (not GetRNode(AState, APosition, TmpWay, forwardNodePos, AForwardRouteNode, AStartCoord, ATargetCoord, AForwardRNode))
+  then
+    Exit;
+
+  if Assigned(ABackwardRouteNode)
+  and (not GetRNode(AState, APosition, TmpWay, backwardNodePos, ABackwardRouteNode, AStartCoord, ATargetCoord, ABackwardRNode))
+  then
+    Exit;
+
+  Result := True;
+end;
+
+function TAbstractRoutingService.ResolveRNodesToRouteData(const AState: TRoutingState;
+  const ANodes: TVNodeList; const AStart: TRoutePosition;
+  const ATarget: TRoutePosition; var ARoute: TRouteData): Boolean;
+var
+  routeNodeIds: TMapDBIdArray;
+  wayOffsets: TMapDBFileOffsetArray;
+  areaOffsets: TMapDBFileOffsetArray;
+  routeNodeMap: TRouteNodeMap;
+  areaMap: TMapAreaDict;
+  wayMap: TMapWayDict;
+  pIds: ^TGeoPointArray;
+  IsOneway: Boolean;
+  TmpVNode: TVNode;
+  dbId: TMapDatabaseId;
+  iEntry: Integer;
+  initialNode: TRouteNode;
+  routeNodeIndex: Integer;
+  n, nn: Integer;
+  pVNodeN, pVNodeNN: ^TVNode;
+  node, nextNode: TRouteNode;
+  currentNodeIndex, nextNodeIndex: Integer;
+
+  procedure _GetItemNodes(const ADbId: TMapDatabaseId;
+    const AObj: TObjectFileRef);
+  var
+    iEntry: Integer;
+  begin
+    case AObj.RefType of
+      refArea:
+      begin
+        iEntry := areaMap.IndexOf(MapDBFileOffset(ADbId, AObj.Offset).AsStr());
+
+        Assert(iEntry <> -1);
+
+        pIds := Addr(areaMap.Data[iEntry].Rings[0].Nodes);
+        IsOneway := False;
+      end;
+
+      refWay:
+      begin
+        iEntry := wayMap.IndexOf(MapDBFileOffset(AStart.DatabaseId, AStart.Obj.Offset).AsStr());
+
+        Assert(iEntry <> -1);
+
+        pIds := Addr(wayMap.Data[iEntry].Nodes);
+        IsOneway := not CanUseBackward(AState, AStart.DatabaseId, wayMap.Data[iEntry]);
+      end;
+    else
+      Assert(False);
+    end;
+  end;
+
+begin
+  Result := False;
+  IsOneway := False;
+
+  // Collect all route node file offsets on the path and also
+  // all area/way file offsets on the path
+  for TmpVNode in ANodes.Items do
+  begin
+    MapDBIdArrayAppend(routeNodeIds, TmpVNode.CurNode);
+    dbId := TmpVNode.CurNode.DatabaseId;
+
+    if TmpVNode.Obj.IsValid() then
+    begin
+      case TmpVNode.Obj.RefType of
+        refArea: MapDBFileOffsetArrayAppend(areaOffsets, MapDBFileOffset(dbId, TmpVNode.Obj.Offset));
+        refWay:  MapDBFileOffsetArrayAppend(wayOffsets, MapDBFileOffset(dbId, TmpVNode.Obj.Offset));
+      else
+        Assert(False, 'Unknown RefType');
+      end;
+    end;
+  end;
+
+  // Collect area/way file offset for the
+  // target object (not traversed by above loop)
+  case ATarget.Obj.RefType of
+    refArea: MapDBFileOffsetArrayAppend(areaOffsets, MapDBFileOffset(ATarget.DatabaseId, ATarget.Obj.Offset));
+    refWay: MapDBFileOffsetArrayAppend(wayOffsets, MapDBFileOffset(ATarget.DatabaseId, ATarget.Obj.Offset));
+  else
+    Assert(False);
+  end;
+
+  //
+  // Load data
+  //
+
+  if (not GetRouteNodes(routeNodeIds, routeNodeMap)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Cannot load route nodes');
+    Exit;
+  end;
+
+  if (not GetAreasByOffset(areaOffsets, areaMap)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Cannot load areas');
+    Exit;
+  end;
+
+  if (not GetWaysByOffset(wayOffsets, wayMap)) then
+  begin
+    WriteLn(LogFile, 'ERROR: Cannot load ways');
+    Exit;
+  end;
+
+  Assert(AStart.Obj.RefType in [refArea, refWay]);
+  pIds := nil;
+
+  _GetItemNodes(AStart.DatabaseId, AStart.Obj);
+
+  if (ANodes.Count() = 0) then
+  begin
+    // We assume that startNode and targetNode are on the same area/way (with no routing node in between)
+    Assert(AStart.Obj.IsEqual(ATarget.Obj));
+
+    AddNodes(ARoute,
+      AStart.DatabaseId,
+      pIds^[AStart.NodeIndex].GetId(),
+      AStart.NodeIndex,
+      AStart.Obj,
+      Length(pIds^),
+      IsOneway,
+      ATarget.NodeIndex);
+
+    ARoute.AddEntry(ATarget.DatabaseId, 0, ATarget.NodeIndex, ObjectFileRef(0, refNone), 0);
+    Result := True;
+    Exit;
+  end;
+
+  if not routeNodeMap.TryGetData(ANodes.Items[0].CurNode, initialNode) then
+  begin
+    WriteLn(LogFile, 'ERROR: Can''t found route node ', ANodes.Items[0].CurNode.DatabaseId,
+      ', ', ANodes.Items[0].CurNode.Id);
+    Exit;
+  end;
+
+  //
+  // Add The path from the start node to the first routing node
+  //
+  if (pIds^[AStart.NodeIndex].GetId() <> initialNode.GetId()) then
+  begin
+    routeNodeIndex := 0;
+
+    while (pIds^[routeNodeIndex].GetId() <> initialNode.GetId()) and (routeNodeIndex < Length(pIds^)) do
+      Inc(routeNodeIndex);
+
+    Assert(routeNodeIndex < Length(pIds^));
+
+    // Start node to initial route node
+    AddNodes(ARoute,
+      AStart.DatabaseId,
+      pIds^[AStart.NodeIndex].GetId(),
+      AStart.NodeIndex,
+      AStart.Obj,
+      Length(pIds^),
+      IsOneway,
+      routeNodeIndex);
+  end;
+
+  //
+  // Walk the routing path from route node to the next route node
+  // and build entries.
+  //
+  for n := 0 to ANodes.Count()-1 do
+  begin
+    nn := n+1;
+    pVNodeN := Addr(ANodes.Items[n]);
+    pVNodeNN := Addr(ANodes.Items[nn]);
+
+    routeNodeMap.TryGetData(pVNodeN^.CurNode, node);
+
+    //
+    // The path from the last routing node to the target node and the
+    // target node itself
+    //
+    if (nn >= ANodes.Count()) then
+    begin
+      Assert(ATarget.Obj.RefType in[refArea, refWay]);
+
+      _GetItemNodes(ATarget.DatabaseId, ATarget.Obj);
+
+      currentNodeIndex := 0;
+
+      while (pIds^[currentNodeIndex].GetId() <> node.GetId()) and (currentNodeIndex < Length(pIds^)) do
+        Inc(currentNodeIndex);
+
+      Assert(currentNodeIndex < Length(pIds^));
+
+      if (currentNodeIndex <> ATarget.NodeIndex) then
+      begin
+        AddNodes(ARoute,
+          ATarget.DatabaseId,
+          pIds^[currentNodeIndex].GetId(),
+          currentNodeIndex,
+          ATarget.Obj,
+          Length(pIds^),
+          IsOneway,
+          ATarget.NodeIndex);
+      end;
+
+      ARoute.AddEntry(ATarget.DatabaseId, 0, ATarget.NodeIndex, ObjectFileRef(0, refNone), 0);
+
+      Break;
+    end;
+
+    routeNodeMap.TryGetData(pVNodeNN^.CurNode, nextNode);
+
+    if (pVNodeN^.CurNode.DatabaseId <> pVNodeNN^.CurNode.DatabaseId)
+    and (node.GetId() = nextNode.GetId()) then
+    begin
+      // there is no way between database transition nodes
+      Continue;
+    end;
+
+    Assert(pVNodeNN^.Obj.RefType in [refArea, refWay]);
+
+    _GetItemNodes(pVNodeNN^.CurNode.DatabaseId, pVNodeNN^.Obj);
+
+    currentNodeIndex := 0;
+
+    while (pIds^[currentNodeIndex].GetId() <> node.GetId()) and (currentNodeIndex < Length(pIds^)) do
+      Inc(currentNodeIndex);
+
+    Assert(currentNodeIndex < Length(pIds^));
+
+    nextNodeIndex := 0;
+
+    while (pIds^[nextNodeIndex].GetId() <> nextNode.GetId()) and (nextNodeIndex < Length(pIds^)) do
+      Inc(currentNodeIndex);
+
+    Assert(nextNodeIndex < Length(pIds^));
+
+    AddNodes(ARoute,
+      pVNodeNN^.CurNode.DatabaseId,
+      pIds^[currentNodeIndex].GetId(),
+      currentNodeIndex,
+      pVNodeNN^.Obj,
+      Length(pIds^),
+      IsOneway,
+      nextNodeIndex);
+  end;
+
+  Result := True;
+end;
+
+function TAbstractRoutingService.WalkToOtherDatabases(const AState: TRoutingState;
+  var ACurrent: TRNode; var ACurrentRouteNode: TRouteNode;
+  var AOpenList: TOpenList;
+  //var AOpenMap: TOpenMap;
+  const AClosedSet: TClosedSet;
+  const AClosedRestrictedSet: TClosedSet): Boolean;
+var
+  twins: TMapDBIdArray;
+  twin: TMapDBId;
+  twinIndex: Integer; // index in AOpenList
+  rn: TRNode;
+  node: TRouteNode;
+begin
+  Result := False;
+  // add twin nodes to nextNode from other databases to open list
+  twins := GetNodeTwins(AState, ACurrent.Id.DatabaseId, ACurrentRouteNode.GetId());
+
+  for twin in twins do
+  begin
+    if (ACurrent.IsAccess and (AClosedSet.IndexOf(VNode(twin)) <> -1))
+    or (not ACurrent.IsAccess and (AClosedRestrictedSet.IndexOf(VNode(twin)) <> -1))
+    then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, 'Twin node ', twin, ' is closed already, ignore it');
+      {$endif}
+      Continue;
+    end;
+
+    //twinIndex := AOpenMap.KeyData[twin];
+    //if (twinIndex <> -1) then
+    if AOpenList.FindById(twin, twinIndex) then
+    begin
+      rn := AOpenList.Items[twinIndex];
+      if (rn.CurrentCost > ACurrent.CurrentCost) then
+      begin
+        // this is cheaper path to twin
+
+        rn.Prev := ACurrent.Id;
+        //rn->object=node->objects.begin()->object, /*TODO: how to find correct way from other DB?*/
+
+        rn.CurrentCost := ACurrent.CurrentCost;
+        rn.EstimateCost := ACurrent.EstimateCost;
+        rn.OverallCost := ACurrent.OverallCost;
+        rn.IsAccess := ACurrent.IsAccess;
+
+        AOpenList.Delete(twinIndex);
+
+        AOpenList.Append(rn);
+
+        {$ifdef DEBUG_ROUTING}
+        WriteLn(LogFile, 'Better transition from ', rn.Prev, ' to ', rn.id);
+        {$endif}
+      end;
+    end
+    else
+    begin
+      if (not GetRouteNode(twin, node)) then
+        Exit;
+
+      rn.Init(twin, node,
+        //node->objects.begin()->object, /*TODO: how to find correct way from other DB?*/
+        ObjectFileRef(node.FileOffset, TRefType.refNone), // TODO: have to be valid Object here?
+        ACurrent.id);
+
+      rn.CurrentCost := ACurrent.CurrentCost;
+      rn.EstimateCost := ACurrent.EstimateCost;
+      rn.OverallCost := ACurrent.OverallCost;
+      rn.IsAccess := ACurrent.IsAccess;
+
+      AOpenList.Append(rn);
+
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, 'Transition from ', rn.Prev, ' to ', rn.id);
+      {$endif}
+    end;
+  end;
+  Result := True;
+end;
+
+function TAbstractRoutingService.WalkPaths(const AState: TRoutingState;
+  var ACurrent: TRNode; var ACurrentRouteNode: TRouteNode;
+  var AOpenList: TOpenList;
+  //var AOpenMap: TOpenMap;
+  var AClosedSet: TClosedSet;
+  var AClosedRestrictedSet: TClosedSet;
+  var AResult: TRoutingResult;
+  const AParameter: TRoutingParameter;
+  const ATargetCoord: TGeoPoint;
+  const AVehicle: TVehicleType;
+  var ANodesIgnoredCount: Integer;
+  var ACurrentMaxDistance: TDistance;
+  const AOverallDistance: TDistance;
+  const ACostLimit: Double): Boolean;
+var
+  dbId: TMapDatabaseId;
+  i: Integer;
+  path: TRouteNodePath;
+  canTurnedInto: Boolean;
+  exclude: TRouteNodeExclude;
+  currentCost: Double;
+  openEntryIdx: Integer;
+  openEntry, node: TRNode;
+  nextNode: TRouteNode;
+  distanceToTarget: TDistance;
+  estimateCost, overallCost: Double;
+begin
+  dbId := ACurrent.Id.DatabaseId;
+  i := 0;
+
+  for path in ACurrentRouteNode.Paths do
+  begin
+    if (path.Id = ACurrent.Prev.Id) then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Skipping route to ', path.id,
+      ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+      ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+      ' => back to the last node visited');
+      {$endif}
+      Inc(ANodesIgnoredCount);
+      Inc(i);
+
+      Continue;
+    end;
+
+    if (not ACurrent.IsAccess) and (not path.IsRestricted(AVehicle)) then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Skipping route to ', path.id,
+      ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+      ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+      ' => moving from non-accessible way back to accessible way');
+      {$endif}
+      Inc(ANodesIgnoredCount);
+      Inc(i);
+      Continue;
+    end;
+
+    if (not CanUse(AState, dbId, ACurrentRouteNode, i)) then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Skipping route to ', path.id,
+      ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+      ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+      ' => Cannot be used');
+      {$endif}
+      Inc(ANodesIgnoredCount);
+      Inc(i);
+
+      Continue;
+    end;
+
+    if (ACurrent.IsAccess and (AClosedSet.IndexOf(VNode(MapDBId(dbId, path.Id))) <> -1))
+    or ((not ACurrent.IsAccess) and (AClosedRestrictedSet.IndexOf(VNode(MapDBId(dbId, path.Id))) <> -1))
+    then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Skipping route to ', dbId, ' / ', path.id,
+      ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+      ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+      ' => already calculated');
+      {$endif}
+      Inc(i);
+
+      Continue;
+    end;
+
+    if (Length(ACurrentRouteNode.Excludes) <> 0) then
+    begin
+      canTurnedInto := True;
+
+      for exclude in ACurrentRouteNode.Excludes do
+      begin
+        if exclude.Source.IsEqual(ACurrent.Obj)
+        and ACurrentRouteNode.Objects[exclude.TargetIndex].Obj.IsEqual(ACurrentRouteNode.objects[path.ObjectIndex].Obj)
+        then
+        begin
+          {$ifdef DEBUG_ROUTING}
+          WriteLn(LogFile, '  Skipping route to ', dbId, ' / ', path.id,
+          ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+          ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+          ' => turn not allowed');
+          {$endif}
+          canTurnedInto := False;
+          Break;
+        end;
+      end;
+
+      if (not canTurnedInto) then
+      begin
+        Inc(ANodesIgnoredCount);
+        Inc(i);
+
+        Continue;
+      end;
+    end;
+
+    currentCost := ACurrent.CurrentCost + GetCosts(AState, dbId, ACurrentRouteNode, i);
+
+    if AOpenList.FindById(MapDBId(ACurrent.Id.DatabaseId, path.Id), openEntryIdx) then
+    begin
+      openEntry := AOpenList.Items[openEntryIdx];
+
+      // Check, if we already have a cheaper path to the new node. If yes, do not put the new path
+      // into the open list
+      if (openEntry.CurrentCost <= currentCost) then
+      begin
+        {$ifdef DEBUG_ROUTING}
+        WriteLn(LogFile, '  Skipping route to ', dbId, ' / ', path.id,
+        ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+        ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+        ' => cheaper route exists ', currentCost, '<=>', openEntry.obj.GetName(), ' ', openEntry.Node.GetId(), ' ', openEntry.CurrentCost);
+        {$endif}
+        Inc(i);
+
+        Continue;
+      end;
+      nextNode := openEntry.Node;
+    end
+    else
+    if (not GetRouteNode(MapDBId(ACurrent.Id.DatabaseId, path.Id), nextNode)) then
+    begin
+      WriteLn(LogFile, 'ERROR: Cannot load route node with id ', path.id);
+      Exit;
+    end
+    else
+    begin
+      openEntryIdx := -1;
+    end;
+
+    distanceToTarget := GetSphericalDistance(nextNode.Point, ATargetCoord);
+
+    ACurrentMaxDistance := Max(ACurrentMaxDistance, AOverallDistance - distanceToTarget);
+    AResult.CurrentMaxDistance := ACurrentMaxDistance;
+
+    // Estimate costs for the rest of the distance to the target
+    estimateCost := GetEstimateCosts(AState, dbId, distanceToTarget);
+    overallCost := currentCost + estimateCost;
+
+    if (overallCost > ACostLimit) then
+    begin
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Skipping route to ', dbId, ' / ', path.id,
+      ' (', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.GetTypeName(),
+      ' ', ACurrentRouteNode.Objects[path.ObjectIndex].Obj.Offset, ')',
+      ' => cost limit reached (', overallCost, '>', costLimit, ')');
+      {$endif}
+
+      Inc(ANodesIgnoredCount);
+      Inc(i);
+
+      Continue;
+    end;
+
+    if Assigned(AParameter.OnProgress) then
+      AParameter.OnProgress(ACurrentMaxDistance, AOverallDistance);
+
+
+    // If we already have the node in the open list, but the new path is cheaper (as tested above),
+    // update the existing entry
+    if (openEntryIdx <> -1) then
+    begin
+      node := openEntry;
+
+      node.Prev := ACurrent.Id;
+      node.Obj := ACurrentRouteNode.Objects[path.ObjectIndex].Obj;
+
+      node.CurrentCost := currentCost;
+      node.EstimateCost := estimateCost;
+      node.OverallCost := overallCost;
+      node.IsAccess := (not ACurrentRouteNode.Paths[i].IsRestricted(AVehicle));
+
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Updating route ', ACurrent.Id,
+        ' via ', node.Obj.GetTypeName(), ' ', node.Obj.Offset,
+        ' cur=', currentCost,
+        ' est=', estimateCost,
+        ' tot=', overallCost,
+        ' id=', ACurrentRouteNode.GetId());
+      {$endif}
+
+      AOpenList.Delete(openEntryIdx);
+
+      AOpenList.Append(node);
+    end
+    else
+    begin
+      node.Init(MapDBId(dbId, path.Id),
+        nextNode,
+        ACurrentRouteNode.Objects[path.ObjectIndex].Obj,
+        ACurrent.Id);
+
+      node.CurrentCost := currentCost;
+      node.EstimateCost := estimateCost;
+      node.OverallCost := overallCost;
+      node.IsAccess := (not path.IsRestricted(AVehicle));
+
+      {$ifdef DEBUG_ROUTING}
+      WriteLn(LogFile, '  Inserting route to ', path.Id,
+        ' (', node.obj.GetTypeName(), ' ', node.Obj.Offset, ')',
+        ' cur=', currentCost,
+        ' est=', estimateCost,
+        ' tot=', overallCost,
+        ' id=', ACurrentRouteNode.GetId());
+      {$endif}
+
+      AOpenList.Append(node);
+    end;
+
+    Inc(i);
+  end;
+
+  Result := True;
+end;
+
+constructor TAbstractRoutingService.Create(const AParameter: TRouterParameter);
+begin
+
+end;
+
+function TAbstractRoutingService.CalculateRoute(var AState: TRoutingState;
+  const AStart: TRoutePosition; const ATarget: TRoutePosition;
+  const AParameter: TRoutingParameter): TRoutingResult;
+var
+  vehicle: TVehicleType;
+  startForwardRouteNode: TRouteNode;
+  startBackwardRouteNode: TRouteNode;
+  targetForwardRouteNode: TRouteNode;
+  targetBackwardRouteNode: TRouteNode;
+  startForwardNode: TRNode;
+  startBackwardNode: TRNode;
+  startCoord, targetCoord: TGeoPoint;
+  openList: TOpenList;
+  closedSet: TClosedSet;
+  closedRestrictedSet: TClosedSet;
+  nodesLoadedCount, nodesIgnoredCount: Integer;
+  maxOpenList, maxClosedSet: Integer;
+  currentMaxDistance, overallDistance: TDistance;
+  overallCost, costLimit: Double;
+  clock: TStopClock;
+  current: TRNode;
+  currentRouteNode: TRouteNode;
+  dbId: TMapDatabaseId;
+  targetForwardFound: Boolean;
+  targetBackwardFound: Boolean;
+  targetForwardFinalNode: TRNode;
+  targetBackwardFinalNode: TRNode;
+  targetFinalNode: TRNode;
+  s: string;
+  nodes: TVNodeList;
+  node: TVNode;
+begin
+  Result.Init();
+  vehicle := GetVehicle(AState);
+
+  // Sorted list (smallest cost first) of ways to check (we are using a std::set)
+  openList.Clear();
+
+  // Restricted way (access=destination) is a way that may be used just
+  // in case when target is on this way. Some routing nodes may be accessed
+  // from two different ways - one without any access restriction (closedSet)
+  // and second with restriction (closedRestrictedSet)
+  closedSet.Clear();
+  closedRestrictedSet.Clear();
+
+  nodesLoadedCount := 0;
+  nodesIgnoredCount := 0;
+  maxOpenList := 0;
+  maxClosedSet := 0;
+
+  openList.Reserve(10000);
+  closedSet.Reserve(300000);
+  closedRestrictedSet.Reserve(10000);
+
+  if (not GetTargetNodes(AState, ATarget, targetCoord, targetForwardRouteNode, targetBackwardRouteNode)) then
+    Exit;
+
+  if (not GetStartNodes(AState, AStart, startCoord, targetCoord, startForwardRouteNode, startBackwardRouteNode, startForwardNode, startBackwardNode)) then
+    Exit;
+
+  {$ifdef DEBUG_ROUTING}
+  //if Assigned(startForwardNode) then
+  begin
+    WriteLn(LogFile, 'StartForwardNode:   ', AStart.Obj.GetName(),
+      ' ', startForwardRouteNode.GetId(),
+      ' cur=', startForwardNode.CurrentCost,
+      ' est=', startForwardNode.EstimateCost,
+      ' tot=', startForwardNode.OverallCost);
+  end;
+  //if Assigned(startBackwardNode) then
+  begin
+    WriteLn(LogFile, 'StartBackwardNode:   ', AStart.Obj.GetName(),
+      ' ', startBackwardRouteNode.GetId(),
+      ' cur=', startBackwardNode.CurrentCost,
+      ' est=', startBackwardNode.EstimateCost,
+      ' tot=', startBackwardNode.OverallCost);
+  end;
+  if Assigned(targetForwardRouteNode) then
+  begin
+    WriteLn(LogFile, 'TargetForwardNode:  ', ATarget.Obj.GetName(),
+      ' ', targetForwardRouteNode.GetId());
+  end;
+  if Assigned(startBackwardNode) then
+  begin
+    WriteLn(LogFile, 'TargetBackwardNode: ', ATarget.Obj.GetName(),
+      ' ', targetBackwardRouteNode.GetId());
+  end;
+  {$endif}
+
+  if AParameter.Breaker.IsAborted then
+    Exit;
+
+  //if Assigned(startForwardNode) then
+  if startForwardNode.IsValid() then
+  begin
+    openList.Append(startForwardNode);
+  end;
+
+  //if Assigned(startBackwardNode) then
+  if startBackwardNode.IsValid() then
+  begin
+    openList.Append(startBackwardNode);
+  end;
+
+  currentMaxDistance := 0.0;
+  overallDistance := GetSphericalDistance(startCoord, targetCoord);
+  overallCost := GetEstimateCosts(AState, AStart.DatabaseId, overallDistance);
+  costLimit := GetCostLimit(AState, AStart.DatabaseId, overallDistance);
+
+  Result.OverallDistance := overallDistance;
+  Result.CurrentMaxDistance := currentMaxDistance;
+
+  targetForwardFound := not Assigned(targetForwardRouteNode);
+  targetBackwardFound := not Assigned(targetBackwardRouteNode);
+
+  while Length(openList.Items) > 0 do
+  begin
+    //
+    // Take entry from open list with lowest cost
+    //
+
+    if AParameter.Breaker.IsAborted then
+      Exit;
+
+    current := openList.Items[0];
+
+    openList.Delete(0);
+
+    currentRouteNode := current.Node;
+    dbId := current.Id.DatabaseId;
+
+    Inc(nodesLoadedCount);
+
+    // Get potential follower in the current way
+
+    {$ifdef DEBUG_ROUTING}
+    WriteLn(LogFile, 'Analysing follower of node ', dbId, ' / ', currentRouteNode.GetId(),
+      ' (', current.Obj.GetName(), '[', currentRouteNode.GetId(), '])',
+      ' cur=', current.CurrentCost,
+      ' est=', current.EstimateCost,
+      ' tot=', current.OverallCost);
+    {$endif}
+
+    if (not WalkPaths(AState,
+      current,
+      currentRouteNode,
+      openList,
+      //openMap,
+      closedSet,
+      closedRestrictedSet,
+      Result,
+      AParameter,
+      targetCoord,
+      vehicle,
+      nodesIgnoredCount,
+      currentMaxDistance,
+      overallDistance,
+      costLimit)) then
+    begin
+      WriteLn(LogFile, 'ERROR: Failed to walk paths from ', dbId, ' / ', currentRouteNode.GetId());
+      Exit;
+    end;
+
+    //
+    // Add current node twins (nodes from another databases with same Id)
+    // to openList/openMap or update it
+    //
+
+    if (not WalkToOtherDatabases(AState,
+      current,
+      currentRouteNode,
+      openList,
+      //openMap,
+      closedSet,
+      closedRestrictedSet)) then
+    begin
+      WriteLn(LogFile, 'ERROR: Failed to walk to other databases from ', dbId, ' / ', currentRouteNode.FileOffset);
+      Exit;
+    end;
+
+    //
+    // Add current node to close map
+    //
+
+    {$ifdef DEBUG_ROUTING}
+    WriteLn(LogFile, 'Closing ', current.Id, ' (previous ', current.Prev, ')');
+    {$endif}
+    if current.IsAccess then
+    begin
+      closedSet.Append(VNode(current.Id, current.Obj, current.Prev));
+    end
+    else
+    begin
+      closedRestrictedSet.Append(VNode(current.Id, current.Obj, current.Prev));
+    end;
+
+    current.Node := nil;
+
+    maxOpenList := Max(maxOpenList, openList.Count());
+    maxClosedSet := Max(maxClosedSet, closedSet.Count() + closedRestrictedSet.Count());
+
+    {$ifdef DEBUG_ROUTING}
+    if (openList.Count() = 0) then
+      WriteLn(LogFile, 'No more alternatives, stopping');
+
+    if Assigned(targetForwardRouteNode)
+    and (current.Id.Id = targetForwardRouteNode.GetId())
+    and (current.Id.DatabaseId = ATarget.DatabaseId) then
+      WriteLn(LogFile, 'Reached target: ', current.Id, ' = ', targetForwardRouteNode.GetId(), ' (forward)');
+
+    if Assigned(targetBackwardRouteNode)
+    and (current.Id.Id = targetBackwardRouteNode.GetId())
+    and (current.Id.DatabaseId = ATarget.DatabaseId) then
+      WriteLn(LogFile, 'Reached target: ', current.Id, ' = ', targetBackwardRouteNode.GetId(), ' (backward)');
+    {$endif}
+
+    if (not targetForwardFound) then
+    begin
+      targetForwardFound := (current.Id.Id = targetForwardRouteNode.GetId())
+                            and (current.Id.Id = ATarget.DatabaseId);
+      if targetForwardFound then
+        targetForwardFinalNode := current;
+    end;
+
+    if (not targetBackwardFound) then
+    begin
+      targetBackwardFound := (current.Id.Id = targetBackwardRouteNode.GetId())
+                             and (current.Id.DatabaseId = ATarget.DatabaseId);
+      if targetBackwardFound then
+        targetBackwardFinalNode := current;
+    end;
+
+    if (targetForwardFound and targetBackwardFound) then
+      Break;
+  end;
+
+  // If we have keep the last node open because of access violations, add it
+  // after routing is done
+  if (closedSet.IndexOf(VNode(current.Id)) = -1) then
+  begin
+    closedSet.Append(VNode(current.Id, current.Obj, current.Prev));
+  end;
+
+  targetFinalNode.Init();
+  //if Assigned(targetBackwardFinalNode) and Assigned(targetForwardFinalNode) then
+  if (targetForwardFound and targetBackwardFound) then
+  begin
+    if (targetForwardFinalNode.CurrentCost <= targetBackwardFinalNode.currentCost) then
+      targetFinalNode := targetForwardFinalNode
+    else
+      targetFinalNode := targetBackwardFinalNode;
+  end
+  else
+  if targetBackwardFound then
+    targetFinalNode := targetBackwardFinalNode
+  else
+  if (targetForwardFound) then
+    targetFinalNode := targetForwardFinalNode;
+
+  clock.Stop();
+
+  if FIsDebugPerformance then
+  begin
+    s := 'From:                ';
+    if Assigned(startBackwardRouteNode) then
+      s := s + startBackwardRouteNode.Point.GetDisplayText()
+    else
+      s := s + startForwardRouteNode.Point.GetDisplayText();
+
+    s := s + ' ' + AStart.Obj.GetName();
+    s := s + '[';
+    if Assigned(startBackwardRouteNode) then
+      s := s + startBackwardRouteNode.GetId().ToString + ' >* ';
+    s := s + AStart.NodeIndex.ToString;
+    if Assigned(startForwardRouteNode) then
+      s := s + ' *> ' + startForwardRouteNode.GetId().ToString;
+    s := s + ']';
+    WriteLn(LogFile, s);
+
+    s := 'To:                  ';
+    if Assigned(targetBackwardRouteNode) then
+      s := s + targetBackwardRouteNode.Point.GetDisplayText()
+    else
+      s := s + targetForwardRouteNode.Point.GetDisplayText();
+
+    s := s + ' ' + ATarget.Obj.GetName();
+    s := s + '[';
+    if Assigned(targetForwardRouteNode) then
+      s := s + targetForwardRouteNode.GetId().ToString + ' >* ';
+    s := s + ATarget.NodeIndex.ToString;
+    if Assigned(targetBackwardRouteNode) then
+      s := s + ' *> ' + targetBackwardRouteNode.GetId().ToString;
+    s := s + ']';
+    WriteLn(LogFile, s);
+
+    WriteLn(LogFile, 'Time:                ', clock.ResultString());
+
+    WriteLn(LogFile, 'Air-line distance:   ', (overallDistance / 1000), 'km');
+    WriteLn(LogFile, 'Minimum cost:        ', overallCost);
+    if (targetFinalNode.CurrentCost <> 0.0) then
+      WriteLn(LogFile, 'Actual cost:         ', targetFinalNode.CurrentCost);
+
+    WriteLn(LogFile, 'Cost limit:          ', costLimit);
+    WriteLn(LogFile, 'Route nodes loaded:  ', nodesLoadedCount);
+    WriteLn(LogFile, 'Route nodes ignored: ', nodesIgnoredCount);
+    WriteLn(LogFile, 'Max. OpenList size:  ', maxOpenList);
+    WriteLn(LogFile, 'Max. ClosedSet size: ', maxClosedSet);
+  end;
+
+
+  if (not targetFinalNode.IsValid()) then
+  begin
+    WriteLn(LogFile, 'WARN: No route found!');
+    Exit;
+  end;
+
+  if (AParameter.Breaker.IsAborted) then
+    Exit;
+
+  ResolveRNodeChainToList(targetFinalNode.Id, closedSet, closedRestrictedSet, nodes);
+
+  {$ifdef DEBUG_ROUTING}
+  WriteLn(LogFile, 'VNode List:');
+  for node in nodes do
+    WriteLn(LogFile, node.Obj.GetName(), ' ', node.CurNode.DatabaseId, '/', node.CurNode.Id);
+  {$endif}
+
+  if (AParameter.Breaker.IsAborted) then
+    Exit;
+
+  if (not ResolveRNodesToRouteData(AState, nodes, AStart, ATarget, Result.Route)) then
+  begin
+    WriteLn(LogFile, 'Cannot convert routing result to route data');
+    Exit;
+  end;
+
+  ResolveRouteDataJunctions(Result.Route);
+end;
+
+function TAbstractRoutingService.TransformRouteDataToRouteDescription(const AData: TRouteData;
+  ADescription: TRouteDescription): Boolean;
+var
+  entry: TRouteEntry;
+begin
+  Result := False;
+
+  if Assigned(ADescription) and (not AData.IsEmpty()) then
+  begin
+    ADescription.DatabaseMapping := GetDatabaseMapping();
+    for entry in AData.Entries do
+    begin
+      ADescription.AddNode(entry.DatabaseId,
+                         entry.CurNodeIndex,
+                         entry.Objects,
+                         entry.PathObject,
+                         entry.TargetNodeIndex);
+    end;
+    Result := True;
+  end;
+end;
+
+function TAbstractRoutingService.TransformRouteDataToPoints(const AData: TRouteData;
+  var APoints: TGeoPointArray): Boolean;
+var
+  a: TMapArea;
+  w: TMapWay;
+  aId, wId: TMapDBFileOffset;
+  iterIndex: Integer;
+  iter: TRouteEntry;
+  index: Integer;
+begin
+  Result := False;
+  if AData.IsEmpty() then
+    Exit;
+
+  a := nil;
+  w := nil;
+  aId.Init(0, -1);
+  for iterIndex := 0 to Length(AData.Entries)-1 do
+  begin
+    iter := AData.Entries[iterIndex];
+    if iter.PathObject.IsValid() then
+    begin
+      if (iter.PathObject.RefType = refArea) then
+      begin
+        if (not Assigned(a)) or (not aId.IsEqual(iter.GetDBFileOffset())) then
+        begin
+          a := GetAreaByOffset(iter.GetDBFileOffset());
+          if (not Assigned(a)) then
+          begin
+            WriteLn(LogFile, 'ERROR: Cannot load area with id ', iter.PathObject.Offset);
+            Exit;
+          end;
+          aId := iter.GetDBFileOffset();
+        end;
+
+        // Initial starting point
+        if (iterIndex = 0) then
+        begin
+          index := iter.CurNodeIndex;
+          { TODO: index check }
+          AppendGeoPointToArray(APoints, a.Rings[0].Nodes[index]);
+        end;
+
+        // target node of current path
+        index := iter.TargetNodeIndex;
+        { TODO: index check }
+        AppendGeoPointToArray(APoints, a.Rings[0].Nodes[index]);
+      end
+      else if (iter.PathObject.RefType = refWay) then
+      begin
+        if (not Assigned(w)) or (not wId.IsEqual(iter.GetDBFileOffset())) then
+        begin
+          w := GetWayByOffset(iter.GetDBFileOffset());
+          if (not Assigned(w)) then
+          begin
+            WriteLn(LogFile, 'ERROR: Cannot load way with id ', iter.PathObject.Offset);
+            Exit;
+          end;
+          wId := iter.GetDBFileOffset();
+        end;
+
+        // Initial starting point
+        if (iterIndex = 0) then
+        begin
+          index := iter.CurNodeIndex;
+
+          AppendGeoPointToArray(APoints, w.GetPoint(index));
+        end;
+
+        // target node of current path
+        index := iter.TargetNodeIndex;
+
+        AppendGeoPointToArray(APoints, w.GetPoint(index));
+      end;
+    end;
+  end;
+
+  Result := True;
+end;
+
+function TAbstractRoutingService.TransformRouteDataToWay(const AData: TRouteData;
+  AMapWay: TMapWay): Boolean;
+begin
+  Result := Assigned(AMapWay) and TransformRouteDataToPoints(AData, AMapWay.Nodes);
+end;
+
+{ TVNodeList }
+
+function TVNodeList.Append(const AValue: TVNode): Integer;
+begin
+  Result := Length(Items);
+  SetLength(Items, Result+1);
+  Items[Result] := AValue;
+end;
+
+function TVNodeList.IndexOf(const AValue: TVNode): Integer;
+begin
+  for Result := 0 to Count()-1 do
+  begin
+    if Items[Result].CurNode.IsEqual(AValue.CurNode) then
+      Exit;
+  end;
+  Result := -1;
+end;
+
+function TVNodeList.Count(): Integer;
+begin
+  Result := Length(Items);
+end;
+
+procedure TVNodeList.Reverse();
+var
+  TmpItem: TVNode;
+  i, n: Integer;
+begin
+  n := Count()-1;
+  for i := 0 to (n div 2) do
+  begin
+    TmpItem := Items[i];
+    Items[i] := Items[n-i];
+    Items[n-i] := TmpItem;
+  end;
+end;
+
+{ TRNode }
+
+procedure TRNode.Init(const AId: TMapDBId; const ANode: TRouteNode;
+  const AObj: TObjectFileRef);
+begin
+  Id := AId;
+  Node := ANode;
+  Prev.Init();
+  Obj.Assign(AObj);
+  CurrentCost := 0.0;
+  EstimateCost := 0.0;
+  OverallCost := 0.0;
+  IsAccess := True;
+end;
+
+procedure TRNode.Init(const AId: TMapDBId; const ANode: TRouteNode;
+  const AObj: TObjectFileRef; const APrev: TMapDBId);
+begin
+  Id := AId;
+  Node := ANode;
+  Prev := APrev;
+  Obj.Assign(AObj);
+  CurrentCost := 0.0;
+  EstimateCost := 0.0;
+  OverallCost := 0.0;
+  IsAccess := True;
+end;
+
+procedure TRNode.Init();
+begin
+  Id.Init();
+  Node := nil;
+  Prev.Init();
+  Obj.Invalidate();
+  CurrentCost := 0.0;
+  EstimateCost := 0.0;
+  OverallCost := 0.0;
+  IsAccess := True;
+end;
+
+function TRNode.IsValid(): Boolean;
+begin
+  Result := Assigned(Node);
+end;
+
+{ TRNodeList }
+
+procedure TRNodeList.UpdateHash();
+var
+  i: Integer;
+begin
+  FHash.Clear();
+  for i := 0 to Length(Items)-1 do
+  begin
+    FHash.Add(Items[i].Id.AsStr(), i);
+  end;
+end;
+
+function TRNodeList.Append(const AValue: TRNode): Integer;
+begin
+  Result := Length(Items);
+  SetLength(Items, Result+1);
+  Items[Result] := AValue;
+  FHash.Add(AValue.Id.AsStr(), Result);
+end;
+
+procedure TRNodeList.Delete(AIndex: Integer);
+var
+  i: Integer;
+begin
+  if AIndex < Length(Items)-1 then
+  begin
+    for i := AIndex to Length(Items)-2 do
+    begin
+      Items[i] := Items[i+1];
+    end;
+    UpdateHash();
+  end;
+end;
+
+function TRNodeList.FindById(const AId: TMapDBId; out AIndex: Integer): Boolean;
+begin
+  Result := FHash.FindValue(AId.AsStr(), AIndex);
 end;
 
 end.
