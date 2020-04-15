@@ -136,18 +136,18 @@ function EncodeNumber(ANum: UInt64; var ABuffer): Integer; overload;
 { Decode a signed variable length encoded number from the buffer back to
   the variable.
   The methods returns the number of bytes read. }
-function DecodeNumberSigned(const ABuffer; var ANum: Int64): Integer;
+function DecodeNumberSigned(const ABuffer; out ANum: Int64): Integer;
 
 { Decode a unsigned variable length encoded number from the buffer back to
   the variable.
   The methods returns the number of bytes read. }
-function DecodeNumberUnsigned(const ABuffer; var ANum: UInt64): Integer;
+function DecodeNumberUnsigned(const ABuffer; out ANum: UInt64): Integer;
 
 { Decode a variable length encoded number from the buffer back to
   the variable.
   The methods returns the number of bytes read. }
-function DecodeNumber(const ABuffer; var ANum: Int64): Integer; overload;
-function DecodeNumber(const ABuffer; var ANum: UInt64): Integer; overload;
+function DecodeNumber(const ABuffer; out ANum: Int64): Integer; overload;
+function DecodeNumber(const ABuffer; out ANum: UInt64): Integer; overload;
 
 { Returns the number of bytes needed to encode the number. The function calculates
   the number of bytes that contain information, dropping leading bytes that only
@@ -241,7 +241,7 @@ begin
   Result := EncodeNumberSigned(ANum, ABuffer);
 end;
 
-function DecodeNumberSigned(const ABuffer; var ANum: Int64): Integer;
+function DecodeNumberSigned(const ABuffer; out ANum: Int64): Integer;
 var
   pBuf: PByte;
   Val: Int64;
@@ -271,7 +271,7 @@ begin
   ANum := ANum or (Val shl Shift);
 end;
 
-function DecodeNumberUnsigned(const ABuffer; var ANum: UInt64): Integer;
+function DecodeNumberUnsigned(const ABuffer; out ANum: UInt64): Integer;
 var
   pBuf: PByte;
   Shift: Integer;
@@ -292,12 +292,12 @@ begin
   end;
 end;
 
-function DecodeNumber(const ABuffer; var ANum: Int64): Integer;
+function DecodeNumber(const ABuffer; out ANum: Int64): Integer;
 begin
   Result := DecodeNumberSigned(ABuffer, ANum);
 end;
 
-function DecodeNumber(const ABuffer; var ANum: UInt64): Integer;
+function DecodeNumber(const ABuffer; out ANum: UInt64): Integer;
 begin
   Result := DecodeNumberUnsigned(ABuffer, ANum);
 end;

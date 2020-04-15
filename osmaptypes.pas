@@ -76,6 +76,8 @@ type
   TOsmId = Int64;
   // Type to be used for libosmscout internal ids (unsigned numbers with 64 bit size).
   TId = UInt64;
+  TIdArray = array of TId;
+
   TPageId = UInt64;
   // Type for describing the position of data within a file.
   TFileOffset = Int64;

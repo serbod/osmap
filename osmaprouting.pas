@@ -129,7 +129,8 @@ type
 
   { TIntersection }
 
-  TIntersection = object
+  TIntersection = class(TMapObject)
+  public
     // The id/file offset of the node where the ways meet
     NodeId: TId;
     // The objects that meet at the given node
@@ -137,8 +138,8 @@ type
 
     procedure Init();
 
-    function Read(AScanner: TFileScanner): Boolean; overload;
-    function Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner): Boolean; overload;
+    function ReadData(AScanner: TFileScanner): Boolean;
+    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner); override;
   end;
 
   TIntersectionArray = array of TIntersection;
@@ -1645,7 +1646,7 @@ begin
   SetLength(Objects, 0);
 end;
 
-function TIntersection.Read(AScanner: TFileScanner): Boolean;
+function TIntersection.ReadData(AScanner: TFileScanner): Boolean;
 var
   i: Integer;
   objectCount: LongWord;
@@ -1670,10 +1671,10 @@ begin
   end;
 end;
 
-function TIntersection.Read(ATypeConfig: TTypeConfig;
-  AScanner: TFileScanner): Boolean;
+procedure TIntersection.Read(const ATypeConfig: TTypeConfig;
+  AScanner: TFileScanner);
 begin
-  Result := Read(AScanner);
+  ReadData(AScanner);
 end;
 
 end.
