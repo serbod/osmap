@@ -74,35 +74,56 @@ type
   end;
   PMapItemDrawOptions = ^TMapItemDrawOptions;
 
-  { TMapNode }
-
-  TMapNode = class
+  TMapObject = class
   public
-    { List of features }
-    FeatureValueBuffer: TFeatureValueBuffer;
     { File offset in the data file, use as unique id }
     FileOffset: TFileOffset;
     { Offset after this node }
     NextFileOffset: TFileOffset;
+
+    function GetObjectFileRef(): TObjectFileRef; virtual; abstract;
+    function GetType(): TTypeInfo; virtual; abstract;
+
+    { Returns true if the nodes is in the given bounding box }
+    function Intersects(const ABoundingBox: TGeoBox): Boolean; virtual; abstract;
+
+    { Read the object data from the given FileScanner. }
+    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner); virtual; abstract;
+    { Write the object data to the given FileWriter }
+    procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter); virtual; abstract;
+  end;
+  TMapObjectClass = class of TMapObject;
+
+  {$ifdef FPC}
+  TMapObjectList = specialize TFPGList<TMapObject>;
+  {$else}
+  TMapObjectList = TList<TMapObject>;
+  {$endif}
+
+  { TMapNode }
+
+  TMapNode = class(TMapObject)
+  public
+    { List of features }
+    FeatureValueBuffer: TFeatureValueBuffer;
     { Coordinates of node }
     Coord: TGeoPoint;
 
-    function GetObjectFileRef(): TObjectFileRef;
+    function GetObjectFileRef(): TObjectFileRef; override;
+    function GetType(): TTypeInfo; override; // FeatureValueBuffer.GetType()
 
     { Returns true if the nodes is in the given bounding box }
-    function Intersects(const ABoundingBox: TGeoBox): Boolean;
+    function Intersects(const ABoundingBox: TGeoBox): Boolean; override;
 
     function GetFeatureCount(): Integer;
     function HasFeature(AIndex: Integer): Boolean;
     function GetFeature(AIndex: Integer): TFeatureInfo;
     procedure UnsetFeature(AIndex: Integer);
 
-    function GetType(): TTypeInfo; // FeatureValueBuffer.GetType()
-
     { Read the node data from the given FileScanner. }
-    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner);
+    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner); override;
     { Write the node data to the given FileWriter }
-    procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter);
+    procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter); override;
   end;
 
   {$ifdef FPC}
@@ -158,17 +179,15 @@ type
   TNodeDataMode = (ndmAuto, ndmAll, ndmNone);
 
   { Representation of an (complex/multipolygon) area }
-  TMapArea = class
+  TMapArea = class(TMapObject)
   public
-    FileOffset: TFileOffset;
-    NextFileOffset: TFileOffset;
     Rings: array of TMapAreaRing;
 
     procedure AfterConstruction(); override;
     procedure Init();
 
-    function GetObjectFileRef(): TObjectFileRef;
-    function GetType(): TTypeInfo;
+    function GetObjectFileRef(): TObjectFileRef; override;
+    function GetType(): TTypeInfo; override;
     function GetFeatureValueBuffer(): TFeatureValueBuffer;
 
     function IsSimple(): Boolean;
@@ -178,21 +197,24 @@ type
     function GetBoundingBox(): TGeoBox;
     { Returns true if the bounding box of the object intersects the given
       bounding box }
-    function Intersects(const ABoundingBox: TGeoBox): Boolean;
+    function Intersects(const ABoundingBox: TGeoBox): Boolean; override;
 
     { Read the area as written by Write().
       ADataMode:
        ndmAuto - Node ids will only be read if not thought to be required for this area.
        ndmAll  - All data available will be read.
        ndmNone - No node ids will be read. }
-    procedure Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner; ADataMode: TNodeDataMode = ndmAuto);
+    procedure ReadData(ATypeConfig: TTypeConfig; AScanner: TFileScanner; ADataMode: TNodeDataMode = ndmAuto);
+    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner); override;
     { Read the area as written by WriteImport() All data available will be read. }
     procedure ReadImport(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
     { Read the area as written by WriteOptimized() No node ids will be read. }
     procedure ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 
     { Write the area with all data required in the standard database }
-    procedure Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter; ADataMode: TNodeDataMode = ndmAuto);
+    procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter); override;
+    { Write the area with all data required in the standard database }
+    procedure WriteData(ATypeConfig: TTypeConfig; AWriter: TFileWriter; ADataMode: TNodeDataMode = ndmAuto);
     { Write the area with all data required during import,
       certain optimizations done on the final data
       are not done here to not loose information }
@@ -211,16 +233,12 @@ type
 
   { TMapWay }
 
-  TMapWay = class
+  TMapWay = class(TMapObject)
     { Precomputed (cache) bounding box }
     FBBox: TGeoBox;
   public
     { List of features }
     FeatureValueBuffer: TFeatureValueBuffer;
-    { File offset in the data file, use as unique id }
-    FileOffset: TFileOffset;
-    { Offset after this node }
-    NextFileOffset: TFileOffset;
 
     { Cached options for same zoom level }
     DrawOptions: TMapItemDrawOptions;
@@ -229,8 +247,8 @@ type
     { Precomputed (cache) segment bounding boxes for optimisation }
     Segments: TSegmentGeoBoxArray;
 
-    function GetObjectFileRef(): TObjectFileRef;
-    function GetType(): TTypeInfo;
+    function GetObjectFileRef(): TObjectFileRef; override;
+    function GetType(): TTypeInfo; override;
 
     function GetFeatureCount(): Integer;
     function HasFeature(AIndex: Integer): Boolean;
@@ -255,7 +273,7 @@ type
     function GetBoundingBox(): TGeoBox;
     { Returns true if the bounding box of the object intersects the given
       bounding box }
-    function Intersects(const ABoundingBox: TGeoBox): Boolean;
+    function Intersects(const ABoundingBox: TGeoBox): Boolean; override;
     function GetCenter(var ACenter: TGeoPoint): Boolean;
 
     function GetNodeIndexByNodeId(AId: TId; out AIndex: Integer): Boolean;
@@ -267,12 +285,14 @@ type
        ndmAuto - Node ids will only be read if not thought to be required.
        ndmAll  - All data available will be read.
        ndmNone - No node ids will be read. }
-    procedure Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner; ADataMode: TNodeDataMode = ndmAuto);
+    procedure ReadData(ATypeConfig: TTypeConfig; AScanner: TFileScanner; ADataMode: TNodeDataMode = ndmAuto);
+    procedure Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner); override;
     { Read the data as written by WriteOptimized() No node ids will be read. }
     procedure ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 
     { Write the area with all data required in the standard database }
-    procedure Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter; ADataMode: TNodeDataMode = ndmAuto);
+    procedure WriteData(ATypeConfig: TTypeConfig; AWriter: TFileWriter; ADataMode: TNodeDataMode = ndmAuto);
+    procedure Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter); override;
     { Write the area with all data required by the OptimizeLowZoom
       index, dropping all ids }
     procedure WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
@@ -673,7 +693,7 @@ begin
   Result := GetBoundingBox().IsIntersects(ABoundingBox);
 end;
 
-procedure TMapArea.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
+procedure TMapArea.ReadData(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
   ADataMode: TNodeDataMode);
 var
   RingType: TTypeId;
@@ -741,17 +761,22 @@ begin
   NextFileOffset := AScanner.Stream.Position;
 end;
 
+procedure TMapArea.Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner);
+begin
+  ReadData(ATypeConfig, AScanner, ndmAuto);
+end;
+
 procedure TMapArea.ReadImport(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 begin
-  Read(ATypeConfig, AScanner, ndmAll);
+  ReadData(ATypeConfig, AScanner, ndmAll);
 end;
 
 procedure TMapArea.ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 begin
-  Read(ATypeConfig, AScanner, ndmNone);
+  ReadData(ATypeConfig, AScanner, ndmNone);
 end;
 
-procedure TMapArea.Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
+procedure TMapArea.WriteData(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
   ADataMode: TNodeDataMode);
 var
   RingTypeInfo: TTypeInfo; // type
@@ -819,14 +844,19 @@ begin
   end;
 end;
 
+procedure TMapArea.Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter);
+begin
+  WriteData(ATypeConfig, AWriter, ndmAuto);
+end;
+
 procedure TMapArea.WriteImport(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
 begin
-  Write(ATypeConfig, AWriter, ndmAll);
+  WriteData(ATypeConfig, AWriter, ndmAll);
 end;
 
 procedure TMapArea.WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
 begin
-  Write(ATypeConfig, AWriter, ndmNone);
+  WriteData(ATypeConfig, AWriter, ndmNone);
 end;
 
 { TMapWay }
@@ -962,7 +992,7 @@ begin
   FeatureValueBuffer.SetType(AValue);
 end;
 
-procedure TMapWay.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
+procedure TMapWay.ReadData(ATypeConfig: TTypeConfig; AScanner: TFileScanner;
   ADataMode: TNodeDataMode);
 var
   TypeId: TTypeId;
@@ -988,12 +1018,17 @@ begin
   NextFileOffset := AScanner.Stream.Position;
 end;
 
-procedure TMapWay.ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
+procedure TMapWay.Read(const ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 begin
-  Read(ATypeConfig, AScanner, ndmNone);
+  ReadData(ATypeConfig, AScanner, ndmAuto);
 end;
 
-procedure TMapWay.Write(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
+procedure TMapWay.ReadOptimized(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
+begin
+  ReadData(ATypeConfig, AScanner, ndmNone);
+end;
+
+procedure TMapWay.WriteData(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
   ADataMode: TNodeDataMode);
 var
   IsUseIds: Boolean;
@@ -1016,9 +1051,14 @@ begin
   AWriter.WriteMapPoints(Nodes, IsUseIds);
 end;
 
+procedure TMapWay.Write(const ATypeConfig: TTypeConfig; AWriter: TFileWriter);
+begin
+  WriteData(ATypeConfig, AWriter, ndmAuto);
+end;
+
 procedure TMapWay.WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
 begin
-  Write(ATypeConfig, AWriter, ndmNone);
+  WriteData(ATypeConfig, AWriter, ndmNone);
 end;
 
 { TGroundTileCoord }

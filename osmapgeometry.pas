@@ -69,18 +69,18 @@ const
 
 type
   //TII = SmallInt
-  TLatitude   = type Double;  // Latitude, -90.0 ... 90.0
-  TLongtitude = type Double;  // Longtitude,  -180.0 ... 180.0
+  TLatitude  = type Double;  // Latitude, -90.0 ... 90.0
+  TLongitude = type Double;  // Longitude,  -180.0 ... 180.0
 
   TGeoCoordBuffer = array [0..COORD_BUF_SIZE-1] of Byte;
 
   { Anonymous geographic point with coordinates. }
   TGeoPoint = object
   public
-    Lat: TLatitude;    // Latitude,   -90.0 ... 90.0
-    Lon: TLongtitude;  // Longtitude, -180.0 ... 180.0
+    Lat: TLatitude;   // Latitude,   -90.0 ... 90.0
+    Lon: TLongitude;  // Longitude, -180.0 ... 180.0
 
-    procedure Init(ALat: TLatitude; ALon: TLongtitude); inline;
+    procedure Init(ALat: TLatitude; ALon: TLongitude); inline;
 
     { Assign Lat and Lon from other geopoint }
     procedure Assign(const AValue: TGeoPoint); inline;
@@ -311,8 +311,8 @@ type
     function GetDisplayText(): string;
   end;
 
-{ Return TGeoCoord for given Latitude and Longtitude }
-function GeoCoord(ALat: TLatitude; ALon: TLongtitude): TGeoPoint;
+{ Return TGeoCoord for given Latitude and Longitude }
+function GeoCoord(ALat: TLatitude; ALon: TLongitude): TGeoPoint;
 
 { Return TGeoBox for given MinCoord and MaxCoord }
 function GeoBox(const AMinCoord, AMaxCoord: TGeoPoint): TGeoBox;
@@ -407,7 +407,7 @@ begin
   Arr[Result] := AItem;
 end;
 
-function GeoCoord(ALat: TLatitude; ALon: TLongtitude): TGeoPoint;
+function GeoCoord(ALat: TLatitude; ALon: TLongitude): TGeoPoint;
 begin
   Result.Lon := ALon;
   Result.Lat := ALat;
@@ -554,9 +554,9 @@ begin
   Result := b * A1 * (sigma - deltasigma);
 end;
 
-procedure CalcEllipsoidalDistance(Lat1: TLatitude; Lon1: TLongtitude; ABearing: Double;
+procedure CalcEllipsoidalDistance(Lat1: TLatitude; Lon1: TLongitude; ABearing: Double;
                             const ADistance: TDistance;
-                            out lat2: TLatitude; out lon2: TLongtitude);
+                            out lat2: TLatitude; out lon2: TLongitude);
 var
   a, b, f, A1, B1, C, L: Double;
   distanceAsMeter: Double;
@@ -757,7 +757,7 @@ end;
 
 { TGeoPoint }
 
-procedure TGeoPoint.Init(ALat: TLatitude; ALon: TLongtitude);
+procedure TGeoPoint.Init(ALat: TLatitude; ALon: TLongitude);
 begin
   Lat := ALat;
   Lon := ALon;
@@ -1459,7 +1459,7 @@ function TGeoBox.BoxByCenterAndRadius(const ACenter: TGeoPoint;
   const ARadius: TDistance): TGeoBox;
 var
   topLat, botLat: TLatitude;
-  leftLon, rightLon: TLongtitude;
+  leftLon, rightLon: TLongitude;
 begin
   CalcEllipsoidalDistance(ACenter.Lat,
                          ACenter.Lon,

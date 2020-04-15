@@ -25,6 +25,7 @@
 (*
   OsMap files handling routines
 util\FileScanner (TFileScanner)
+  ObjectFileRefStreamReader -> TFileScanner.ReadObjectFileRefs()
 util\FileWriter  (TFileWriter...)
 *)
 unit OsMapFiles;
@@ -120,12 +121,14 @@ type
 
     procedure Read(out AValue: TObjectFileRef); overload;
 
+    { read variable length number }
     procedure ReadNumber(out AValue: Byte); overload;
     procedure ReadNumber(out AValue: SmallInt); overload;
     procedure ReadNumber(out AValue: Word); overload;
     procedure ReadNumber(out AValue: LongInt); overload;
     procedure ReadNumber(out AValue: LongWord); overload;
     procedure ReadNumber(out AValue: Int64); overload;
+    procedure ReadNumber(out AValue: UInt64); overload;
 
     // See: TGeoCoord.ReadFromStream()
     //procedure ReadCoord(out ACoord: TGeoCoord);
@@ -150,7 +153,7 @@ type
     property Stream: TStream read FFile;
     property IsOpen: Boolean read GetIsOpen;
     property Filename: string read FFilename;
-    //property Position: TFileOffset read GetPos write SetPos;
+    property Position: TFileOffset read GetPos write SetPos;
   end;
 
   { Read back a stream of sorted ObjectFileRefs as written by the ObjectFileRefStreamWriter. }
@@ -159,7 +162,7 @@ type
     FReader: TFileScanner;
     FLastFileOffset: TFileOffset;
   public
-    procedure Init(AReader: TFileScanner; AOffset: TFileOffset);
+    procedure Init(AReader: TFileScanner; AOffset: TFileOffset = 0);
     procedure Reset();
     procedure Read(var AValue: TObjectFileRef);
   end;
@@ -1019,6 +1022,11 @@ end;
 procedure TFileScanner.ReadNumber(out AValue: Int64);
 begin
   AValue := ReadEncodedSignedNumber();
+end;
+
+procedure TFileScanner.ReadNumber(out AValue: UInt64);
+begin
+  AValue := ReadEncodedUnsignedNumber();
 end;
 
 function TFileScanner.ReadMapPoints(var ANodes: TGeoPointArray;

@@ -35,6 +35,9 @@ TypeConfig:
   TypeCondition -> TTypeCondition
   FeatureValueBuffer -> TFeatureValueBuffer
   TypeConfig ...
+
+TypeInfoSet:
+  TypeInfoSet ...
 *)
 unit OsMapObjTypes;
 
@@ -707,6 +710,38 @@ type
 
     { A feature is a attribute set based on parsed tags. Features can get assigned to a type. }
     property Features: TFeatureList read FFeatures;
+  end;
+
+  { Custom data structure to efficiently handle a set of TypeInfoRef.
+    All operations on the set are O(1) using the fact, that TypeInfo internally
+    have a continuously running index variable (Set may be slower if the
+    internal array was not preinitialized to it maximum size by passing a
+    TypeConfig or another TypeInfoSet in the constructor }
+
+  { TTypeInfoSet }
+
+  TTypeInfoSet = object
+    Types: array of TTypeInfo;
+
+    procedure Init(ATypeConfig: TTypeConfig); overload;
+    procedure Init(ATypes: TTypeInfoList); overload;
+    procedure Init(const AOther: TTypeInfoSet); overload;
+
+    procedure Adapt(ATypeConfig: TTypeConfig);
+    procedure Clear();
+
+    procedure Add(AType: TTypeInfo); overload;
+    procedure Add(ATypes: TTypeInfoList); overload;
+    procedure Add(const AOther: TTypeInfoSet); overload;
+
+    procedure Remove(AType: TTypeInfo); overload;
+    procedure Remove(const AOther: TTypeInfoSet); overload;
+
+    procedure Intersection(const AOther: TTypeInfoSet);
+
+    function IsSet(AType: TTypeInfo): Boolean;
+
+    function Intersects(const AOther: TTypeInfoSet): Boolean;
   end;
 
 
@@ -2479,6 +2514,94 @@ begin
     Result := FStrList[ASID]
   else
     Result := '';
+end;
+
+{ TTypeInfoSet }
+
+procedure TTypeInfoSet.Init(ATypeConfig: TTypeConfig);
+begin
+  SetLength(Types, ATypeConfig.GetTypeCount());
+end;
+
+procedure TTypeInfoSet.Init(ATypes: TTypeInfoList);
+var
+  i: Integer;
+begin
+  Clear();
+  for i := 0 to ATypes.Count-1 do
+    Add(ATypes[i]);
+end;
+
+procedure TTypeInfoSet.Init(const AOther: TTypeInfoSet);
+begin
+  Clear();
+  Add(AOther);
+end;
+
+procedure TTypeInfoSet.Adapt(ATypeConfig: TTypeConfig);
+begin
+
+end;
+
+procedure TTypeInfoSet.Clear();
+begin
+  SetLength(Types, 0);
+end;
+
+procedure TTypeInfoSet.Add(AType: TTypeInfo);
+var
+  i, PrevLen: Integer;
+begin
+  Assert(Assigned(AType));
+  if (AType.Index >= Length(Types)) then
+  begin
+    PrevLen := Length(Types);
+    SetLength(Types, AType.Index + 1);
+    for i := PrevLen to AType.Index do
+      Types[AType.Index] := nil;
+  end;
+
+  Types[AType.Index] := AType;
+end;
+
+procedure TTypeInfoSet.Add(ATypes: TTypeInfoList);
+var
+  i: Integer;
+begin
+  for i := 0 to ATypes.Count-1 do
+    Add(ATypes[i]);
+end;
+
+procedure TTypeInfoSet.Add(const AOther: TTypeInfoSet);
+begin
+
+end;
+
+procedure TTypeInfoSet.Remove(AType: TTypeInfo);
+begin
+  if (AType.Index < Length(Types)) and (Types[AType.Index] <> nil) then
+    Types[AType.Index] := nil;
+end;
+
+procedure TTypeInfoSet.Remove(const AOther: TTypeInfoSet);
+begin
+
+end;
+
+procedure TTypeInfoSet.Intersection(const AOther: TTypeInfoSet);
+begin
+
+end;
+
+function TTypeInfoSet.IsSet(AType: TTypeInfo): Boolean;
+begin
+  Assert(Assigned(AType));
+  Result := (AType.Index < Length(Types)) and (Types[AType.Index] <> nil);
+end;
+
+function TTypeInfoSet.Intersects(const AOther: TTypeInfoSet): Boolean;
+begin
+
 end;
 
 initialization

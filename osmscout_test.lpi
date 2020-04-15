@@ -117,7 +117,7 @@
         <PackageName Value="LCL"/>
       </Item2>
     </RequiredPackages>
-    <Units Count="22">
+    <Units Count="26">
       <Unit0>
         <Filename Value="osmscout_test.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -230,6 +230,26 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapRoutingService"/>
       </Unit21>
+      <Unit22>
+        <Filename Value="osmaproutingsimple.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapRoutingSimple"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="osmaproutingdatabase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapRoutingDatabase"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="osmapdatabase.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapDatabase"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="osmapdatafiles.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="OsMapDataFiles"/>
+      </Unit25>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

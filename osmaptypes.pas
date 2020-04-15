@@ -79,6 +79,7 @@ type
   TPageId = UInt64;
   // Type for describing the position of data within a file.
   TFileOffset = Int64;
+  TFileOffsetArray = array of TFileOffset;
   // Type for describing a type of an way, area or node.
   TTypeId = Word;
   // Feature value ID (string ID)
@@ -195,6 +196,8 @@ type
     function GetName(): string;
     function GetTypeName(): string;
   end;
+
+  TObjectFileRefArray = array of TObjectFileRef;
 
   { Representation of a pixel on a display or a plane.
     Coordinates are non-negative, values are decimal. }

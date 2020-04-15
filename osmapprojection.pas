@@ -57,7 +57,7 @@ type
     yPointer[2] array[2] of PDouble;
     {$endif}
 
-    procedure GeoToPixel(ALat: TLatitude; ALon: TLongtitude; var x, y: Double);
+    procedure GeoToPixel(ALat: TLatitude; ALon: TLongitude; var x, y: Double);
   end;
 
   { The Projection class is an abstract base class for multiple projection implementations.
@@ -99,7 +99,7 @@ type
     function GetCenter(): TGeoPoint;
 
     { Returns True, if the given geo coordinate is in the bounding box }
-    function GeoCoordIsIn(ALat: TLatitude; ALon: TLongtitude): Boolean;
+    function GeoCoordIsIn(ALat: TLatitude; ALon: TLongitude): Boolean;
     { Returns true, if the given bounding box is completely within the projection bounding box }
     function GeoBoxIsIn(const AGeoBox: TGeoBox): Boolean; overload;
     { Returns True if pixel with given X.Y is in visible area with ATolerance }
@@ -289,7 +289,7 @@ const
 
 { TBatchTransformer }
 
-procedure TBatchTransformer.GeoToPixel(ALat: TLatitude; ALon: TLongtitude;
+procedure TBatchTransformer.GeoToPixel(ALat: TLatitude; ALon: TLongitude;
   var x, y: Double);
 begin
   Assert(Assigned(Projection));
@@ -345,7 +345,7 @@ begin
   Result.Init(Lat, Lon);
 end;
 
-function TProjection.GeoCoordIsIn(ALat: TLatitude; ALon: TLongtitude): Boolean;
+function TProjection.GeoCoordIsIn(ALat: TLatitude; ALon: TLongitude): Boolean;
 begin
   Result := (ALon >= LonMin) and (ALon < LonMax) and (ALat >= LatMin) and (ALat <= LatMax);
 end;

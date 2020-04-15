@@ -37,6 +37,24 @@ FeatureReader:
   DynamicFeatureReader
   FeatureValueReader
   FeatureLabelReader
+  // (see below) -> TFeatureReader
+  // NameFeatureValueReader
+  // NameAltFeatureValueReader
+  // RefFeatureValueReader
+  // LocationFeatureValueReader
+  // AddressFeatureValueReader
+  // AccessFeatureValueReader
+  // AccessRestrictedFeatureValueReader
+  // LayerFeatureValueReader
+  // WidthFeatureValueReader
+  // MaxSpeedFeatureValueReader
+  // GradeFeatureValueReader
+  // AdminLevelFeatureValueReader
+  // PostalCodeFeatureValueReader
+  // IsInFeatureValueReader
+  // DestinationFeatureValueReader
+  // ConstructionYearFeatureValueReader
+  // LanesFeatureValueReader
 *)
 unit OsMapObjFeatures;
 

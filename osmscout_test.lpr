@@ -11,7 +11,8 @@ uses
   OsMapObjects, OsMapParameters, OsMapObjTypes, OsMapTags, OsMapFiles,
   OsMapUtils, OsMapObjFeatures, OsMapStyleConfig, OsMapLabels, OsMapTransform,
   OsMapPainterAgg, OsMapProjection, OsMapManager, OsMapFormatMp, OsMapRouting,
-  OsMapRoutingService;
+  OsMapRoutingService, OsMapRoutingSimple, OsMapRoutingDatabase, OsMapDatabase,
+  OsMapDataFiles;
 
 {$R *.res}
 

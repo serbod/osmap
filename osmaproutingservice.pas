@@ -44,6 +44,7 @@ routing\AbstractRoutingService
   RoutePointsResult
   RouteDescriptionResult
   RouteWayResult
+  AbstractRoutingService
 *)
 unit OsMapRoutingService;
 
@@ -141,6 +142,7 @@ type
   TRNodeList = object
   private
     FHash: TSimpleStringHash;
+    FCount: Integer;
     procedure UpdateHash();
   public
     Items: array of TRNode;
@@ -166,6 +168,9 @@ type
   { TVNodeList }
 
   TVNodeList = object
+  private
+    FCount: Integer;
+  public
     Items: array of TVNode;
     procedure Clear();
     procedure Reserve(AValue: Integer);
@@ -184,7 +189,7 @@ type
 
   TOpenList = TRNodeList;
   // map to index in TOpenList (not used, TOpenList have built-in map)
-  TOpenMap = specialize TFPGMap<TMapDBId, Integer>;
+  //TOpenMap = specialize TFPGMap<string, Integer>;   // TMapDBId.AsStr, Integer
   TClosedSet = TVNodeList;
 
   { Abstract algorithms for routing }
@@ -237,9 +242,9 @@ type
     MapWay: TMapWay;
   end;  }
 
-  TRouteNodeMap = specialize TFPGMap<TMapDBId, TRouteNode>;
+  //TRouteNodeMap = specialize TFPGMap<TMapDBId, TRouteNode>;
 
-  TRoutingState = TRoutingService;
+  TRoutingState = TRoutingProfile;
 
   { TAbstractRoutingService }
 
@@ -247,42 +252,44 @@ type
   protected
     FIsDebugPerformance: Boolean;
 
-    function GetVehicle(AState: TRoutingState): TVehicleType; virtual;
+    function GetVehicle(AProfile: TRoutingProfile): TVehicleType; virtual; abstract;
 
-    function CanUse(AState: TRoutingState; ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode; APathIndex: Integer): Boolean; virtual;
-    function CanUseForward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
-    function CanUseBackward(AState: TRoutingState; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual;
+    function CanUse(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode; APathIndex: Integer): Boolean; virtual; abstract;
+    function CanUseForward(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual; abstract;
+    function CanUseBackward(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual; abstract;
 
-    function GetCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
-      const ARouteNode: TRouteNode; APathIndex: Integer): Double; virtual; overload;
-    function GetCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
-      AWay: TMapWay; AWayLength: TDistance): Double; virtual; overload;
+    function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
+      const ARouteNode: TRouteNode; APathIndex: Integer): Double; virtual; overload; abstract;
+    function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
+      AWay: TMapWay; AWayLength: TDistance): Double; virtual; overload; abstract;
 
-    function GetEstimateCosts(AState: TRoutingState; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; virtual;
-    function GetCostLimit(AState: TRoutingState; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; virtual;
+    function GetEstimateCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
+      ATargetDistance: TDistance): Double; virtual; abstract;
+    function GetCostLimit(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
+      ATargetDistance: TDistance): Double; virtual; abstract;
 
-    function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMap): Boolean; virtual;
+    function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMapById): Boolean; virtual; abstract;
     { Return the route node for the given database offset }
-    function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; virtual;
+    function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; virtual; abstract;
 
-    function GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay; virtual;
-    function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; virtual;
+    function GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay; virtual; abstract;
+    function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; virtual; abstract;
 
-    function GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea; virtual;
-    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual;
+    function GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea; virtual; abstract;
+    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual; abstract;
 
+    function ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean; virtual; abstract;
+
+    { add twin nodes to nextNode from other databases to open list }
+    function GetNodeTwins(const AProfile: TRoutingProfile;
+      const ADatabase: TMapDatabaseID;
+      AId: TId): TMapDBIdArray; virtual; abstract;
+
+  protected
     procedure ResolveRNodeChainToList(AFinalRouteNode: TMapDBId;
       const AClosedSet: TClosedSet;
       const AClosedRestrictedSet: TClosedSet;
       var ANodes: TVNodeList);
-
-    function ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean; virtual;
-
-    function GetNodeTwins(const AState: TRoutingState;
-      const ADatabase: TMapDatabaseID;
-      AId: TId): TMapDBIdArray; virtual;
 
     procedure GetStartForwardRouteNode(const AState: TRoutingState;
       const ADatabase: TMapDatabaseID;
@@ -580,6 +587,13 @@ end;
 
 { TRoutingResult }
 
+procedure TRoutingResult.Init();
+begin
+  Route.Clear();
+  CurrentMaxDistance := 0.0;
+  OverallDistance := 0.0;
+end;
+
 function TRoutingResult.Success(): Boolean;
 begin
   Result := (not Route.IsEmpty());
@@ -587,87 +601,101 @@ end;
 
 { TAbstractRoutingService }
 
+(*  // abstract items
 function TAbstractRoutingService.GetVehicle(AState: TRoutingState): TVehicleType;
 begin
-
+  Result := TVehicleType.vehicleFoot;
 end;
 
 function TAbstractRoutingService.CanUse(AState: TRoutingState;
   ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode; APathIndex: Integer): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.CanUseForward(AState: TRoutingState;
   ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.CanUseBackward(AState: TRoutingState;
   ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.GetCosts(AState: TRoutingState;
   ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode;
   APathIndex: Integer): Double;
 begin
-
+  Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetCosts(AState: TRoutingState;
   ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): Double;
 begin
-
+  Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetEstimateCosts(AState: TRoutingState;
   ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
 begin
-
+  Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetCostLimit(AState: TRoutingState;
   ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
 begin
-
+  Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetRouteNodes(const ARouteNodeIds: TMapDBIdArray;
-  ARouteNodeMap: TRouteNodeMap): Boolean;
+  ARouteNodeMap: TRouteNodeMapById): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.GetRouteNode(const AId: TMapDBId; out
   ANode: TRouteNode): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay;
 begin
-
+  Result := nil;
 end;
 
 function TAbstractRoutingService.GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray;
   AWayMap: TMapWayDict): Boolean;
 begin
-
+  Result := False;
 end;
 
 function TAbstractRoutingService.GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea;
 begin
-
+  Result := nil;
 end;
 
 function TAbstractRoutingService.GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray;
   AAreaMap: TMapAreaDict): Boolean;
 begin
+  Result := False;
+end;
+
+function TAbstractRoutingService.ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean;
+begin
+  Result := False;
+end;
+
+function TAbstractRoutingService.GetNodeTwins(const AState: TRoutingState;
+  const ADatabase: TMapDatabaseID; AId: TId): TMapDBIdArray;
+begin
 
 end;
+
+*)
 
 procedure TAbstractRoutingService.ResolveRNodeChainToList(AFinalRouteNode: TMapDBId;
   const AClosedSet: TClosedSet; const AClosedRestrictedSet: TClosedSet;
@@ -730,17 +758,6 @@ begin
   ANodes.Append(CurVNode);
 
   ANodes.Reverse();
-end;
-
-function TAbstractRoutingService.ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean;
-begin
-
-end;
-
-function TAbstractRoutingService.GetNodeTwins(const AState: TRoutingState;
-  const ADatabase: TMapDatabaseID; AId: TId): TMapDBIdArray;
-begin
-
 end;
 
 procedure TAbstractRoutingService.GetStartForwardRouteNode(const AState: TRoutingState;
@@ -1087,14 +1104,14 @@ var
   routeNodeIds: TMapDBIdArray;
   wayOffsets: TMapDBFileOffsetArray;
   areaOffsets: TMapDBFileOffsetArray;
-  routeNodeMap: TRouteNodeMap;
+  routeNodeMap: TRouteNodeMapById;
   areaMap: TMapAreaDict;
   wayMap: TMapWayDict;
   pIds: ^TGeoPointArray;
   IsOneway: Boolean;
   TmpVNode: TVNode;
   dbId: TMapDatabaseId;
-  iEntry: Integer;
+  //iEntry: Integer;
   initialNode: TRouteNode;
   routeNodeIndex: Integer;
   n, nn: Integer;
@@ -1132,9 +1149,21 @@ var
     end;
   end;
 
+  procedure _DisposeObjs();
+  begin
+    wayMap.Free();
+    areaMap.Free();
+    routeNodeMap.Free();
+  end;
+
 begin
   Result := False;
   IsOneway := False;
+
+  routeNodeMap := TRouteNodeMapById.Create();
+  areaMap := TMapAreaDict.Create();
+  wayMap := TMapWayDict.Create();
+  // !!! need try..exept
 
   // Collect all route node file offsets on the path and also
   // all area/way file offsets on the path
@@ -1170,18 +1199,21 @@ begin
   if (not GetRouteNodes(routeNodeIds, routeNodeMap)) then
   begin
     WriteLn(LogFile, 'ERROR: Cannot load route nodes');
+    _DisposeObjs();
     Exit;
   end;
 
   if (not GetAreasByOffset(areaOffsets, areaMap)) then
   begin
     WriteLn(LogFile, 'ERROR: Cannot load areas');
+    _DisposeObjs();
     Exit;
   end;
 
   if (not GetWaysByOffset(wayOffsets, wayMap)) then
   begin
     WriteLn(LogFile, 'ERROR: Cannot load ways');
+    _DisposeObjs();
     Exit;
   end;
 
@@ -1206,13 +1238,14 @@ begin
 
     ARoute.AddEntry(ATarget.DatabaseId, 0, ATarget.NodeIndex, ObjectFileRef(0, refNone), 0);
     Result := True;
+    _DisposeObjs();
     Exit;
   end;
 
-  if not routeNodeMap.TryGetData(ANodes.Items[0].CurNode, initialNode) then
+  if not routeNodeMap.TryGetData(ANodes.Items[0].CurNode.Id, initialNode) then
   begin
-    WriteLn(LogFile, 'ERROR: Can''t found route node ', ANodes.Items[0].CurNode.DatabaseId,
-      ', ', ANodes.Items[0].CurNode.Id);
+    WriteLn(LogFile, 'ERROR: Can''t found route node ', ANodes.Items[0].CurNode.AsStr());
+    _DisposeObjs();
     Exit;
   end;
 
@@ -1249,7 +1282,7 @@ begin
     pVNodeN := Addr(ANodes.Items[n]);
     pVNodeNN := Addr(ANodes.Items[nn]);
 
-    routeNodeMap.TryGetData(pVNodeN^.CurNode, node);
+    routeNodeMap.TryGetData(pVNodeN^.CurNode.Id, node);
 
     //
     // The path from the last routing node to the target node and the
@@ -1285,7 +1318,7 @@ begin
       Break;
     end;
 
-    routeNodeMap.TryGetData(pVNodeNN^.CurNode, nextNode);
+    routeNodeMap.TryGetData(pVNodeNN^.CurNode.Id, nextNode);
 
     if (pVNodeN^.CurNode.DatabaseId <> pVNodeNN^.CurNode.DatabaseId)
     and (node.GetId() = nextNode.GetId()) then
@@ -1323,6 +1356,7 @@ begin
   end;
 
   Result := True;
+  _DisposeObjs();
 end;
 
 function TAbstractRoutingService.WalkToOtherDatabases(const AState: TRoutingState;
@@ -1643,7 +1677,8 @@ end;
 
 constructor TAbstractRoutingService.Create(const AParameter: TRouterParameter);
 begin
-
+  inherited Create;
+  FIsDebugPerformance := AParameter.IsDebugPerformance;
 end;
 
 function TAbstractRoutingService.CalculateRoute(var AState: TRoutingState;
@@ -1865,7 +1900,7 @@ begin
     if (not targetForwardFound) then
     begin
       targetForwardFound := (current.Id.Id = targetForwardRouteNode.GetId())
-                            and (current.Id.Id = ATarget.DatabaseId);
+                            and (current.Id.DatabaseId = ATarget.DatabaseId);
       if targetForwardFound then
         targetForwardFinalNode := current;
     end;
@@ -2097,8 +2132,10 @@ end;
 
 function TVNodeList.Append(const AValue: TVNode): Integer;
 begin
-  Result := Length(Items);
-  SetLength(Items, Result+1);
+  Result := FCount;
+  Inc(FCount);
+  if Length(Items) < FCount then
+    SetLength(Items, FCount);
   Items[Result] := AValue;
 end;
 
@@ -2112,9 +2149,20 @@ begin
   Result := -1;
 end;
 
+procedure TVNodeList.Clear();
+begin
+  FCount := 0;
+end;
+
+procedure TVNodeList.Reserve(AValue: Integer);
+begin
+  if Length(Items) < AValue then
+    SetLength(Items, AValue);
+end;
+
 function TVNodeList.Count(): Integer;
 begin
-  Result := Length(Items);
+  Result := FCount;
 end;
 
 procedure TVNodeList.Reverse();
@@ -2183,16 +2231,34 @@ var
   i: Integer;
 begin
   FHash.Clear();
-  for i := 0 to Length(Items)-1 do
+  for i := 0 to FCount-1 do
   begin
     FHash.Add(Items[i].Id.AsStr(), i);
   end;
 end;
 
+procedure TRNodeList.Clear();
+begin
+  FCount := 0;
+end;
+
+procedure TRNodeList.Reserve(AValue: Integer);
+begin
+  if Length(Items) < AValue then
+    SetLength(Items, AValue);
+end;
+
+function TRNodeList.Count(): Integer;
+begin
+  Result := FCount;
+end;
+
 function TRNodeList.Append(const AValue: TRNode): Integer;
 begin
-  Result := Length(Items);
-  SetLength(Items, Result+1);
+  Result := FCount;
+  Inc(FCount);
+  if Length(Items) < FCount then
+    SetLength(Items, FCount);
   Items[Result] := AValue;
   FHash.Add(AValue.Id.AsStr(), Result);
 end;
@@ -2201,9 +2267,9 @@ procedure TRNodeList.Delete(AIndex: Integer);
 var
   i: Integer;
 begin
-  if AIndex < Length(Items)-1 then
+  if AIndex < FCount-1 then
   begin
-    for i := AIndex to Length(Items)-2 do
+    for i := AIndex to FCount-2 do
     begin
       Items[i] := Items[i+1];
     end;

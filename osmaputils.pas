@@ -26,6 +26,9 @@
 util\Number (...)
 Breaker:
   Breaker -> TBreakerObject
+
+util/Cache:
+  Cache
 *)
 unit OsMapUtils;
 
@@ -89,6 +92,10 @@ type
   end;
 
   TCompareFunc = function (const elem1, elem2): Integer;
+
+  {TCache = object
+
+  end; }
 
 { Sort any array }
 procedure AnySort(var Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);

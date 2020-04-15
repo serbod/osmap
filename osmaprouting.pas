@@ -24,33 +24,35 @@
 *)
 (*
   OsMap routing
-routing\DBFileOffset
+  Intersection
+  JunctionRef -> TIntersection
+
+routing/DBFileOffset
   DBId -> TMapDBId
   DBFileOffset -> TMapDBFileOffset
 
-routing\route
+routing/route
   Description -> TRouteItemDescription
   Node -> TRouteItem
   RouteDescription -> TRouteDescription
 
-ObjectVariantDataFile
-
-routing\RouteNode
+routing/RouteNode
   ObjectVariantData
   ObjectData -> TRouteNodeObjectData
   Exclude -> TRouteNodeExclude
   Path -> TRouteNodePath
   RouteNode -> TRouteNode
 
-routing\RouteData
+routing/RouteData
   RouteData
   RouteEntry
 
-routing\RoutingProfile
+routing/RoutingProfile
   RoutingProfile -> TAbstractRoutingProfile
   AbstractRoutingProfile -> TRoutingProfile
   ShortestPathRoutingProfile -> TRoutingProfile
   FastestPathRoutingProfile
+
 *)
 unit OsMapRouting;
 
@@ -121,6 +123,25 @@ type
   end;
 
   TMapDBFileOffsetArray = array of TMapDBFileOffset;
+
+  { A Intersection is a node, where multiple routeable ways or areas
+    meet. }
+
+  { TIntersection }
+
+  TIntersection = object
+    // The id/file offset of the node where the ways meet
+    NodeId: TId;
+    // The objects that meet at the given node
+    Objects: TObjectFileRefArray;
+
+    procedure Init();
+
+    function Read(AScanner: TFileScanner): Boolean; overload;
+    function Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner): Boolean; overload;
+  end;
+
+  TIntersectionArray = array of TIntersection;
 
 { Description of a route, enhanced with information that are required to
   give a human textual (or narrative) drive instructions;
@@ -325,24 +346,6 @@ type
 
   TObjectVariantDataArray = array of TObjectVariantData;
 
-  { DataFile class for loading the object variant data, which is part of the
-    routing graph. The object variat data contains a lookup table for path
-    attributes. Since the number of attribute value combinations is much
-    smaller then the actual number of elements in the route graph it makes
-    sense to store all possible combinations in a lookup table and just
-    index them from the routing graph paths. }
-
-  { TObjectVariantDataFile }
-
-  TObjectVariantDataFile = object
-    Data: array of TObjectVariantData;
-    IsLoaded: Boolean;
-    Filename: string;
-
-    procedure Init();
-    function Load(ATypeConfig: TTypeConfig; AFilename: string): Boolean;
-  end;
-
   { Information for an object referenced by a path. }
   TRouteNodeObjectData = record
     Obj: TObjectFileRef;       // Reference to the object
@@ -389,6 +392,8 @@ type
     function GetId(): TId; // Point.GetId()
     //function GetCoord(): TGeoPoint; // Point.GetCoord()
 
+    function IsRelevant(): Boolean;  // Point.IsRelevant()
+
     procedure Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
     procedure Write(AWriter: TFileWriter);
 
@@ -398,6 +403,9 @@ type
     property Point: TGeoPoint read FPoint;
     property Serial: Byte read FSerial;
   end;
+
+  TRouteNodeList =  specialize TFPGList<TRouteNode>;
+  TRouteNodeMapById = specialize TFPGMap<TId, TRouteNode>; // Id : RouteNode
 
   { TRouteEntry }
 
@@ -623,7 +631,7 @@ end;
 
 function TMapDBId.AsStr(): string;
 begin
-  Result := IntToStr(Id);
+  Result := Format('%d:%d', [DatabaseId, Id]);
 end;
 
 { TMapDBFileOffset }
@@ -1066,6 +1074,11 @@ begin
   Result := FPoint.GetId();
 end;
 
+function TRouteNode.IsRelevant(): Boolean;
+begin
+  Result := (Serial <> 0);
+end;
+
 procedure TRouteNode.Read(ATypeConfig: TTypeConfig; AScanner: TFileScanner);
 var
   ObjectCount, PathCount, ExcludesCount, btMask: Byte;
@@ -1245,41 +1258,7 @@ begin
   Result := (Length(Entries) > 0);
 end;
 
-{ TObjectVariantDataFile }
-
-procedure TObjectVariantDataFile.Init();
-begin
-  SetLength(Data, 0);
-  IsLoaded := False;
-  Filename := '';
-end;
-
-function TObjectVariantDataFile.Load(ATypeConfig: TTypeConfig;
-  AFilename: string): Boolean;
-var
-  Scanner: TFileScanner;
-  i, iDataCount: Integer;
-begin
-  Init();
-  Filename := AFilename;
-
-  Scanner := TFileScanner.Create();
-  try
-    Scanner.Open(Filename, fsmSequential, True);
-
-    Scanner.Read(iDataCount);
-    SetLength(Data, iDataCount);
-    for i := 0 to iDataCount-1 do
-    begin
-      Data[i].Read(ATypeConfig, Scanner);
-    end;
-    Scanner.Close();
-    IsLoaded := True;
-  finally
-    Scanner.Free();
-  end;
-  Result := IsLoaded;
-end;
+{ TObjectVariantData }
 
 procedure TObjectVariantData.Read(ATypeConfig: TTypeConfig;
   AScanner: TFileScanner);
@@ -1656,6 +1635,45 @@ begin
     Result := ((ADistance / 1000) / speed)
   else
     Result := 0.0;
+end;
+
+{ TIntersection }
+
+procedure TIntersection.Init();
+begin
+  NodeId := 0;
+  SetLength(Objects, 0);
+end;
+
+function TIntersection.Read(AScanner: TFileScanner): Boolean;
+var
+  i: Integer;
+  objectCount: LongWord;
+  objectFileRefReader: TObjectFileRefStreamReader;
+begin
+  try
+    AScanner.ReadNumber(NodeId);
+    AScanner.ReadNumber(objectCount);
+    SetLength(Objects, objectCount);
+
+    objectFileRefReader.Init(AScanner);
+
+    for i := 0 to objectCount-1 do
+      objectFileRefReader.Read(Objects[i]);
+    Result := True;
+  except
+    on E: Exception do
+    begin
+      WriteLn(LogFile, 'ERROR: ', E.Message);
+      Result := False;
+    end;
+  end;
+end;
+
+function TIntersection.Read(ATypeConfig: TTypeConfig;
+  AScanner: TFileScanner): Boolean;
+begin
+  Result := Read(AScanner);
 end;
 
 end.
