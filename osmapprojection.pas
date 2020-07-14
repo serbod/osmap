@@ -51,13 +51,13 @@ type
     Projection: TProjection;
     {$ifdef OSMSCOUT_HAVE_SSE2}
     Count: Integer;
-    lat: array[2] of Double;
-    lon: array[2] of Double;
+    lat: array[2] of TReal;
+    lon: array[2] of TReal;
     xPointer[2] array[2] of PDouble;
     yPointer[2] array[2] of PDouble;
     {$endif}
 
-    procedure GeoToPixel(ALat: TLatitude; ALon: TLongitude; var x, y: Double);
+    procedure GeoToPixel(ALat: TLatitude; ALon: TLongitude; var x, y: TReal);
   end;
 
   { The Projection class is an abstract base class for multiple projection implementations.
@@ -69,22 +69,22 @@ type
 
   TProjection = class
   protected
-    FLon: Double;           // Longitude coordinate of the center of the image
-    FLat: Double;           // Latitude coordinate of the center of the image
-    FAngle: Double;         // Display rotation angle in radians
+    FLon: TReal;           // Longitude coordinate of the center of the image
+    FLat: TReal;           // Latitude coordinate of the center of the image
+    FAngle: TReal;         // Display rotation angle in radians
     FMagnification: TMagnification;  // Current magnification
-    FDpi: Double;           // Screen DPI
+    FDpi: TReal;           // Screen DPI
     FWidth: Integer;        // Width of image
     FHeight: Integer;       // Height of image
 
-    LonMin: Double;         // Longitude of the upper left corner of the image
-    LatMin: Double;         // Latitude of the upper left corner of the image
-    LonMax: Double;         // Longitude of the lower right corner of the image
-    LatMax: Double;         // Latitude of the lower right corner of the image
+    LonMin: TReal;         // Longitude of the upper left corner of the image
+    LatMin: TReal;         // Latitude of the upper left corner of the image
+    LonMax: TReal;         // Longitude of the lower right corner of the image
+    LatMax: TReal;         // Latitude of the lower right corner of the image
 
-    FPixelSize: Double;     // Size of a pixel in meter
-    FMeterInPixel: Double;  // Number of on screen pixel for one meter on the ground
-    FMeterInMM: Double;     // Number of on screen millimeters for one meter on the ground
+    FPixelSize: TReal;     // Size of a pixel in meter
+    FMeterInPixel: TReal;  // Number of on screen pixel for one meter on the ground
+    FMeterInMM: TReal;     // Number of on screen millimeters for one meter on the ground
 
     procedure GeoToPixelBath(ATransformData: TBatchTransformer); virtual; abstract;
   public
@@ -103,7 +103,7 @@ type
     { Returns true, if the given bounding box is completely within the projection bounding box }
     function GeoBoxIsIn(const AGeoBox: TGeoBox): Boolean; overload;
     { Returns True if pixel with given X.Y is in visible area with ATolerance }
-    function IsPixelValid(AX, AY, ATolerance: Double): Boolean;
+    function IsPixelValid(AX, AY, ATolerance: TReal): Boolean;
 
     { Returns the bounding box of the area covered }
     function GetDimensions(): TGeoBox;
@@ -112,40 +112,42 @@ type
     { Convert a width in mm into the equivalent pixel size based on the given DPI
       AValue - Width in mm
       Result - Width in screen pixel }
-    function ConvertWidthToPixel(AValue: Double): Double;
+    { // original name: ConvertWidthToPixel }
+    function MillimetersToPixels(AValue: TReal): TReal;
     { Convert a width in pixel into the equivalent mm size based on the given DPI
       AValue - Width in screen pixel
       Result - Width in mm }
-    function ConvertPixelToWidth(AValue: Double): Double;
+    { // original name: ConvertPixelToWidth }
+    function PixelsToMillimeters(AValue: TReal): TReal;
 
     { Converts a pixel coordinate to a geo coordinate. Return True on success,
       or False if returned coordinate is not valid for this projection. }
-    function PixelToGeo(X, Y: Double; out ACoord: TGeoPoint): Boolean; virtual; abstract;
+    function PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean; virtual; abstract;
     { Converts a geo coordinate to a pixel coordinate. Return True on success,
       or False if given coordinate is not valid for this projection. }
-    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: Double): Boolean; virtual; abstract;
+    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: TReal): Boolean; virtual; abstract;
 
     { longitude coordinate of the region center }
-    property Lon: Double read FLon;
+    property Lon: TReal read FLon;
     { latitude coordinate of the region center }
-    property Lat: Double read FLat;
+    property Lat: TReal read FLat;
     { angle in radians ([0..2*PI[) of the display in relation to the north. A degree of 0 means
       north is to the top, a degree of PI, renders with the south to the top of the display) }
-    property Angle: Double read FAngle;
+    property Angle: TReal read FAngle;
     { Current magnification }
     property Magnification: TMagnification read FMagnification;
     { Screen DPI as part of the projection }
-    property Dpi: Double read FDpi;
+    property Dpi: TReal read FDpi;
     { width of the screen, in pixels }
     property Width: Integer read FWidth;
     { height of the screen, in pixels }
     property Height: Integer read FHeight;
     { Size of a pixel in meter }
-    property PixelSize: Double read FPixelSize;
+    property PixelSize: TReal read FPixelSize;
     { Number of on screen pixel for one meter on the ground }
-    property MeterInPixel: Double read FMeterInPixel;
+    property MeterInPixel: TReal read FMeterInPixel;
     { Number of on screen millimeters for one meter on the ground }
-    property MeterInMM: Double read FMeterInMM;
+    property MeterInMM: TReal read FMeterInMM;
   end;
 
   { Mercator projection that tries to render the resulting map in the same
@@ -157,23 +159,23 @@ type
     tiles were designed for 96 DPI displays. }
   TMercatorProjection = class(TProjection)
   protected
-    FMaxLat: Double;
-    FMinLat: Double;
-    FMaxLon: Double;
-    FMinLon: Double;
+    FMaxLat: TReal;
+    FMinLat: TReal;
+    FMaxLon: TReal;
+    FMinLon: TReal;
 
     FIsValid: Boolean; //  projection is valid
-    FLatOffset: Double;  // Absolute and untransformed screen position of lat coordinate
-    FAngleSin: Double;
-    FAngleCos: Double;
-    FAngleNegSin: Double;
-    FAngleNegCos: Double;
+    FLatOffset: TReal;  // Absolute and untransformed screen position of lat coordinate
+    FAngleSin: TReal;
+    FAngleCos: TReal;
+    FAngleNegSin: TReal;
+    FAngleNegCos: TReal;
 
-    FScale: Double;
-    FScaleGradtorad: Double; // Precalculated scale*Gradtorad
+    FScale: TReal;
+    FScaleGradtorad: TReal; // Precalculated scale*Gradtorad
 
     // precalculated derivation of "latToYPixel" function in projection center scaled by gradtorad * scale
-    FScaledLatDeriv: Double;
+    FScaledLatDeriv: TReal;
     FIsLinearInterpolationEnabled: Boolean;
 
     procedure GeoToPixelBath(ATransformData: TBatchTransformer); override;
@@ -185,8 +187,8 @@ type
     function IsValid(): Boolean; override;
     function IsValidFor(const ACoord: TGeoPoint): Boolean; override;
 
-    function PixelToGeo(X, Y: Double; out ACoord: TGeoPoint): Boolean; override;
-    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: Double): Boolean; override;
+    function PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean; override;
+    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: TReal): Boolean; override;
 
     { Setup projection parameters. Return True on success,
       or False if arguments are not valid for Mercator projection,
@@ -207,21 +209,21 @@ type
 
       may be x >= 0 }
     function Setup(const ACoord: TGeoPoint;
-                   AAngle: Double;
+                   AAngle: TReal;
                    const AMagnification: TMagnification;
-                   ADpi: Double;
+                   ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean;
 
-    function Move(AHorizPixel, AVertPixel: Double): Boolean;
-    function MoveUp(APixel: Double): Boolean;
-    function MoveDown(APixel: Double): Boolean;
-    function MoveLeft(APixel: Double): Boolean;
-    function MoveRight(APixel: Double): Boolean;
+    function Move(AHorizPixel, AVertPixel: TReal): Boolean;
+    function MoveUp(APixel: TReal): Boolean;
+    function MoveDown(APixel: TReal): Boolean;
+    function MoveLeft(APixel: TReal): Boolean;
+    function MoveRight(APixel: TReal): Boolean;
 
-    property MaxLat: Double read FMaxLat;
-    property MinLat: Double read FMinLat;
-    property MaxLon: Double read FMaxLon;
-    property MinLon: Double read FMinLon;
+    property MaxLat: TReal read FMaxLat;
+    property MinLat: TReal read FMinLat;
+    property MaxLon: TReal read FMaxLon;
+    property MinLon: TReal read FMinLon;
 
     { Switch to enable/disable linear interpolation of latitude to pixel computation.
       It speedup GeoToPixel calculation with fractional error on small render area. }
@@ -235,21 +237,21 @@ type
   TTileProjection = class(TProjection)
   protected
     FIsValid: Boolean; //  projection is valid
-    FLonOffset: Double;
-    FLatOffset: Double;
+    FLonOffset: TReal;
+    FLatOffset: TReal;
 
-    FScale: Double;
+    FScale: TReal;
     // Precalculated scale*Gradtorad
-    FScaleGradtorad: Double;
+    FScaleGradtorad: TReal;
     // precalculated derivation of "latToYPixel" function in projection center scaled by gradtorad * scale
-    FScaledLatDeriv: Double;
+    FScaledLatDeriv: TReal;
     FIsLinearInterpolationEnabled: Boolean;
 
     procedure GeoToPixelBath(ATransformData: TBatchTransformer); override;
 
-    function SetupInternal(ALonMin, ALatMin, ALonMax, ALatMax: Double;
+    function SetupInternal(ALonMin, ALatMin, ALonMax, ALatMax: TReal;
                    const AMagnification: TMagnification;
-                   ADpi: Double;
+                   ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean;
 
   public
@@ -259,17 +261,17 @@ type
     function IsValid(): Boolean; override;
     function IsValidFor(const ACoord: TGeoPoint): Boolean; override;
 
-    function PixelToGeo(X, Y: Double; out ACoord: TGeoPoint): Boolean; override;
-    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: Double): Boolean; override;
+    function PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean; override;
+    function GeoToPixel(const ACoord: TGeoPoint; out X, Y: TReal): Boolean; override;
 
     function Setup(const ATile: TOsmTileId;
                    const AMagnification: TMagnification;
-                   ADpi: Double;
+                   ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean; overload;
 
     function Setup(const ATileBox: TOsmTileIdBox;
                    const AMagnification: TMagnification;
-                   ADpi: Double;
+                   ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean; overload;
 
     { Switch to enable/disable linear interpolation of latitude to pixel computation.
@@ -290,7 +292,7 @@ const
 { TBatchTransformer }
 
 procedure TBatchTransformer.GeoToPixel(ALat: TLatitude; ALon: TLongitude;
-  var x, y: Double);
+  var x, y: TReal);
 begin
   Assert(Assigned(Projection));
 {$ifdef OSMSCOUT_HAVE_SSE2}
@@ -358,7 +360,7 @@ begin
               or (AGeoBox.MaxCoord.Lat < LatMin));
 end;
 
-function TProjection.IsPixelValid(AX, AY, ATolerance: Double): Boolean;
+function TProjection.IsPixelValid(AX, AY, ATolerance: TReal): Boolean;
 begin
   Result := (AX >= -ATolerance) and (AX <= (Width + ATolerance))
         and (AY >= -ATolerance) and (AY <= (Height + ATolerance));
@@ -376,12 +378,12 @@ begin
   AValue.MaxCoord.Init(LatMax, LonMax);
 end;
 
-function TProjection.ConvertWidthToPixel(AValue: Double): Double;
+function TProjection.MillimetersToPixels(AValue: TReal): TReal;
 begin
   Result := AValue * Dpi / 25.4;
 end;
 
-function TProjection.ConvertPixelToWidth(AValue: Double): Double;
+function TProjection.PixelsToMillimeters(AValue: TReal): TReal;
 begin
   Result := AValue * 25.4 / Dpi;
 end;
@@ -425,9 +427,9 @@ begin
         and (ACoord.Lon >= MinLon) and (ACoord.Lon <= MaxLon);
 end;
 
-function TMercatorProjection.PixelToGeo(X, Y: Double; out ACoord: TGeoPoint): Boolean;
+function TMercatorProjection.PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean;
 var
-  xn, yn: Double;
+  xn, yn: TReal;
 begin
   Assert(FIsValid);
 
@@ -452,9 +454,9 @@ begin
 end;
 
 function TMercatorProjection.GeoToPixel(const ACoord: TGeoPoint; out X,
-  Y: Double): Boolean;
+  Y: TReal): Boolean;
 var
-  xn, yn: Double;
+  xn, yn: TReal;
 begin
   Assert(FIsValid);
 
@@ -482,17 +484,17 @@ begin
   Result := IsValidFor(ACoord);
 end;
 
-function TMercatorProjection.Setup(const ACoord: TGeoPoint; AAngle: Double;
-  const AMagnification: TMagnification; ADpi: Double; AWidth, AHeight: Integer): Boolean;
+function TMercatorProjection.Setup(const ACoord: TGeoPoint; AAngle: TReal;
+  const AMagnification: TMagnification; ADpi: TReal; AWidth, AHeight: Integer): Boolean;
 var
-  fpEquatorTileWidth, fpEquatorTileResolution: Double;
-  fpEquatorCorrectedEquatorTileResolution: Double;
-  fpGroundWidthEquatorMeter, fpGroundWidthVisibleMeter: Double;
+  fpEquatorTileWidth, fpEquatorTileResolution: TReal;
+  fpEquatorCorrectedEquatorTileResolution: TReal;
+  fpGroundWidthEquatorMeter, fpGroundWidthVisibleMeter: TReal;
   tl: TGeoPoint; // top left
   tr: TGeoPoint; // top right
   bl: TGeoPoint; // bottom left
   br: TGeoPoint; // bottom right
-  latDeriv: Double;
+  latDeriv: TReal;
 begin
   Result := FIsValid
         and (Lon = ACoord.Lon)
@@ -604,9 +606,9 @@ begin
   Result := True;
 end;
 
-function TMercatorProjection.Move(AHorizPixel, AVertPixel: Double): Boolean;
+function TMercatorProjection.Move(AHorizPixel, AVertPixel: TReal): Boolean;
 var
-  x, y: Double;
+  x, y: TReal;
   TmpCoord: TGeoPoint;
 begin
   Result := False;
@@ -624,22 +626,22 @@ begin
   Result := Setup(TmpCoord, Angle, Magnification, Dpi, Width, Height);
 end;
 
-function TMercatorProjection.MoveUp(APixel: Double): Boolean;
+function TMercatorProjection.MoveUp(APixel: TReal): Boolean;
 begin
   Result := Move(0, APixel);
 end;
 
-function TMercatorProjection.MoveDown(APixel: Double): Boolean;
+function TMercatorProjection.MoveDown(APixel: TReal): Boolean;
 begin
   Result := Move(0, -APixel);
 end;
 
-function TMercatorProjection.MoveLeft(APixel: Double): Boolean;
+function TMercatorProjection.MoveLeft(APixel: TReal): Boolean;
 begin
   Result := Move(-APixel, 0);
 end;
 
-function TMercatorProjection.MoveRight(APixel: Double): Boolean;
+function TMercatorProjection.MoveRight(APixel: TReal): Boolean;
 begin
   Result := Move(APixel, 0);
 end;
@@ -647,10 +649,10 @@ end;
 { TTileProjection }
 
 function TTileProjection.SetupInternal(ALonMin, ALatMin, ALonMax,
-  ALatMax: Double; const AMagnification: TMagnification; ADpi: Double; AWidth,
+  ALatMax: TReal; const AMagnification: TMagnification; ADpi: TReal; AWidth,
   AHeight: Integer): Boolean;
 var
-  latDeriv: Double;
+  latDeriv: TReal;
 begin
   Result := (LatMax = ALatMax)
         and (LonMin = ALonMin)
@@ -732,7 +734,7 @@ begin
         and (ACoord.Lon >= -180.0) and (ACoord.Lon <= +180.0);
 end;
 
-function TTileProjection.PixelToGeo(X, Y: Double; out ACoord: TGeoPoint): Boolean;
+function TTileProjection.PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean;
 begin
   ACoord.Lon := (X + FLonOffset) / (FScale * GRAD_TO_RAD);
   ACoord.Lat := arctan(sinh((Height - Y + FLatOffset) / FScale)) / GRAD_TO_RAD;
@@ -740,7 +742,7 @@ begin
   Result := IsValidFor(ACoord);
 end;
 
-function TTileProjection.GeoToPixel(const ACoord: TGeoPoint; out X, Y: Double): Boolean;
+function TTileProjection.GeoToPixel(const ACoord: TGeoPoint; out X, Y: TReal): Boolean;
 begin
   X := ACoord.Lon * FScaleGradtorad - FLonOffset;
 
@@ -776,7 +778,7 @@ begin
 end;
 
 function TTileProjection.Setup(const ATile: TOsmTileId;
-  const AMagnification: TMagnification; ADpi: Double; AWidth, AHeight: Integer): Boolean;
+  const AMagnification: TMagnification; ADpi: TReal; AWidth, AHeight: Integer): Boolean;
 var
   BoundingBox: TGeoBox;
 begin
@@ -791,7 +793,7 @@ begin
 end;
 
 function TTileProjection.Setup(const ATileBox: TOsmTileIdBox;
-  const AMagnification: TMagnification; ADpi: Double; AWidth, AHeight: Integer): Boolean;
+  const AMagnification: TMagnification; ADpi: TReal; AWidth, AHeight: Integer): Boolean;
 var
   BoundingBox: TGeoBox;
 begin

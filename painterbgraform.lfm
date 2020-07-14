@@ -1,0 +1,25 @@
+object FormPainterBGRA: TFormPainterBGRA
+  Left = 311
+  Height = 240
+  Top = 250
+  Width = 320
+  Caption = 'FormPainterBGRA'
+  OnMouseDown = FormMouseDown
+  OnMouseMove = FormMouseMove
+  OnMouseWheel = FormMouseWheel
+  OnResize = FormResize
+  PopupMenu = PopupMenu1
+  LCLVersion = '2.0.8.0'
+  object PopupMenu1: TPopupMenu
+    left = 161
+    top = 79
+    object MenuItem1: TMenuItem
+      Caption = 'Test draw polygon'
+      OnClick = MenuItem1Click
+    end
+    object MenuItem2: TMenuItem
+      Caption = 'Test draw text'
+      OnClick = MenuItem2Click
+    end
+  end
+end

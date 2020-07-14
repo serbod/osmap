@@ -174,7 +174,7 @@ type
       throws OSMScoutException in case of errors }
     function LoadAreasInRadius(const ALocation: TGeoPoint;
       const ATypes: TTypeInfoSet;
-      AMaxDistance: TDistance = 100): AreaRegionSearchResult;
+      AMaxDistance: TDistance = 100): TAreaRegionSearchResult;
 
     { Load nodes of given types in the given geo box
       Distance is measured in relation to the center of the bounding box

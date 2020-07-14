@@ -9,7 +9,8 @@
 interface
 
 uses
-  Types, Classes, SysUtils, strutils,
+  {$ifdef MSWINDOWS}Windows, {$else}Types, {$endif}
+  Classes, SysUtils, strutils,
   {$ifdef FPC}
   streamex,
   {$endif}
@@ -196,16 +197,28 @@ begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('city'));
     end;
-    $03, // landuse = residential
-    $04: // landuse = military
+    $03: // landuse = residential
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_residential'));
     end;
+    $08, // landuse = retail
+    $0A, // amenity = school
+    $0B: // amenity = hospital
+    begin
+      TmpArea := TMapArea.Create();
+      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_social'));
+    end;
+    $04, // landuse = military
+    $0C: // amenity = industrial
+    begin
+      TmpArea := TMapArea.Create();
+      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_industrial'));
+    end;
     $05: // landuse = garages
     begin
       TmpArea := TMapArea.Create();
-      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_industrial'));
+      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_parking'));
     end;
     $06: // building = garages
     begin
@@ -213,15 +226,11 @@ begin
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_industrial'));
     end;
     $07, // building = yes, aeroway = terminal
-    $08, // landuse = retail
     $09: // building = yes, leisure = marina
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_industrial'));
     end;
-    $0A,  // amenity = school
-    $0B, // amenity = hospital
-    $0C, // industrial
     $6F: // building = industrial
     begin
       TmpArea := TMapArea.Create();
@@ -267,7 +276,7 @@ begin
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_apartments'));
     end;
     $88, // landuse = farmland
-    $89: //natural = beach
+    $89: // natural = beach
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('farmland'));
@@ -471,7 +480,7 @@ begin
   if Pos('_', AFileName) = 1 then
   begin
     // from resource
-    ResStream := TResourceStream.Create(HInstance, AFileName, RT_RCDATA);
+    ResStream := TResourceStream.Create(HInstance, AFileName, Windows.RT_RCDATA);
   end
   else
   begin

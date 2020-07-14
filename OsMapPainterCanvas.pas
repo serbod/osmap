@@ -20,8 +20,8 @@ uses
 
 type
   TNativeGlyph = record
-    X: Double;
-    Y: Double;
+    X: TReal;
+    Y: TReal;
     //AggGlyph: TAggGlyphCache;
     Glyph: Char;
   end;
@@ -41,7 +41,7 @@ type
     FLabelLayouter: TLabelLayouter;
     FMutex: TCriticalSection;
 
-    FFontSize: Double;
+    FFontSize: TReal;
     FIsAlienAgg: Boolean;
     FIsDrawingWayBorder: Boolean;
 
@@ -49,15 +49,15 @@ type
     procedure SetCanvas(AValue: TCanvas);
 
     procedure SetFont(AProjection: TProjection; AParameter: TMapParameter;
-      ASize: Double); // agg::glyph_rendering ren_type = agg::glyph_ren_native_gray8
+      ASize: TReal); // agg::glyph_rendering ren_type = agg::glyph_ren_native_gray8
 
-    procedure GetTextDimension(const AText: string; out AWidth, AHeight: Double);
+    procedure GetTextDimension(const AText: string; out AWidth, AHeight: TReal);
 
-    //procedure DrawText(X, Y: Double; const AText: string);
+    //procedure DrawText(X, Y: TReal; const AText: string);
 
-    //procedure DrawGlyph(X, Y: Double; const AGlyph: TAggGlyphCache);
+    //procedure DrawGlyph(X, Y: TReal; const AGlyph: TAggGlyphCache);
 
-    procedure DrawGlyphVector(X, ABaselineY: Double; const AGlyphs: TNativeGlyphArray);
+    procedure DrawGlyphVector(X, ABaselineY: TReal; const AGlyphs: TNativeGlyphArray);
 
     procedure DrawGlyphs(AProjection: TProjection;
       AParameter: TMapParameter;
@@ -77,35 +77,35 @@ type
       AParameter: TMapParameter; AStyle: TIconStyle): Boolean; override;
 
     function GetFontHeight(const AProjection: TProjection;
-      const AParameter: TMapParameter; AFontSize: Double): Double; override;
+      const AParameter: TMapParameter; AFontSize: TReal): TReal; override;
 
     procedure DrawGround(const AProjection: TProjection;
       const AParameter: TMapParameter; const AStyle: TFillStyle); override;
 
-    procedure DrawIcon(AStyle: TIconStyle; ACenterX, ACenterY: Double;
-      AWidth, Aheight: Double); override;
+    procedure DrawIcon(AStyle: TIconStyle; ACenterX, ACenterY: TReal;
+      AWidth, Aheight: TReal); override;
 
     procedure DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
-      X, Y: Double); override;
+      X, Y: TReal); override;
 
     procedure DrawLabel(AProjection: TProjection;
       AParameter: TMapParameter;
-      X, Y: Double;
+      X, Y: TReal;
       const AMapLabel: TMapLabel;
       const ALabel: TLabelData);
 
     procedure DrawPath(const AProjection: TProjection;
-      const AParameter: TMapParameter; const AColor: TMapColor; AWidth: Double;
-      const ADash: array of Double; AStartCap: TLineCapStyle;
+      const AParameter: TMapParameter; const AColor: TMapColor; AWidth: TReal;
+      const ADash: array of TReal; AStartCap: TLineCapStyle;
       AEndCap: TLineCapStyle; ATransStart, ATransEnd: Integer); override;
 
     { Register regular label with given text at the given pixel coordinate
       in a style defined by the given LabelStyle. }
     procedure RegisterRegularLabel(const AProjection: TProjection;
       const AParameter: TMapParameter; const ALabels: TLabelDataList;
-      const APosition: TVertex2D; AObjectWidth: Double); override;
+      const APosition: TVertex2D; AObjectWidth: TReal); override;
 
     { Register contour label }
     procedure RegisterContourLabel(const AProjection: TProjection;
@@ -121,7 +121,7 @@ type
 
     procedure DrawContourSymbol(const AProjection: TProjection;
       const AParameter: TMapParameter; const ASymbol: TMapSymbol;
-      ASpace: Double; ATransStart, ATransEnd: Integer); override;
+      ASpace: TReal; ATransStart, ATransEnd: Integer); override;
 
     procedure DrawArea(const AProjection: TProjection;
       const AParameter: TMapParameter; const AAreaData: TAreaData); override;
@@ -148,7 +148,7 @@ type
       AProjection: TProjection;
       AParameter: TMapParameter;
       const AText: string;
-      AFontSize, AObjectWidth: Double;
+      AFontSize, AObjectWidth: TReal;
       AEnableWrapping: Boolean = False;
       AContourLabel: Boolean = False);
   public
@@ -176,7 +176,7 @@ begin
   ADashArray[n+1] := ASpace;
 end;
 
-{ TMapPainterAgg }
+{ TMapPainterCanvas }
 
 function TMapPainterCanvas.GetAlphaColor(const AColor: TMapColor): TAlphaColor;
 begin
@@ -198,7 +198,7 @@ begin
 end;
 
 procedure TMapPainterCanvas.SetFont(AProjection: TProjection;
-  AParameter: TMapParameter; ASize: Double);
+  AParameter: TMapParameter; ASize: TReal);
 begin
   try
     FCanvas.Font.Family := AParameter.FontName;
@@ -210,13 +210,13 @@ begin
 end;
 
 procedure TMapPainterCanvas.GetTextDimension(const AText: string; out AWidth,
-  AHeight: Double);
+  AHeight: TReal);
 begin
   AWidth := FCanvas.TextWidth(AText);
   AHeight := FCanvas.TextHeight(AText);
 end;
 
-{procedure TMapPainterCanvas.DrawText(X, Y: Double; const AText: string);
+{procedure TMapPainterCanvas.DrawText(X, Y: TReal; const AText: string);
 var
   ws: WideString;
 begin
@@ -228,7 +228,7 @@ begin
   FCanvas.FillText  Text(X, Y, ws);
 end; }
 
-procedure TMapPainterCanvas.DrawGlyphVector(X, ABaselineY: Double;
+procedure TMapPainterCanvas.DrawGlyphVector(X, ABaselineY: TReal;
   const AGlyphs: TNativeGlyphArray);
 begin
   //
@@ -331,7 +331,7 @@ procedure TMapPainterCanvas.DrawFillStyle(AProjection: TProjection;
   AFillStyle: TFillStyle;
   ABorderStyle: TBorderStyle);
 var
-  borderWidth: Double;
+  borderWidth: TReal;
   i: Integer;
   da: TDashArray;
 begin
@@ -400,7 +400,7 @@ begin
 end;
 
 function TMapPainterCanvas.GetFontHeight(const AProjection: TProjection;
-  const AParameter: TMapParameter; AFontSize: Double): Double;
+  const AParameter: TMapParameter; AFontSize: TReal): TReal;
 begin
   if (FFontSize <> 0) then
     Result := FCanvas.Font.Size / FFontSize * AFontSize
@@ -431,7 +431,7 @@ begin
 end;
 
 procedure TMapPainterCanvas.DrawIcon(AStyle: TIconStyle; ACenterX,
-  ACenterY: Double; AWidth, Aheight: Double);
+  ACenterY: TReal; AWidth, Aheight: TReal);
 begin
   //
 end;
@@ -439,9 +439,9 @@ end;
 procedure TMapPainterCanvas.DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
-      X, Y: Double);
+      X, Y: TReal);
 var
-  minX, minY, maxX, maxY, centerX, centerY: Double;
+  minX, minY, maxX, maxY, centerX, centerY: TReal;
   Primitive: TDrawPrimitive;
   Polygon: TPolygonPrimitive;
   TmpRectangle: TRectanglePrimitive;
@@ -450,7 +450,7 @@ var
   borderStyle: TBorderStyle;
   i: Integer;
   Pixel: TVertex2D;
-  xPos, yPos, width, height, radius: Double;
+  xPos, yPos, width, height, radius: TReal;
   pd: TPathData;
   r: TRectF;
 begin
@@ -571,7 +571,7 @@ begin
 end;  }
 
 procedure TMapPainterCanvas.DrawLabel(AProjection: TProjection;
-  AParameter: TMapParameter; X, Y: Double; const AMapLabel: TMapLabel;
+  AParameter: TMapParameter; X, Y: TReal; const AMapLabel: TMapLabel;
   const ALabel: TLabelData);
 var
   TmpStyle: TTextStyle;
@@ -630,8 +630,8 @@ begin
 end;
 
 procedure TMapPainterCanvas.DrawPath(const AProjection: TProjection;
-  const AParameter: TMapParameter; const AColor: TMapColor; AWidth: Double;
-  const ADash: array of Double; AStartCap: TLineCapStyle;
+  const AParameter: TMapParameter; const AColor: TMapColor; AWidth: TReal;
+  const ADash: array of TReal; AStartCap: TLineCapStyle;
   AEndCap: TLineCapStyle; ATransStart, ATransEnd: Integer);
 var
   i: Integer;
@@ -725,7 +725,7 @@ end;
 
 procedure TMapPainterCanvas.RegisterRegularLabel(const AProjection: TProjection;
   const AParameter: TMapParameter; const ALabels: TLabelDataList;
-  const APosition: TVertex2D; AObjectWidth: Double);
+  const APosition: TVertex2D; AObjectWidth: TReal);
 begin
   FLabelLayouter.RegisterLabel(AProjection, AParameter, APosition, ALabels, AObjectWidth);
 end;
@@ -828,7 +828,7 @@ begin
 end;
 
 procedure TMapPainterCanvas.DrawContourSymbol(const AProjection: TProjection;
-  const AParameter: TMapParameter; const ASymbol: TMapSymbol; ASpace: Double;
+  const AParameter: TMapParameter; const ASymbol: TMapSymbol; ASpace: TReal;
   ATransStart, ATransEnd: Integer);
 begin
   //
@@ -916,10 +916,10 @@ end;
 
 procedure TMapPainterCanvas.OnTextLayoutHandler(out ALabel: TMapLabel;
   AProjection: TProjection; AParameter: TMapParameter; const AText: string;
-  AFontSize, AObjectWidth: Double; AEnableWrapping: Boolean;
+  AFontSize, AObjectWidth: TReal; AEnableWrapping: Boolean;
   AContourLabel: Boolean);
 var
-  x, y, w, h, cw: Double;
+  x, y, w, h, cw: TReal;
   i: Integer;
   //ws: WideString;
   ws: string;

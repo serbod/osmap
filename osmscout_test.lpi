@@ -109,15 +109,18 @@
       <FormatVersion Value="2"/>
       <Modes Count="0"/>
     </RunParams>
-    <RequiredPackages Count="2">
+    <RequiredPackages Count="3">
       <Item1>
-        <PackageName Value="AggPasRunLaz"/>
+        <PackageName Value="BGRABitmapPack"/>
       </Item1>
       <Item2>
-        <PackageName Value="LCL"/>
+        <PackageName Value="AggPasRunLaz"/>
       </Item2>
+      <Item3>
+        <PackageName Value="LCL"/>
+      </Item3>
     </RequiredPackages>
-    <Units Count="26">
+    <Units Count="23">
       <Unit0>
         <Filename Value="osmscout_test.lpr"/>
         <IsPartOfProject Value="True"/>
@@ -221,35 +224,26 @@
         <UnitName Value="OsMapFormatMp"/>
       </Unit19>
       <Unit20>
-        <Filename Value="osmaprouting.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapRouting"/>
-      </Unit20>
-      <Unit21>
-        <Filename Value="osmaproutingservice.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapRoutingService"/>
-      </Unit21>
-      <Unit22>
-        <Filename Value="osmaproutingsimple.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapRoutingSimple"/>
-      </Unit22>
-      <Unit23>
-        <Filename Value="osmaproutingdatabase.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapRoutingDatabase"/>
-      </Unit23>
-      <Unit24>
-        <Filename Value="osmapdatabase.pas"/>
-        <IsPartOfProject Value="True"/>
-        <UnitName Value="OsMapDatabase"/>
-      </Unit24>
-      <Unit25>
         <Filename Value="osmapdatafiles.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapDataFiles"/>
-      </Unit25>
+      </Unit20>
+      <Unit21>
+        <Filename Value="painteraggform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="FormPainterAgg"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="PainterAggForm"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="painterbgraform.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="FormPainterBGRA"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="PainterBgraForm"/>
+      </Unit22>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

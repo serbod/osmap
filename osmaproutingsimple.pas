@@ -39,7 +39,7 @@ interface
 uses
   Classes, SysUtils,
   OsMapTypes, OsMapObjTypes, OsMapGeometry, OsMapObjFeatures,
-  OsMapRouting, OsMapRoutingService, OsMapRoutingDatabase;
+  OsMapRouting, OsMapRoutingService, OsMapRoutingDatabase, OsMapDatabase;
 
 type
   TClosestRoutableObjectResult = record
@@ -63,7 +63,7 @@ type
 
   TSimpleRoutingService = class(TAbstractRoutingService)
   private
-    FDatabase: TMapDatabaseID;      // Database object, holding all index and data files
+    FDatabase: TMapDatabase;        // Database object, holding all index and data files
     FFileNameBase: string;          // Common base name for all router files
     FAccessReader: TFeatureValueReader;   // Read access information from objects
     FIsOpen: Boolean;               // true, if opened
@@ -80,24 +80,25 @@ type
     function CanUseBackward(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; override;
 
     function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      const ARouteNode: TRouteNode; APathIndex: Integer): Double; overload; override;
+      const ARouteNode: TRouteNode; APathIndex: Integer): TReal; overload; override;
     function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      AWay: TMapWay; AWayLength: TDistance): Double; overload; override;
+      AWay: TMapWay; AWayLength: TDistance): TReal; overload; override;
 
     function GetEstimateCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; override;
+      ATargetDistance: TDistance): TReal; override;
     function GetCostLimit(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; override;
+      ATargetDistance: TDistance): TReal; override;
 
     function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMap): Boolean; override;
     { Return the route node for the given database offset }
     function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; override;
 
+    { !! offsets only for data files
     function GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay; override;
     function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; override;
 
     function GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea; override;
-    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; override;
+    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; override;}
 
     function ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean; override;
 
@@ -204,25 +205,25 @@ end;
 
 function TSimpleRoutingService.GetCosts(AProfile: TRoutingProfile;
   ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode;
-  APathIndex: Integer): Double;
+  APathIndex: Integer): TReal;
 begin
   Result := AProfile.GetCosts(ARouteNode, FRoutingDatabase.GetObjectVariantData(), APathIndex);
 end;
 
 function TSimpleRoutingService.GetCosts(AProfile: TRoutingProfile;
-  ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): Double;
+  ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): TReal;
 begin
   Result := AProfile.GetCosts(AWay, AWayLength);
 end;
 
 function TSimpleRoutingService.GetEstimateCosts(AProfile: TRoutingProfile;
-  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): TReal;
 begin
   Result := AProfile.GetCosts(ATargetDistance);
 end;
 
 function TSimpleRoutingService.GetCostLimit(AProfile: TRoutingProfile;
-  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): TReal;
 begin
   Result := AProfile.GetCosts(AProfile.GetCostLimitDistance())
           + (AProfile.GetCosts(ATargetDistance) * AProfile.GetCostLimitFactor());
@@ -273,24 +274,14 @@ begin
   Result := FRoutingDatabase.GetRouteNode(AId.Id, ANode);
 end;
 
-function TSimpleRoutingService.GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay;
-var
-  wayDataFile: TWayDataFile;
+{function TSimpleRoutingService.GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay;
 begin
-  wayDataFile := FDatabase. ->GetWayDataFile());
-
-  if (!wayDataFile) {
-    return false;
-  }
-
-  return wayDataFile->GetByOffset(offset.offset,way);
-
+  FDatabase.WayDataFile.GetByOffset(AOffset, Result);
 end;
 
 function TSimpleRoutingService.GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray;
   AWayMap: TMapWayDict): Boolean;
 begin
-
 end;
 
 function TSimpleRoutingService.GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea;
@@ -302,7 +293,7 @@ function TSimpleRoutingService.GetAreasByOffset(const AOffsetList: TMapDBFileOff
   AAreaMap: TMapAreaDict): Boolean;
 begin
 
-end;
+end;}
 
 function TSimpleRoutingService.ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean;
 begin

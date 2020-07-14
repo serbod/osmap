@@ -98,7 +98,7 @@ type
   end; }
 
 { Sort any array }
-procedure AnySort(var Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
+procedure AnySort(const Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
 
 { Encode a signed number into the given buffer using some variable length encoding.
   The methods returns the number of bytes written.
@@ -233,12 +233,12 @@ end;
 
 function EncodeNumber(ANum: Int64; var ABuffer): Integer;
 begin
-  Result := EncodeNumberUnsigned(ANum, ABuffer);
+  Result := EncodeNumberSigned(ANum, ABuffer);
 end;
 
 function EncodeNumber(ANum: UInt64; var ABuffer): Integer;
 begin
-  Result := EncodeNumberSigned(ANum, ABuffer);
+  Result := EncodeNumberUnsigned(ANum, ABuffer);
 end;
 
 function DecodeNumberSigned(const ABuffer; out ANum: Int64): Integer;
@@ -281,10 +281,10 @@ begin
   Result := 1;
   ANum := 0;
 
-  while True do
+  while True and (Shift < 48) do
   begin
     ANum := ANum or (UInt64(pBuf^ and $7F) shl Shift);
-    if (pBuf^ or $80) = 0 then
+    if (pBuf^ and $80) = 0 then
       Break;
     Inc(pBuf);
     Inc(Shift, 7);
@@ -524,7 +524,7 @@ begin
     Value := P^.Value;
 end;
 
-procedure AnyQuickSort(var Arr; idxL, idxH: Integer;
+procedure AnyQuickSort(const Arr; idxL, idxH: Integer;
   ItemSize: Integer; CompareFunc: TCompareFunc; var SwapBuf);
 var
   ls, hs: Integer;
@@ -533,7 +533,7 @@ var
   ms    : Integer;
   pb    : PByteArray;
 begin
-  pb := Addr(Arr);
+  pb := @Arr;
   li := idxL;
   hi := idxH;
   mi := (li+hi) div 2;
@@ -564,7 +564,7 @@ begin
   if li < idxH then AnyQuickSort(Arr, li, idxH, ItemSize, CompareFunc, SwapBuf);
 end;
 
-procedure AnySort(var Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
+procedure AnySort(const Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
 var
   buf: array of byte;
 begin

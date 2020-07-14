@@ -70,11 +70,11 @@ type
 
   TLabelPathSegment = object
     Start: TVertex2D;
-    Offset: Double;
-    Length: Double;
-    Angle: Double;
+    Offset: TReal;
+    Length: TReal;
+    Angle: TReal;
 
-    procedure Init(const AStart: TVertex2D; AOffset, ALength, AAngle: Double); inline;
+    procedure Init(const AStart: TVertex2D; AOffset, ALength, AAngle: TReal); inline;
   end;
 
   TLabelPathSegmentArray = array of TLabelPathSegment;
@@ -83,26 +83,26 @@ type
 
   TLabelPath = object
   private
-    FLength: Double;
+    FLength: TReal;
     FSegments: TLabelPathSegmentArray;
     FOffsetIndexArr: array of Integer;  // segment offset by length 100
-    FMinSegmentLength: Double;
+    FMinSegmentLength: TReal;
     FEnd: TVertex2D;
-    FEndDistance: Double;
+    FEndDistance: TReal;
 
-    function SegmentBefore(AOffset: Double): TLabelPathSegment;
+    function SegmentBefore(AOffset: TReal): TLabelPathSegment;
   public
-    procedure Init(AMinSegmentLength: Double = 5); inline;
-    procedure AddPoint(X, Y: Double);
-    function GetLength(): Double;
-    function PointAtLength(AOffset: Double): TVertex2D;
-    function AngleAtLength(AOffset: Double): Double;
-    function AngleAtLengthDeg(AOffset: Double): Double;
+    procedure Init(AMinSegmentLength: TReal = 5); inline;
+    procedure AddPoint(X, Y: TReal);
+    function GetLength(): TReal;
+    function PointAtLength(AOffset: TReal): TVertex2D;
+    function AngleAtLength(AOffset: TReal): TReal;
+    function AngleAtLengthDeg(AOffset: TReal): TReal;
 
     { Test how squiggly is path in given offsets. It return true
       if angle between first path segment (on startOffset) and any
       following (until endOffset) is lesser than required maximum. }
-    function TestAngleVariance(AStartOffset, AEndOffset, AMaximumAngle: Double): Boolean;
+    function TestAngleVariance(AStartOffset, AEndOffset, AMaximumAngle: TReal): Boolean;
 
     property Segments: TLabelPathSegmentArray read FSegments;
 
@@ -111,12 +111,12 @@ type
   { TDoubleRectangle }
 
   TDoubleRectangle = object
-    X: Double;
-    Y: Double;
-    Width: Double;
-    Height: Double;
+    X: TReal;
+    Y: TReal;
+    Width: TReal;
+    Height: TReal;
 
-    procedure Init(AX, AY, AW, AH: Double); inline;
+    procedure Init(AX, AY, AW, AH: TReal); inline;
     { Test if this Rectangle intersects with another.
       It is using open interval, so if two rectangles are just touching
       each other, these don't intersects. }
@@ -144,10 +144,10 @@ type
   public
     Priority: Integer;        // Priority of the entry
     Text: string;             // The label text (type==Text|PathText)
-    //FontSize: Double;         // Font size to be used, in pixels
+    //FontSize: TReal;         // Font size to be used, in pixels
     Style: TPathTextStyle;
-    ContourLabelOffset: Double;
-    ContourLabelSpace: Double;
+    ContourLabelOffset: TReal;
+    ContourLabelSpace: TReal;
     procedure Init(AStyle: TPathTextStyle);
   end;
 
@@ -161,14 +161,14 @@ type
     Priority: Integer;       // Priority of the entry
     Position: Integer;       // Relative vertical position of the label
 
-    Alpha: Double;           // Alpha value of the label; 0.0 = fully transparent, 1.0 = solid
-    FontSize: Double;        // Font size to be used, in pixels
+    Alpha: TReal;           // Alpha value of the label; 0.0 = fully transparent, 1.0 = solid
+    FontSize: TReal;        // Font size to be used, in pixels
     Style: TLabelStyle;      // Style for drawing
     Text: string;            // The label text (type==Text|PathText)
 
     IconStyle: TIconStyle;   // Icon or symbol style
-    IconWidth: Double;
-    IconHeight: Double;
+    IconWidth: TReal;
+    IconHeight: TReal;
 
     procedure Init();
   end;
@@ -193,13 +193,13 @@ type
     TextChar: WideChar;   // Unicode char
     NativeGlyph: Pointer; // TNativeGlyph;
     Position: TVertex2D;  // glyph baseline position
-    Width: Double;        // width before rotation
-    Height: Double;       // height before rotation
-    Angle: Double;        // clock-wise rotation in radian
+    Width: TReal;        // width before rotation
+    Height: TReal;       // height before rotation
+    Angle: TReal;        // clock-wise rotation in radian
 
     TrPosition: TVertex2D; // top-left position after rotation
-    TrWidth: Double;   // width after rotation
-    TrHeight: Double;  // height after rotation
+    TrWidth: TReal;   // width after rotation
+    TrHeight: TReal;  // height after rotation
   end;
 
   TMapGlyphArray = array of TMapGlyph;
@@ -209,9 +209,9 @@ type
   TMapLabel = object
   public
     pLabel: Pointer;   // TNativeLabel
-    Width: Double;
-    Height: Double;
-    FontSize: Double;  // Resulting font size
+    Width: TReal;      // Width in pixels
+    Height: TReal;     // Height in pixels
+    FontSize: TReal;   // Resulting font size in pixels
     Text: string;      // The label text
     Glyphs: TMapGlyphArray;
 
@@ -226,8 +226,8 @@ type
   TTextLabelElement = object
   public
     LabelData: TLabelData;
-    X: Double;             // Coordinate of the left, top edge of the text / icon / symbol
-    Y: Double;             // Coordinate of the left, top edge of the text / icon / symbol
+    X: TReal;             // Coordinate of the left, top edge of the text / icon / symbol
+    Y: TReal;             // Coordinate of the left, top edge of the text / icon / symbol
     MapLabel: TMapLabel;   // std::shared_ptr<Label<NativeGlyph, NativeLabel>>
     IsVisible: Boolean;
 
@@ -312,7 +312,7 @@ type
   TOnTextLayout = procedure(out ALabel: TMapLabel; AProjection: TProjection;
       AParameter: TMapParameter;
       const AText: string;
-      AFontSize, AObjectWidth: Double;
+      AFontSize, AObjectWidth: TReal;
       AEnableWrapping: Boolean = False;
       AContourLabel: Boolean = False) of object;
 
@@ -327,7 +327,7 @@ type
 
     FVisibleViewport: TDoubleRectangle;
     FLayoutViewport: TDoubleRectangle;
-    FLayoutOverlap: Double;  // overlap ratio used for label layouting
+    FLayoutOverlap: TReal;  // overlap ratio used for label layouting
     FLabelPathLayoutMode: TLabelPathLayoutMode;
 
     //FOnGlyphBoundingBox: TOnGlyphBoundingBox;
@@ -339,7 +339,7 @@ type
 
     procedure SetViewport(const V: TDoubleRectangle);
 
-    procedure SetLayoutOverlap(AOverlap: Double);
+    procedure SetLayoutOverlap(AOverlap: TReal);
 
     procedure Reset();
 
@@ -362,7 +362,7 @@ type
     procedure RegisterLabel(AProjection: TProjection; AParameter: TMapParameter;
       const APoint: TVertex2D;
       const ADataList: TLabelDataList;
-      AObjectWidth: Double = 10.0);
+      AObjectWidth: TReal = 10.0);
 
     procedure RegisterContourLabel(AProjection: TProjection; AParameter: TMapParameter;
       const ALabelData: TPathLabelData;
@@ -438,7 +438,7 @@ end;
 { TSegment }
 
 procedure TLabelPathSegment.Init(const AStart: TVertex2D; AOffset, ALength,
-  AAngle: Double);
+  AAngle: TReal);
 begin
   Start.Assign(AStart);
   Offset := AOffset;
@@ -448,7 +448,7 @@ end;
 
 { TLabelPath }
 
-function TLabelPath.SegmentBefore(AOffset: Double): TLabelPathSegment;
+function TLabelPath.SegmentBefore(AOffset: TReal): TLabelPathSegment;
 var
   i, iHundred: Integer;
 begin
@@ -471,7 +471,7 @@ begin
   Result := FSegments[High(FSegments)];
 end;
 
-procedure TLabelPath.Init(AMinSegmentLength: Double);
+procedure TLabelPath.Init(AMinSegmentLength: TReal);
 begin
   FLength := 0.0;
   FMinSegmentLength := AMinSegmentLength;
@@ -480,11 +480,11 @@ begin
   FOffsetIndexArr[0] := 0;
 end;
 
-procedure TLabelPath.AddPoint(X, Y: Double);
+procedure TLabelPath.AddPoint(X, Y: TReal);
 var
   n, i: Integer;
   LastSeg: TLabelPathSegment;
-  endDistance: Double;
+  endDistance: TReal;
 begin
   if Length(FSegments) = 0 then
   begin
@@ -520,16 +520,16 @@ begin
   end;
 end;
 
-function TLabelPath.GetLength(): Double;
+function TLabelPath.GetLength(): TReal;
 begin
   Result := FLength + FEndDistance;
 end;
 
-function TLabelPath.PointAtLength(AOffset: Double): TVertex2D;
+function TLabelPath.PointAtLength(AOffset: TReal): TVertex2D;
 var
   RelSeg: TLabelPathSegment;
   p, VtAdd: TVertex2D;
-  mul: Double;
+  mul: TReal;
 begin
   if Length(FSegments) = 0 then
     Exit;
@@ -542,20 +542,20 @@ begin
   Result.SetValue(p.X + VtAdd.X, p.Y + VtAdd.Y);
 end;
 
-function TLabelPath.AngleAtLength(AOffset: Double): Double;
+function TLabelPath.AngleAtLength(AOffset: TReal): TReal;
 begin
   Result := SegmentBefore(AOffset).Angle;
 end;
 
-function TLabelPath.AngleAtLengthDeg(AOffset: Double): Double;
+function TLabelPath.AngleAtLengthDeg(AOffset: TReal): TReal;
 begin
   Result := (AngleAtLength(AOffset) * 180) / M_PI;
 end;
 
 function TLabelPath.TestAngleVariance(AStartOffset, AEndOffset,
-  AMaximumAngle: Double): Boolean;
+  AMaximumAngle: TReal): Boolean;
 var
-  initialAngle: Double;
+  initialAngle: TReal;
   IsInited: Boolean;
   i: Integer;
 begin
@@ -590,7 +590,7 @@ end;
 
 { TDoubleRectangle }
 
-procedure TDoubleRectangle.Init(AX, AY, AW, AH: Double);
+procedure TDoubleRectangle.Init(AX, AY, AW, AH: TReal);
 begin
   X := AX;
   Y := AY;
@@ -647,7 +647,7 @@ begin
   pLabel := nil;
   Width := -1;
   Height := -1;
-  FontSize := 1;
+  FontSize := 0.0;
   Text := '';
 end;
 
@@ -753,7 +753,7 @@ begin
   SetLayoutOverlap(FLayoutOverlap);
 end;
 
-procedure TLabelLayouter.SetLayoutOverlap(AOverlap: Double);
+procedure TLabelLayouter.SetLayoutOverlap(AOverlap: TReal);
 begin
   if AOverlap < 0 then
     AOverlap := 0;
@@ -822,8 +822,8 @@ end;
 procedure TLabelLayouter.Layout(AProjection: TProjection;
   AParameter: TMapParameter);
 var
-  iconPadding, labelPadding, shieldLabelPadding: Double;
-  contourLabelPadding, overlayLabelPadding: Double;
+  iconPadding, labelPadding, shieldLabelPadding: TReal;
+  contourLabelPadding, overlayLabelPadding: TReal;
   i, iLabel, iContour: Integer;
   rowSize: Int64;
   iconCanvas: TQWordArray;
@@ -838,17 +838,17 @@ var
   visibleElementsCount: Integer;
   element: TTextLabelElement;
   pRow: ^TMapMask;
-  padding: Double;
+  padding: TReal;
   rectangle: TIntRectangle;
   pCanvas: PQWordArray;
   IsCollision: Boolean;
   pGlyph: ^TMapGlyph;
 begin
-  iconPadding := AProjection.ConvertWidthToPixel(AParameter.IconPadding);
-  labelPadding := AProjection.ConvertWidthToPixel(AParameter.LabelPadding);
-  shieldLabelPadding := AProjection.ConvertWidthToPixel(AParameter.PlateLabelPadding);
-  contourLabelPadding := AProjection.ConvertWidthToPixel(AParameter.ContourLabelPadding);
-  overlayLabelPadding := AProjection.ConvertWidthToPixel(AParameter.OverlayLabelPadding);
+  iconPadding := AProjection.MillimetersToPixels(AParameter.IconPadding);
+  labelPadding := AProjection.MillimetersToPixels(AParameter.LabelPadding);
+  shieldLabelPadding := AProjection.MillimetersToPixels(AParameter.PlateLabelPadding);
+  contourLabelPadding := AProjection.MillimetersToPixels(AParameter.ContourLabelPadding);
+  overlayLabelPadding := AProjection.MillimetersToPixels(AParameter.OverlayLabelPadding);
 
   // sort labels by priority and position (to be deterministic)
   {$ifdef FPC}
@@ -1100,10 +1100,10 @@ end;
 
 procedure TLabelLayouter.RegisterLabel(AProjection: TProjection;
   AParameter: TMapParameter; const APoint: TVertex2D;
-  const ADataList: TLabelDataList; AObjectWidth: Double);
+  const ADataList: TLabelDataList; AObjectWidth: TReal);
 var
   instance: TTextLabel;
-  offset: Double;
+  offset: TReal;
   i: Integer;
   d: TLabelData;
   element: TTextLabelElement;
@@ -1169,24 +1169,24 @@ procedure TLabelLayouter.RegisterContourLabel(AProjection: TProjection;
   const ALabelPath: TLabelPath);
 var
   TmpLabel: TMapLabel;
-  textBaselineOffset, PathLength, offset, initialAngle: Double;
+  textBaselineOffset, PathLength, offset, initialAngle: TReal;
   glyph, glyphCopy: TMapGlyph;
   ContLabel: TContourLabel;
   IsUpwards: Boolean;
-  glyphOffset, w, h: Double;
+  glyphOffset, w, h: TReal;
   point: TVertex2D;  // glyph point
   GlyphRect: TDoubleRectangle;
   tl: TVertex2D; // glyph top left
-  angle: Double; // glyph angle in radians
-  diagonal, FontHeight: Double;
-  sinA, cosA, ox, oy: Double;
-  XArr, YArr: array [0..3] of Double;
+  angle: TReal; // glyph angle in radians
+  diagonal, FontHeight: TReal;
+  sinA, cosA, ox, oy: TReal;
+  XArr, YArr: array [0..3] of TReal;
   i, iDelta, GlyphIndex: Integer;
-  minX, maxX, minY, maxY: Double;
+  minX, maxX, minY, maxY: TReal;
   Seg: TLabelPathSegment;
 begin
   // TODO: cache label for string and font parameters
-  FontHeight := AProjection.ConvertWidthToPixel(ALabelData.Style.Size);
+  FontHeight := AProjection.MillimetersToPixels(ALabelData.Style.SizeMM);
   TmpLabel.Init();
   OnTextLayout(TmpLabel, AProjection, AParameter,
       ALabelData.Text,

@@ -28,7 +28,8 @@ unit OsMapManager;
 interface
 
 uses
-  Types, Classes, SysUtils, SyncObjs,
+  {$ifdef MSWINDOWS}Windows, {$else}Types, {$endif}
+  Classes, SysUtils, SyncObjs,
   OsMapPainter, OsMapProjection, OsMapStyleConfig, OsMapTypes, OsMapObjTypes,
   OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder, IniFiles;
 
@@ -67,16 +68,28 @@ type
     FMapProjection: TMercatorProjection;
     FMapPainter: TMapPainter;
 
+
     FOnAfterRender: TNotifyEvent;
   public
     Busy: Boolean;
+    WaysFileName: string;
+    AreasFileName: string;
+
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
-    procedure InitTypes();
+    //procedure InitTypes();
+    { Load map object types properties from .ini file.
+      if AFileName begins with underscope "_" - load from named resource }
     procedure InitTypesFromIni(AFileName: string);
 
     procedure Render();
+
+    procedure SaveWaysToFile(AFileName: string);
+    procedure SaveAreasToFile(AFileName: string);
+
+    procedure LoadWaysFromFile(AFileName: string);
+    procedure LoadAreasFromFile(AFileName: string);
 
     // shared
     property MapData: TMapData read FMapData;
@@ -93,7 +106,7 @@ type
 
 implementation
 
-uses OsMapUtils;
+uses OsMapUtils, OsMapFiles;
 
 { TMapManager }
 
@@ -113,6 +126,8 @@ begin
   //FMapPainter := TMapPainterAgg.Create(FMapStyleConfig);
 
   //InitTypes();
+  WaysFileName := 'ways.mbd';
+  AreasFileName := 'areas.mbd';
 end;
 
 procedure TMapManager.BeforeDestruction;
@@ -124,267 +139,6 @@ begin
   FreeAndNil(FMapTypeConfig);
   FreeAndNil(FMapParameter);
   inherited BeforeDestruction;
-end;
-
-procedure TMapManager.InitTypes();
-var
-  TmpType: TTypeInfo;
-  TmpStyle: TStyle;
-begin
-  // ======
-  TmpType := TTypeInfo.Create('highway_trunk');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(250, 177, 153, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 2;
-  (TmpStyle as TLineStyle).Priority := 4;
-  // lanes feature must be = 2+
-  //(TmpStyle as TLineStyle).OffsetRel := lorLaneDivider;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_primary');
-  TmpType.CanBeWay := True;
-  TmpType.AddFeature(MapTypeConfig.GetFeature(ftName));
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(251, 213, 164, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 2;
-  (TmpStyle as TLineStyle).Priority := 3;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  TmpStyle := TPathTextStyle.Create();
-  with (TmpStyle as TPathTextStyle) do
-  begin
-    Name := TmpType.TypeName + '_PathText';
-    Size := 4;
-    FeatureType := ftName;
-    //ScaleAndFadeMag.Level := 15;
-    //IsAutoSize := True;
-    TextColor.InitFromBytes(180, 180, 180, 255);
-    Priority := 3;
-  end;
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_secondary');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(242, 242, 187, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 1;
-  (TmpStyle as TLineStyle).Priority := 1;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_service');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(254, 254, 254, 255);
-  (TmpStyle as TLineStyle).Width := 1;
-  (TmpStyle as TLineStyle).DisplayWidth := 1;
-  (TmpStyle as TLineStyle).Priority := 0;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_residential');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(252, 252, 252, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 0;
-  (TmpStyle as TLineStyle).Priority := 0;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_road');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(220, 220, 220, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 1;
-  (TmpStyle as TLineStyle).Priority := 1;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_path');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(248, 146, 134, 255);
-  (TmpStyle as TLineStyle).Width := 1;
-  (TmpStyle as TLineStyle).DisplayWidth := 1;
-  (TmpStyle as TLineStyle).AddDash(2, 2);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('railway_rail');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(111, 111, 111, 255);
-  (TmpStyle as TLineStyle).GapColor.InitFromBytes(253, 253, 253, 255);
-  (TmpStyle as TLineStyle).Width := 1;
-  (TmpStyle as TLineStyle).DisplayWidth := 0;
-  (TmpStyle as TLineStyle).AddDash(4, 4);
-  (TmpStyle as TLineStyle).Priority := 3;
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('railway_tram');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(111, 111, 111, 255);
-  (TmpStyle as TLineStyle).Width := 1;
-  (TmpStyle as TLineStyle).DisplayWidth := 0;
-  (TmpStyle as TLineStyle).Priority := 3;
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('highway_construction');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(251, 213, 164, 255);
-  (TmpStyle as TLineStyle).GapColor.InitFromBytes(253, 253, 253, 255);
-  (TmpStyle as TLineStyle).Width := 2;
-  (TmpStyle as TLineStyle).DisplayWidth := 1;
-  (TmpStyle as TLineStyle).AddDash(2, 2);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('water_way');
-  TmpType.CanBeWay := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TLineStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Line';
-  (TmpStyle as TLineStyle).LineColor.InitFromBytes(169, 210, 222, 255);
-  (TmpStyle as TLineStyle).Width := 1;
-  (TmpStyle as TLineStyle).DisplayWidth := 2;
-  (TmpStyle as TLineStyle).Priority := 1;
-  //(TmpStyle as TLineStyle).
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ====== 'building'
-  TmpType := TTypeInfo.Create('building');
-  TmpType.CanBeArea := True;
-  TmpType.AddFeature(MapTypeConfig.GetFeature(ftName));
-  TmpType.AddFeature(MapTypeConfig.GetFeature(ftAddress));
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(214, 208, 199, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  TmpStyle := TBorderStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Border';
-  (TmpStyle as TBorderStyle).Width := 0.2;
-  //(TmpStyle as TBorderStyle).Color.InitFromBytes(180, 180, 180, 255);
-  (TmpStyle as TBorderStyle).Color.InitFromBytes(100, 100, 100, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  TmpStyle := TTextStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Text';
-  (TmpStyle as TTextStyle).FeatureType := ftName;
-  (TmpStyle as TTextStyle).Size := 5;
-  (TmpStyle as TTextStyle).ScaleAndFadeMagLevel := 15;
-  (TmpStyle as TTextStyle).IsAutoSize := True;
-  (TmpStyle as TTextStyle).TextColor.InitFromBytes(180, 180, 180, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('building_apartments');
-  TmpType.CanBeArea := True;
-  TmpType.AddFeature(MapTypeConfig.GetFeature(ftName));
-  TmpType.AddFeature(MapTypeConfig.GetFeature(ftAddress));
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(242, 213, 182, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('building_industrial');
-  TmpType.CanBeArea := True;
-  MapTypeConfig.RegisterType(TmpType);
-
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(198, 198, 180, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  TmpStyle := TBorderStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Border';
-  (TmpStyle as TBorderStyle).Width := 0.5;
-  (TmpStyle as TBorderStyle).Color.InitFromBytes(190, 190, 178, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('grass');
-  TmpType.CanBeArea := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(204, 234, 176, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('farmland');
-  TmpType.CanBeArea := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(237, 239, 213, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('forest');
-  TmpType.CanBeArea := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(172, 208, 158, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-  // ======
-  TmpType := TTypeInfo.Create('water');
-  TmpType.CanBeArea := True;
-  MapTypeConfig.RegisterType(TmpType);
-  TmpStyle := TFillStyle.Create();
-  TmpStyle.Name := TmpType.TypeName + '_Fill';
-  (TmpStyle as TFillStyle).FillColor.InitFromBytes(169, 210, 222, 255);
-  MapStyleConfig.AddStyle(TmpType, TmpStyle);
-
-
 end;
 
 procedure TMapManager.InitTypesFromIni(AFileName: string);
@@ -416,7 +170,7 @@ end;
 
 procedure _ReadDash(ASect, AName: string; AStyle: TLineStyle);
 var
-  n1, n2: Double;
+  n1, n2: TReal;
   s, ss: string;
 begin
   ss := ini.ReadString(ASect, AName, '');
@@ -446,7 +200,7 @@ begin
   if Pos('_', AFileName) = 1 then
   begin
     // from resource
-    ResStream := TResourceStream.Create(HInstance, AFileName, RT_RCDATA);
+    ResStream := TResourceStream.Create(HInstance, AFileName, Windows.RT_RCDATA);
     ini := TMemIniFile.Create(ResStream);
   end
   else
@@ -471,6 +225,7 @@ begin
         TmpType.CanBeWay := ini.ReadBool(sSect, 'CanBeWay', False);
         TmpType.CanBeNode := ini.ReadBool(sSect, 'CanBeNode', False);
         TmpType.CanBeRelation := ini.ReadBool(sSect, 'CanBeRelation', False);
+        TmpType.ZOrder := ini.ReadInteger(sSect, 'ZOrder', 0);
         sValue := ini.ReadString(sSect, 'Features', '');
         repeat
           s := Trim(Fetch(sValue, ','));
@@ -504,7 +259,7 @@ begin
         TmpStyle.Name := TmpType.TypeName + '_Border';
         _ReadColor(sSect, 'BorderColor', (TmpStyle as TBorderStyle).Color);
         _ReadColor(sSect, 'BorderGapColor', (TmpStyle as TBorderStyle).GapColor);
-        (TmpStyle as TBorderStyle).Width := ini.ReadFloat(sSect, 'BorderWidth', (TmpStyle as TBorderStyle).Width);
+        (TmpStyle as TBorderStyle).WidthMM := ini.ReadFloat(sSect, 'BorderWidth', (TmpStyle as TBorderStyle).WidthMM);
         MapStyleConfig.AddStyle(TmpType, TmpStyle);
       end;
 
@@ -518,7 +273,7 @@ begin
         TmpStyle.MaxZoom := ini.ReadInteger(sSect, 'MaxZoom', TmpStyle.MaxZoom);
         TmpStyle.Name := TmpType.TypeName + '_Text';
         (TmpStyle as TTextStyle).FeatureType := ftName;
-        (TmpStyle as TTextStyle).Size := ini.ReadFloat(sSect, 'TextSize', (TmpStyle as TTextStyle).Size);
+        (TmpStyle as TTextStyle).SizeMM := ini.ReadFloat(sSect, 'TextSize', (TmpStyle as TTextStyle).SizeMM);
         (TmpStyle as TTextStyle).ScaleAndFadeMagLevel := ini.ReadInteger(sSect, 'TextScaleAndFadeMagLevel', (TmpStyle as TTextStyle).ScaleAndFadeMagLevel);
         (TmpStyle as TTextStyle).IsAutoSize := ini.ReadBool(sSect, 'TextAutoSize', (TmpStyle as TTextStyle).IsAutoSize);
         _ReadColor(sSect, 'TextColor', (TmpStyle as TTextStyle).TextColor);
@@ -537,7 +292,7 @@ begin
         _ReadColor(sSect, 'LineColor', (TmpStyle as TLineStyle).LineColor);
         _ReadColor(sSect, 'LineGapColor', (TmpStyle as TLineStyle).GapColor);
         (TmpStyle as TLineStyle).Width := ini.ReadFloat(sSect, 'LineWidth', (TmpStyle as TLineStyle).Width);
-        (TmpStyle as TLineStyle).DisplayWidth := ini.ReadFloat(sSect, 'LineDisplayWidth', (TmpStyle as TLineStyle).DisplayWidth);
+        (TmpStyle as TLineStyle).DisplayWidthMM := ini.ReadFloat(sSect, 'LineDisplayWidth', (TmpStyle as TLineStyle).DisplayWidthMM);
         (TmpStyle as TLineStyle).Priority := ini.ReadInteger(sSect, 'LinePriority', (TmpStyle as TLineStyle).Priority);
         _ReadDash(sSect, 'LineDash', (TmpStyle as TLineStyle));
         MapStyleConfig.AddStyle(TmpType, TmpStyle);
@@ -555,7 +310,7 @@ begin
         begin
           Name := TmpType.TypeName + '_PathText';
           FeatureType := ftName;
-          Size := ini.ReadFloat(sSect, 'PathTextSize', Size);
+          SizeMM := ini.ReadFloat(sSect, 'PathTextSize', SizeMM);
           //ScaleAndFadeMagLevel := ini.ReadInteger(sSect, 'PathTextScaleAndFadeMagLevel', ScaleAndFadeMagLevel);
           //IsAutoSize := ini.ReadBool(sSect, 'PathTextAutoSize', IsAutoSize);
           _ReadColor(sSect, 'PathTextColor', TextColor);
@@ -587,6 +342,94 @@ begin
   end;
   if Assigned(OnAfterRender) then
     OnAfterRender(Self);
+end;
+
+procedure TMapManager.SaveWaysToFile(AFileName: string);
+var
+  Writer: TFileWriter;
+  TmpWay: TMapWay;
+  n: UInt64;
+begin
+  Writer := TFileWriter.Create();
+  try
+    Writer.Open(AFileName);
+    n := MapData.WayList.Count;
+    Writer.WriteNumber(n);
+    for TmpWay in MapData.WayList do
+    begin
+      TmpWay.Write(MapTypeConfig, Writer);
+    end;
+    Writer.Close();
+  finally
+    Writer.Free();
+  end;
+end;
+
+procedure TMapManager.SaveAreasToFile(AFileName: string);
+var
+  Writer: TFileWriter;
+  TmpArea: TMapArea;
+  n: UInt64;
+begin
+  Writer := TFileWriter.Create();
+  try
+    Writer.Open(AFileName);
+    n := MapData.AreaList.Count;
+    Writer.WriteNumber(n);
+    for TmpArea in MapData.AreaList do
+    begin
+      TmpArea.Write(MapTypeConfig, Writer);
+    end;
+    Writer.Close();
+  finally
+    Writer.Free();
+  end;
+end;
+
+procedure TMapManager.LoadWaysFromFile(AFileName: string);
+var
+  Reader: TFileScanner;
+  TmpWay: TMapWay;
+  n: UInt64;
+begin
+  Reader := TFileScanner.Create();
+  try
+    Reader.Open(AFileName, fsmNormal, False);
+    Reader.ReadNumber(n);
+
+    while n > 0 do
+    begin
+      TmpWay := TMapWay.Create();
+      TmpWay.Read(MapTypeConfig, Reader);
+      MapData.WayList.Add(TmpWay);
+    end;
+    Reader.Close();
+  finally
+    Reader.Free();
+  end;
+end;
+
+procedure TMapManager.LoadAreasFromFile(AFileName: string);
+var
+  Reader: TFileScanner;
+  TmpArea: TMapArea;
+  n: UInt64;
+begin
+  Reader := TFileScanner.Create();
+  try
+    Reader.Open(AFileName, fsmNormal, False);
+    Reader.ReadNumber(n);
+
+    while n > 0 do
+    begin
+      TmpArea := TMapArea.Create();
+      TmpArea.Read(MapTypeConfig, Reader);
+      MapData.AreaList.Add(TmpArea);
+    end;
+    Reader.Close();
+  finally
+    Reader.Free();
+  end;
 end;
 
 { TMapRenderThread }

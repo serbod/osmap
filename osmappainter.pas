@@ -87,7 +87,7 @@ type
     WayPriority: Integer;        // Priority of way (from style sheet)
     TransStart: Integer;         // Start of coordinates in transformation buffer
     TransEnd: Integer;           // End of coordinates in transformation buffer
-    LineWidth: Double;           // Line width in pixels
+    LineWidth: TReal;           // Line width in pixels
     IsStartClosed: Boolean;      // The end of the way is closed, it does not lead to another way or area
     IsEndClosed: Boolean;        // The end of the way is closed, it does not lead to another way or area
   end;
@@ -164,23 +164,27 @@ type
     TransEnd: Integer;           // End of coordinates in transformation buffer
     Clippings: array of TPolyData; // Clipping polygons to be used during drawing of this area
   end;
-  TAreaSorter = function(const A, B: TAreaData): Boolean;
+  PAreaData = ^TAreaData;
+  TAreaDataCompare = function(const A, B: TAreaData): Integer;
 
   { TAreaDataList }
 
   TAreaDataList = object
   private
     FCount: Integer;
+    FItems: array of PAreaData;
     function GetCapacity: Integer;
     procedure SetCapacity(AValue: Integer);
+    function GetPItem(AIndex: Integer): PAreaData;
+    procedure QSort(L, R: Integer);
   public
-    Items: array of TAreaData;
     procedure Clear();
     function Append(const AItem: TAreaData): Integer;
-    procedure Sort(ASorter: TAreaSorter);
+    procedure Sort(ASorter: TAreaDataCompare);
 
     property Capacity: Integer read GetCapacity write SetCapacity;
     property Count: Integer read FCount;
+    property PItems[AIndex: Integer]: PAreaData read GetPItem;
   end;
 
   { TContourLabelHelper }
@@ -189,16 +193,16 @@ type
     the actual backend. }
   TContourLabelHelper = object
   public
-    ContourLabelOffset: Double;
-    ContourLabelSpace: Double;
-    PathLength: Double;
-    TextWidth: Double;
-    CurrentOffset: Double;
+    ContourLabelOffset: TReal;
+    ContourLabelSpace: TReal;
+    PathLength: TReal;
+    TextWidth: TReal;
+    CurrentOffset: TReal;
 
-    function Init(APathLength: Double = 0.0; ATextWidth: Double = 0.0): Boolean;
+    function Init(APathLength: TReal = 0.0; ATextWidth: TReal = 0.0): Boolean;
     function ContinueDrawing(): Boolean;
-    function GetCurrentOffset(): Double;
-    procedure AdvancePartial(AWidth: Double);
+    function GetCurrentOffset(): TReal;
+    procedure AdvancePartial(AWidth: TReal);
     procedure AdvanceText();
     procedure AdvanceSpace();
   end;
@@ -217,7 +221,7 @@ type
   TMapPainter = class(TObject)
   private
     //FStepMethods: array [TRenderSteps] of TStepMethod;
-    FErrorTolerancePixel: Double;
+    FErrorTolerancePixel: TReal;
 
     FAreaDataList: TAreaDataList;
     FWayDataList: TWayDataList;
@@ -233,8 +237,8 @@ type
     FCoastlineSegmentAttributes: TFeatureValueBuffer;
 
     { Precalculations }
-    FStandardFontHeight: Double; // Default font height in pixels
-    FAreaMinDimension: Double;   // Minimal width or height in pixels for visible area
+    FStandardFontHeight: TReal; // Default font height in pixels
+    FAreaMinDimension: TReal;   // Minimal width or height in pixels for visible area
 
     FOnLog: TGetStrProc;
 
@@ -309,9 +313,9 @@ type
                      const ABuffer: TFeatureValueBuffer;
                      const AIconStyle: TIconStyle;
                      const ATextStyles: TTextStyleList;
-                     X, Y: Double;
-                     AObjectWidth: Double = 0;
-                     AObjectHeight: Double = 0): Boolean;
+                     X, Y: TReal;
+                     AObjectWidth: TReal = 0;
+                     AObjectHeight: TReal = 0): Boolean;
 
     function DrawWayDecoration(const AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
@@ -432,39 +436,39 @@ type
     FAccessReader: TFeatureValueReader;
 
     { Presets, precalculations and similar }
-    FEmptyDash: array of Double;    // Empty dash array
-    FTunnelDash: array of Double;   // Dash array for drawing tunnel border
+    FEmptyDash: array of TReal;    // Empty dash array
+    FTunnelDash: array of TReal;   // Dash array for drawing tunnel border
     FAreaMarkStyle: TFillStyle;     // Marker fill style for internal debugging
-    FContourLabelOffset: Double;    // Same value as in MapParameter but converted to pixel
-    FContourLabelSpace: Double;     // Same value as in MapParameter but converted to pixel
-    FShieldGridSizeHoriz: Double;   // Width of a cell for shield label placement
-    FShieldGridSizeVert: Double;    // Height of a cell for shield label placement
+    FContourLabelOffset: TReal;    // Same value as in MapParameter but converted to pixel
+    FContourLabelSpace: TReal;     // Same value as in MapParameter but converted to pixel
+    FShieldGridSizeHoriz: TReal;   // Width of a cell for shield label placement
+    FShieldGridSizeVert: TReal;    // Height of a cell for shield label placement
 
   protected
     { Useful global helper functions. }
 
     function IsVisibleArea(const AProjection: TProjection;
                        const ABoundingBox: TGeoBox;
-                       APixelOffset: Double): Boolean;
+                       APixelOffset: TReal): Boolean;
 
     { Return True if given ABoundingBox for way path is intersects with
       projection visible area. APixelOffset is half width of Way line, in pixels }
     function IsVisibleWay(const AProjection: TProjection;
                        const ABoundingBox: TGeoBox;
-                       APixelOffset: Double): Boolean;
+                       APixelOffset: TReal): Boolean;
 
     procedure Transform(const AProjection: TProjection;
                        const AParameter: TMapParameter;
                        const ACoord: TGeoPoint;
-                       var X, Y: Double);
+                       var X, Y: TReal);
 
     { translate meters to pixels, result not less than AMinPixel }
     function GetProjectedWidth(const AProjection: TProjection;
-                       AMinPixel, AWidth: Double): Double; overload;
+                       AMinPixel, AWidth: TReal): TReal; overload;
 
     { translate meters to pixels }
     function GetProjectedWidth(const AProjection: TProjection;
-                       AWidth: Double): Double; overload;
+                       AWidth: TReal): TReal; overload;
 
 
     // GetWayData -> FWayDataList
@@ -502,7 +506,7 @@ type
     { Returns the height of the font in pixel in relation to the given AFontSize in mm }
     function GetFontHeight(const AProjection: TProjection;
                      const AParameter: TMapParameter;
-                     AFontSize: Double): Double; virtual; abstract;
+                     AFontSize: TReal): TReal; virtual; abstract;
 
     { (Optionally) fills the area with the given default color
       for ground. In 2D backends this just fills the given area,
@@ -517,7 +521,7 @@ type
                      const AParameter: TMapParameter;
                      const ALabels: TLabelDataList;
                      const APosition: TVertex2D;
-                     AObjectWidth: Double); virtual; abstract;
+                     AObjectWidth: TReal); virtual; abstract;
     { Register contour label }
     procedure RegisterContourLabel(const AProjection: TProjection;
                      const AParameter: TMapParameter;
@@ -529,22 +533,22 @@ type
 
     { Draw the Icon as defined by the IconStyle at the given pixel coordinate (icon center). }
     procedure DrawIcon(AStyle: TIconStyle;
-                     ACenterX, ACenterY: Double;
-                     AWidth, Aheight: Double); virtual; abstract;
+                     ACenterX, ACenterY: TReal;
+                     AWidth, Aheight: TReal); virtual; abstract;
 
     { Draw the Symbol as defined by the SymbolStyle at the given pixel coordinate (symbol center). }
     procedure DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
-      X, Y: Double); virtual; abstract;
+      X, Y: TReal); virtual; abstract;
 
     { Draw simple line with the given style,the given color, the given width
       and the given untransformed nodes. }
     procedure DrawPath(const AProjection: TProjection;
                      const AParameter: TMapParameter;
                      const AColor: TMapColor;
-                     AWidth: Double;
-                     const ADash: array of Double;
+                     AWidth: TReal;
+                     const ADash: array of TReal;
                      AStartCap: TLineCapStyle;
                      AEndCap: TLineCapStyle;
                      ATransStart, ATransEnd: Integer); virtual; abstract;
@@ -554,7 +558,7 @@ type
     procedure DrawContourSymbol(const AProjection: TProjection;
                      const AParameter: TMapParameter;
                      const ASymbol: TMapSymbol;
-                     ASpace: Double;
+                     ASpace: TReal;
                      ATransStart, ATransEnd: Integer); virtual; abstract;
 
     { Draw the given area using the given FillStyle
@@ -566,9 +570,9 @@ type
     { Compute suggested label width for given parameters.
       It may be used by backend for layout labels with wrapping words. }
     function GetProposedLabelWidth(const AParameter: TMapParameter;
-                     AAverageCharWidth: Double;
-                     AObjectWidth: Double;
-                     AStringLength: Integer): Double; virtual;
+                     AAverageCharWidth: TReal;
+                     AObjectWidth: TReal;
+                     AStringLength: Integer): TReal; virtual;
 
     procedure DrawWay(AStyleConfig: TStyleConfig;
                      const AProjection: TProjection;
@@ -634,14 +638,14 @@ type
       AStyle: TIconStyle): Boolean; override;
 
     function GetFontHeight(const AProjection: TProjection;
-      const AParameter: TMapParameter; AFontSize: Double): Double; override;
+      const AParameter: TMapParameter; AFontSize: TReal): TReal; override;
 
     procedure DrawGround(const AProjection: TProjection;
       const AParameter: TMapParameter; const AStyle: TFillStyle); override;
 
     procedure RegisterRegularLabel(const AProjection: TProjection;
       const AParameter: TMapParameter; const ALabels: TLabelDataList;
-      const APosition: TVertex2D; AObjectWidth: Double); override;
+      const APosition: TVertex2D; AObjectWidth: TReal); override;
 
     procedure RegisterContourLabel(const AProjection: TProjection;
       const AParameter: TMapParameter; const ALabel: TPathLabelData;
@@ -650,22 +654,22 @@ type
     procedure DrawLabels(const AProjection: TProjection;
       const AParameter: TMapParameter; const AData: TMapData); override;
 
-    procedure DrawIcon(AStyle: TIconStyle; ACenterX, ACenterY: Double;
-      AWidth, Aheight: Double); override;
+    procedure DrawIcon(AStyle: TIconStyle; ACenterX, ACenterY: TReal;
+      AWidth, Aheight: TReal); override;
 
     procedure DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
-      X, Y: Double); override;
+      X, Y: TReal); override;
 
     procedure DrawPath(const AProjection: TProjection;
-      const AParameter: TMapParameter; const AColor: TMapColor; AWidth: Double;
-      const ADash: array of Double; AStartCap: TLineCapStyle;
+      const AParameter: TMapParameter; const AColor: TMapColor; AWidth: TReal;
+      const ADash: array of TReal; AStartCap: TLineCapStyle;
       AEndCap: TLineCapStyle; ATransStart, ATransEnd: Integer); override;
 
     procedure DrawContourSymbol(const AProjection: TProjection;
       const AParameter: TMapParameter; const ASymbol: TMapSymbol;
-      ASpace: Double; ATransStart, ATransEnd: Integer); override;
+      ASpace: TReal; ATransStart, ATransEnd: Integer); override;
 
     procedure DrawArea(const AProjection: TProjection;
       const AParameter: TMapParameter; const AData: TAreaData); override;
@@ -728,19 +732,24 @@ begin
     Result := -1;
 end;
 
-function AreaSorter(const A, B: TAreaData): Boolean;
+function CompareAreaData(const A, B: TAreaData): Integer;
 begin
+  if A.TypeInfo.ZOrder > B.TypeInfo.ZOrder then
+    Exit(1)
+  else if A.TypeInfo.ZOrder < B.TypeInfo.ZOrder then
+    Exit(-1);
+
   if Assigned(A.FillStyle) and Assigned(B.FillStyle) then
   begin
     if A.FillStyle.FillColor.IsSolid() and (not B.FillStyle.FillColor.IsSolid()) then
-      Exit(True)
+      Exit(1)
     else if (not A.FillStyle.FillColor.IsSolid()) and B.FillStyle.FillColor.IsSolid() then
-      Exit(False);
+      Exit(-1);
   end
   else if Assigned(A.FillStyle) then
-    Exit(True)
+    Exit(1)
   else if Assigned(B.FillStyle) then
-    Exit(False);
+    Exit(-1);
 
   if (A.BoundingBox.MinCoord.Lon = B.BoundingBox.MinCoord.Lon) then
   begin
@@ -755,35 +764,39 @@ begin
            *  - in one as outer ring (type of relation is used) and in second relation as inner ring.
            * In such case, we want to draw area with outer type after that one of inner type
            *)
-          Result := ((not A.IsOuter) and B.isOuter);
+          if ((not A.IsOuter) and B.isOuter) then
+            Result := 1
+          else
+            Result := 0;
         end
         else
-          Result := (A.BoundingBox.MaxCoord.Lat > B.BoundingBox.MaxCoord.Lat);
+          Result := Trunc(A.BoundingBox.MaxCoord.Lat - B.BoundingBox.MaxCoord.Lat);
       end
       else
-        Result := (A.BoundingBox.MinCoord.Lat < B.BoundingBox.MinCoord.Lat);
+        Result := Trunc(A.BoundingBox.MinCoord.Lat - B.BoundingBox.MinCoord.Lat);
     end
     else
-      Result := (A.BoundingBox.MaxCoord.Lon > B.BoundingBox.MaxCoord.Lon);
+      Result := Trunc(A.BoundingBox.MaxCoord.Lon - B.BoundingBox.MaxCoord.Lon);
   end
   else
-    Result := (A.BoundingBox.MinCoord.Lon < B.BoundingBox.MinCoord.Lon);
+    Result := Trunc(A.BoundingBox.MinCoord.Lon - B.BoundingBox.MinCoord.Lon);
+
 end;
 
-function FMod(a, b: Double): Double;
+function FMod(a, b: TReal): TReal;
 begin
   Result := a - b * Int(a / b);
 end;
 
 procedure GetGridPoints(const ANodes: TGeoPointArray;
-  AGridSizeHoriz, AGridSizeVert: Double;
+  AGridSizeHoriz, AGridSizeVert: TReal;
   var AIntersections: TGeoPointArray);
 var
   i, n, cellXStart, cellYStart, cellXEnd, cellYEnd: Integer;
-  lower, upper: Double;
+  lower, upper: TReal;
   xIndex, yIndex: Integer;
   intersection: TGeoPoint;
-  xCoord, yCoord: Double;
+  xCoord, yCoord: TReal;
 begin
   Assert(Length(ANodes) >= 2);
 
@@ -845,10 +858,10 @@ end;
 
 { TContourLabelHelper }
 
-function TContourLabelHelper.Init(APathLength: Double; ATextWidth: Double
+function TContourLabelHelper.Init(APathLength: TReal; ATextWidth: TReal
   ): Boolean;
 var
-  a: Double;
+  a: TReal;
 begin
   Result := False;
   PathLength := APathLength;
@@ -865,12 +878,12 @@ begin
   Result := (CurrentOffset < PathLength);
 end;
 
-function TContourLabelHelper.GetCurrentOffset(): Double;
+function TContourLabelHelper.GetCurrentOffset(): TReal;
 begin
   Result := CurrentOffset;
 end;
 
-procedure TContourLabelHelper.AdvancePartial(AWidth: Double);
+procedure TContourLabelHelper.AdvancePartial(AWidth: TReal);
 begin
   CurrentOffset := CurrentOffset + AWidth;
 end;
@@ -905,7 +918,7 @@ procedure TMapPainter.PrepareNode(const AStyleConfig: TStyleConfig;
   const ANode: TMapNode);
 var
   IconStyle: TIconStyle;
-  x, y: Double;
+  x, y: TReal;
 begin
   IconStyle := AStyleConfig.GetNodeIconStyle(ANode.FeatureValueBuffer, AProjection);
 
@@ -928,9 +941,9 @@ procedure TMapPainter.PrepareNodes(const AStyleConfig: TStyleConfig;
 var
   i: Integer;
   {$ifdef DEBUG_NODE_DRAW}
-  times: array of Double;
+  times: array of TReal;
   nodeTimer: TStopClockNano;
-  overallTime: Double;
+  overallTime: TReal;
   {$endif}
 begin
 {$ifdef DEBUG_NODE_DRAW}
@@ -977,7 +990,7 @@ function TMapPainter.CalculatePaths(const AStyleConfig: TStyleConfig;
 var
   IsTransformed: Boolean;
   TransStart, TransEnd: Integer;
-  MainSlotWidth, LineWidth, LineOffset: Double;
+  MainSlotWidth, LineWidth, LineOffset: TReal;
   btAccessValue, btLanesValue, btWidthValue, btLayerValue, btLanes, btLane: Byte;
   i, ii: Integer;
   LineStyle: TLineStyle;
@@ -985,7 +998,7 @@ var
   nodes: TGeoPointArray;
   Segment: TSegmentGeoBox;
   WayPathData: TWayPathData;
-  LanesSpace, LaneOffset: Double;
+  LanesSpace, LaneOffset: TReal;
 begin
   Result := False;
   if (not IsVisibleWay(AProjection, AWay.GetBoundingBox(), 10)) then
@@ -1020,8 +1033,8 @@ begin
         LineWidth := LineWidth + GetProjectedWidth(AProjection, LineStyle.Width);
     end;
 
-    if (LineStyle.DisplayWidth > 0.0) then
-      LineWidth := LineWidth + AProjection.ConvertWidthToPixel(LineStyle.DisplayWidth);
+    if (LineStyle.DisplayWidthMM > 0.0) then
+      LineWidth := LineWidth + AProjection.MillimetersToPixels(LineStyle.DisplayWidthMM);
 
     if (lineStyle.Slot = '') then
       MainSlotWidth := LineWidth;
@@ -1053,7 +1066,7 @@ begin
       LineOffset := LineOffset + GetProjectedWidth(AProjection, LineStyle.Offset);
 
     if (LineStyle.DisplayOffset <> 0.0) then
-      LineOffset := LineOffset + AProjection.ConvertWidthToPixel(LineStyle.DisplayOffset);
+      LineOffset := LineOffset + AProjection.MillimetersToPixels(LineStyle.DisplayOffset);
 
     WayData.Ref := ARef;
     WayData.LineWidth := LineWidth;
@@ -1246,7 +1259,7 @@ var
   BorderStyle: TBorderStyle;
   FillProcessor: TFillStyleProcessor;
   AreaData: TAreaData;
-  dBorderWidth, dOffset: Double;
+  dBorderWidth, dOffset: TReal;
   ClipCount: Integer;
   TransStart, TransEnd: Integer;
   ZoomLevel: Byte;
@@ -1381,7 +1394,7 @@ begin
       IsFoundRing := True;
 
       if Assigned(BorderStyle) then
-        dBorderWidth := BorderStyle.Width
+        dBorderWidth := BorderStyle.WidthMM
       else
         dBorderWidth := 0.0;
 
@@ -1432,7 +1445,7 @@ begin
           dOffset := dOffset + GetProjectedWidth(AProjection, BorderStyle.Offset);
 
         if (BorderStyle.DisplayOffset <> 0.0) then
-          dOffset := dOffset + AProjection.ConvertWidthToPixel(BorderStyle.DisplayOffset);
+          dOffset := dOffset + AProjection.MillimetersToPixels(BorderStyle.DisplayOffset);
 
         if (dOffset <> 0.0) then
           FTransBuffer.GenerateParallelWay(TransStart, TransEnd,
@@ -1461,7 +1474,7 @@ procedure TMapPainter.PrepareAreaLabel(const AStyleConfig: TStyleConfig;
   const AAreaData: TAreaData);
 var
   IconStyle: TIconStyle;
-  x1, x2, y1, y2: Double;
+  x1, x2, y1, y2: TReal;
   AreaCenter: TVertex2D;
 begin
   IconStyle := AStyleConfig.GetAreaIconStyle(AAreaData.pBuffer^, AProjection);
@@ -1512,7 +1525,7 @@ begin
       PrepareArea(AStyleConfig, AProjection, AParameter, AData.AreaList[i]);
   end;
 
-  FAreaDataList.Sort(@AreaSorter);
+  FAreaDataList.Sort(@CompareAreaData);
 
   // POI Areas
   FCurItemDesc := 'PoiArea';
@@ -1531,7 +1544,7 @@ procedure TMapPainter.RegisterPointWayLabel(const AProjection: TProjection;
 var
   LbStyle: TLabelStyle;
   gridPoints: TGeoPointArray;
-  x, y: Double;
+  x, y: TReal;
   i: Integer;
   LbBox: TLabelData;
   LbList: TLabelDataList;
@@ -1552,7 +1565,7 @@ begin
     LbBox.Init();
     LbBox.Priority := LbStyle.Priority;
     LbBox.Alpha := 1.0;
-    LbBox.FontSize := LbStyle.Size;
+    LbBox.FontSize := AProjection.MillimetersToPixels(LbStyle.SizeMM);
     LbBox.Style := LbStyle;
     LbBox.Text := AText;
 
@@ -1567,16 +1580,16 @@ function TMapPainter.LayoutPointLabels(const AProjection: TProjection;
   const ABuffer: TFeatureValueBuffer;
   const AIconStyle: TIconStyle;
   const ATextStyles: TTextStyleList;
-  X, Y: Double;
-  AObjectWidth: Double;
-  AObjectHeight: Double): Boolean;
+  X, Y: TReal;
+  AObjectWidth: TReal;
+  AObjectHeight: TReal): Boolean;
 var
   LbLayoutData: TLabelDataList;
   LbData: TLabelData;
   TextStyle: TTextStyle;
   s, sLabel: string;
-  dFactor: Double;
-  dHeight, dAlpha, dMaxHeight, dMinAlpha, dNormHeight: Double;
+  dFactor: TReal;
+  dHeight, dAlpha, dMaxHeight, dMinAlpha, dNormHeight: TReal;
 begin
   Result := False;
   if Assigned(AIconStyle) then
@@ -1609,8 +1622,8 @@ begin
       // TODO: add priority to symbols
       //LbData.Priority := AIconStyle.Priority;
 
-      LbData.IconWidth := AProjection.ConvertWidthToPixel(AIconStyle.Symbol.Width);
-      LbData.IconHeight := AProjection.ConvertWidthToPixel(AIconStyle.Symbol.Height);
+      LbData.IconWidth := AProjection.MillimetersToPixels(AIconStyle.Symbol.Width);
+      LbData.IconHeight := AProjection.MillimetersToPixels(AIconStyle.Symbol.Height);
 
       LbLayoutData.Add(LbData);
     end;
@@ -1646,7 +1659,9 @@ begin
     then
     begin
       dFactor := AProjection.Magnification.Level - TextStyle.ScaleAndFadeMagLevel;
-      LbData.FontSize := TextStyle.Size * power(1.5, dFactor);
+      LbData.FontSize := AProjection.MillimetersToPixels(TextStyle.SizeMM);
+      if dFactor > 1 then
+        LbData.FontSize := LbData.FontSize * power(1.5, dFactor);
 
       LbData.Alpha := min(TextStyle.TextColor.A / dFactor, 1.0);
     end
@@ -1660,7 +1675,8 @@ begin
 
       // Retricts the dHeight of a label to dMaxHeight
       dAlpha := TextStyle.TextColor.A;
-      dMaxHeight := AProjection.Height / 5.0;
+      //dMaxHeight := AProjection.Height / 5.0;
+      dMaxHeight := AProjection.MillimetersToPixels(AParameter.FontSizeMax);
 
       if (dHeight > dMaxHeight) then
       begin
@@ -1676,7 +1692,8 @@ begin
     end
     else
     begin
-      LbData.FontSize := TextStyle.Size;
+      //LbData.FontSize := TextStyle.Size;
+      LbData.FontSize := AProjection.MillimetersToPixels(TextStyle.SizeMM);
       LbData.Alpha := TextStyle.TextColor.A;
     end;
 
@@ -1710,7 +1727,7 @@ function TMapPainter.DrawWayDecoration(const AStyleConfig: TStyleConfig;
   const AData: TWayPathData): Boolean;
 var
   PathSymbolStyle: TPathSymbolStyle;
-  lineOffset, symbolSpace: Double;
+  lineOffset, symbolSpace: TReal;
   transStart, transEnd: Integer;
 begin
   Result := False;
@@ -1722,13 +1739,13 @@ begin
   lineOffset := 0.0;
   transStart := AData.TransStart;
   transEnd := AData.TransEnd;
-  symbolSpace := AProjection.ConvertWidthToPixel(PathSymbolStyle.SymbolSpace);
+  symbolSpace := AProjection.MillimetersToPixels(PathSymbolStyle.SymbolSpace);
 
   if (PathSymbolStyle.Offset <> 0.0) then
     lineOffset := lineOffset + GetProjectedWidth(AProjection, PathSymbolStyle.Offset);
 
   if (PathSymbolStyle.DisplayOffset <> 0.0) then
-    lineOffset := lineOffset + AProjection.ConvertWidthToPixel(PathSymbolStyle.DisplayOffset);
+    lineOffset := lineOffset + AProjection.MillimetersToPixels(PathSymbolStyle.DisplayOffset);
 
   if (lineOffset <> 0.0) then
   begin
@@ -1765,8 +1782,13 @@ begin
   end;
 
   sLabel := GetLabelText(ShieldStyle.ShieldStyle.FeatureType, AParameter, AData.FeatureValueBuffer);
+  if ShieldStyle.ShieldStyle.SizeMM = 0 then
+    ShieldStyle.ShieldStyle.SizeMM := AParameter.FontSize;
 
-  if (sLabel = '') or (Length(AData.Nodes) < 2) then
+  if (sLabel = '')
+  or (Length(AData.Nodes) < 2)
+  //or (ShieldStyle.ShieldStyle.Size < 4)
+  then
   begin
     AData.DrawOptions.IsTextLabelVisible := False;
     Exit;
@@ -1786,7 +1808,7 @@ function TMapPainter.DrawWayContourLabel(const AStyleConfig: TStyleConfig;
   const AData: TWayPathData): Boolean;
 var
   PathTextStyle: TPathTextStyle;
-  lineOffset: Double;
+  lineOffset: TReal;
   transStart, transEnd: Integer;
   sLabel: string;
   LabelData: TPathLabelData;
@@ -1818,7 +1840,7 @@ begin
     lineOffset := lineOffset + GetProjectedWidth(AProjection, PathTextStyle.Offset);
 
   if (PathTextStyle.DisplayOffset <> 0.0) then
-    lineOffset := lineOffset + AProjection.ConvertWidthToPixel(PathTextStyle.DisplayOffset);
+    lineOffset := lineOffset + AProjection.MillimetersToPixels(PathTextStyle.DisplayOffset);
 
   if (lineOffset <> 0.0) then
   begin
@@ -1853,7 +1875,7 @@ function TMapPainter.DrawAreaBorderLabel(const AStyleConfig: TStyleConfig;
   const AAreaData: TAreaData): Boolean;
 var
   BorderTextStyle: TPathTextStyle;
-  lineOffset: Double;
+  lineOffset: TReal;
   transStart, transEnd: Integer;
   sLabel: string;
   helper: TContourLabelHelper;
@@ -1885,7 +1907,7 @@ begin
     lineOffset := lineOffset + GetProjectedWidth(AProjection, BorderTextStyle.Offset);
 
   if (borderTextStyle.DisplayOffset <> 0.0) then
-    lineOffset := lineOffset + AProjection.ConvertWidthToPixel(BorderTextStyle.DisplayOffset);
+    lineOffset := lineOffset + AProjection.MillimetersToPixels(BorderTextStyle.DisplayOffset);
 
   if (lineOffset <> 0.0) then
     FTransBuffer.GenerateParallelWay(transStart,
@@ -1920,9 +1942,9 @@ function TMapPainter.DrawAreaBorderSymbol(const AStyleConfig: TStyleConfig;
   const AAreaData: TAreaData): Boolean;
 var
   BorderSymbolStyle: TPathSymbolStyle;
-  lineOffset: Double;
+  lineOffset: TReal;
   transStart, transEnd: Integer;
-  symbolSpace: Double;
+  symbolSpace: TReal;
 begin
   Result := False;
   BorderSymbolStyle := AStyleConfig.GetAreaBorderSymbolStyle(AAreaData.pBuffer^, AProjection);
@@ -1933,13 +1955,13 @@ begin
   lineOffset := 0.0;
   transStart := AAreaData.TransStart;
   transEnd := AAreaData.TransEnd;
-  symbolSpace := AProjection.ConvertWidthToPixel(BorderSymbolStyle.SymbolSpace);
+  symbolSpace := AProjection.MillimetersToPixels(BorderSymbolStyle.SymbolSpace);
 
   if (BorderSymbolStyle.Offset <> 0.0) then
     lineOffset := lineOffset + GetProjectedWidth(AProjection, BorderSymbolStyle.Offset);
 
   if (BorderSymbolStyle.DisplayOffset <> 0.0) then
-    lineOffset := lineOffset + AProjection.ConvertWidthToPixel(BorderSymbolStyle.DisplayOffset);
+    lineOffset := lineOffset + AProjection.MillimetersToPixels(BorderSymbolStyle.DisplayOffset);
 
   if (lineOffset <> 0.0) then
   begin
@@ -2012,7 +2034,7 @@ begin
     WayItem.TransStart := TransStart;
     WayItem.TransEnd := TransEnd;
     WayItem.LineWidth := GetProjectedWidth(AProjection,
-                                     AProjection.ConvertWidthToPixel(AOsmTileLine.DisplayWidth),
+                                     AProjection.MillimetersToPixels(AOsmTileLine.DisplayWidthMM),
                                      AOsmTileLine.Width);
     WayItem.IsStartClosed := False;
     WayItem.IsEndClosed := False;
@@ -2045,7 +2067,7 @@ begin
     WayItem.TransStart := TransStart;
     WayItem.TransEnd := TransEnd;
     WayItem.LineWidth:= GetProjectedWidth(AProjection,
-                                     AProjection.ConvertWidthToPixel(AOsmTileLine.DisplayWidth),
+                                     AProjection.MillimetersToPixels(AOsmTileLine.DisplayWidthMM),
                                      AOsmTileLine.Width);
     WayItem.IsStartClosed := False;
     WayItem.IsEndClosed := False;
@@ -2057,10 +2079,10 @@ end;
 procedure TMapPainter.InitializeRender(const AProjection: TProjection;
   const AParameter: TMapParameter; const AData: TMapData);
 begin
-  FErrorTolerancePixel := AProjection.ConvertWidthToPixel(AParameter.IsOptimizeErrorToleranceMm);
-  FAreaMinDimension    := AProjection.ConvertWidthToPixel(AParameter.AreaMinDimensionMM);
-  FContourLabelOffset  := AProjection.ConvertWidthToPixel(AParameter.ContourLabelOffset);
-  FContourLabelSpace   := AProjection.ConvertWidthToPixel(AParameter.ContourLabelSpace);
+  FErrorTolerancePixel := AProjection.MillimetersToPixels(AParameter.IsOptimizeErrorToleranceMm);
+  FAreaMinDimension    := AProjection.MillimetersToPixels(AParameter.AreaMinDimensionMM);
+  FContourLabelOffset  := AProjection.MillimetersToPixels(AParameter.ContourLabelOffset);
+  FContourLabelSpace   := AProjection.MillimetersToPixels(AParameter.ContourLabelSpace);
 
   FShieldGridSizeHoriz := 360.0 / (power(2, AProjection.Magnification.Level+1));
   FShieldGridSizeVert  := 180.0 / (power(2, AProjection.Magnification.Level+1));
@@ -2068,7 +2090,7 @@ begin
   FTransBuffer.Reset();
   { TODO : ivestigate }
   //FStandardFontHeight    := GetFontHeight(AProjection, AParameter, 1.0);
-  FStandardFontHeight := AProjection.ConvertWidthToPixel(AParameter.FontSize);
+  FStandardFontHeight := AProjection.MillimetersToPixels(AParameter.FontSize);
 end;
 
 procedure TMapPainter.DumpStatistics(const AProjection: TProjection;
@@ -2150,8 +2172,8 @@ var
   tile: TGroundTile;
   areaData: TAreaData;
   minCoord, maxCoord: TGeoPoint;
-  lat, lon: Double;
-  x, y, px, py: Double;
+  lat, lon: TReal;
+  x, y, px, py: TReal;
   lineStart, lineEnd: Integer;
   wd: TWayData;
 begin
@@ -2312,7 +2334,7 @@ begin
             wd.TransStart := iStart + lineStart;
             wd.TransEnd := iStart + lineEnd;
             wd.LineWidth := GetProjectedWidth(AProjection,
-                                           AProjection.ConvertWidthToPixel(coastlineLine.DisplayWidth),
+                                           AProjection.MillimetersToPixels(coastlineLine.DisplayWidthMM),
                                            coastlineLine.Width);
             wd.IsStartClosed := False;
             wd.IsEndClosed := False;
@@ -2399,7 +2421,7 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    DrawArea(AProjection, AParameter, FAreaDataList.Items[i]);
+    DrawArea(AProjection, AParameter, FAreaDataList.PItems[i]^);
   end;
 
   if AParameter.IsDebugPerformance then
@@ -2500,7 +2522,7 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    pAreaData := Addr(FAreaDataList.Items[i]);
+    pAreaData := FAreaDataList.PItems[i];
     if Assigned(pAreaData^.pBuffer) and pAreaData^.pDrawOptions^.IsTextLabelVisible then
     begin
       PrepareAreaLabel(FStyleConfig, AProjection, AParameter, pAreaData^);
@@ -2529,9 +2551,9 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    if Assigned(FAreaDataList.Items[i].pBuffer) and FAreaDataList.Items[i].pDrawOptions^.IsBorderLabelVisible then
+    if Assigned(FAreaDataList.PItems[i]^.pBuffer) and FAreaDataList.PItems[i]^.pDrawOptions^.IsBorderLabelVisible then
     begin
-      if DrawAreaBorderLabel(FStyleConfig, AProjection, AParameter, FAreaDataList.Items[i]) then
+      if DrawAreaBorderLabel(FStyleConfig, AProjection, AParameter, FAreaDataList.PItems[i]^) then
         Inc(n);
     end;
   end;
@@ -2557,9 +2579,9 @@ begin
   for i := 0 to FAreaDataList.Count-1 do
   begin
     FCurItemIndex := i;
-    if Assigned(FAreaDataList.Items[i].pBuffer) then
+    if Assigned(FAreaDataList.PItems[i]^.pBuffer) then
     begin
-      if DrawAreaBorderSymbol(FStyleConfig, AProjection, AParameter, FAreaDataList.Items[i]) then
+      if DrawAreaBorderSymbol(FStyleConfig, AProjection, AParameter, FAreaDataList.PItems[i]^) then
         Inc(n);
     end;
   end;
@@ -2597,9 +2619,9 @@ begin
 end;
 
 function TMapPainter.IsVisibleArea(const AProjection: TProjection;
-  const ABoundingBox: TGeoBox; APixelOffset: Double): Boolean;
+  const ABoundingBox: TGeoBox; APixelOffset: TReal): Boolean;
 var
-  x, y, xMin, xMax, yMin, yMax: Double;
+  x, y, xMin, xMax, yMin, yMax: TReal;
 begin
   Result := False;
   if (not ABoundingBox.Valid) then
@@ -2650,9 +2672,9 @@ begin
 end;
 
 function TMapPainter.IsVisibleWay(const AProjection: TProjection;
-  const ABoundingBox: TGeoBox; APixelOffset: Double): Boolean;
+  const ABoundingBox: TGeoBox; APixelOffset: TReal): Boolean;
 var
-  x, y, xMin, xMax, yMin, yMax: Double;
+  x, y, xMin, xMax, yMin, yMax: TReal;
 begin
   Result := False;
   if (not ABoundingBox.Valid) then
@@ -2700,13 +2722,13 @@ begin
 end;
 
 procedure TMapPainter.Transform(const AProjection: TProjection;
-  const AParameter: TMapParameter; const ACoord: TGeoPoint; var X, Y: Double);
+  const AParameter: TMapParameter; const ACoord: TGeoPoint; var X, Y: TReal);
 begin
   AProjection.GeoToPixel(ACoord, X, Y);
 end;
 
 function TMapPainter.GetProjectedWidth(const AProjection: TProjection;
-  AMinPixel, AWidth: Double): Double;
+  AMinPixel, AWidth: TReal): TReal;
 begin
   Result := AWidth / AProjection.PixelSize;
 
@@ -2715,7 +2737,7 @@ begin
 end;
 
 function TMapPainter.GetProjectedWidth(const AProjection: TProjection;
-  AWidth: Double): Double;
+  AWidth: TReal): TReal;
 begin
   Result := AWidth / AProjection.PixelSize;
 end;
@@ -2735,7 +2757,7 @@ begin
 end;
 
 function TMapPainter.GetProposedLabelWidth(const AParameter: TMapParameter;
-  AAverageCharWidth: Double; AObjectWidth: Double; AStringLength: Integer): Double;
+  AAverageCharWidth: TReal; AObjectWidth: TReal; AStringLength: Integer): TReal;
 begin
   // If there is just a few characters (less than LabelLineMinCharCount)
   // we should not wrap the words at all.
@@ -2830,7 +2852,7 @@ begin
   FDebugLabel.Style := tssNormal;
   FDebugLabel.Priority := 0;
   FDebugLabel.TextColor.Init(0, 0, 0, 0.9);
-  FDebugLabel.Size := 0.7;
+  FDebugLabel.SizeMM := 0.7;
 
   {
   FStepMethods[rsInitialize] := @InitializeRender;
@@ -2951,14 +2973,38 @@ end;
 
 function TAreaDataList.GetCapacity: Integer;
 begin
-  Result := Length(Items);
+  Result := Length(FItems);
 end;
 
 procedure TAreaDataList.SetCapacity(AValue: Integer);
+var
+  i: Integer;
 begin
-  SetLength(Items, AValue);
+  // removed positions
+  i := FCount-1;
+  while i >= AValue do
+  begin
+    Dispose(FItems[i]);
+    Dec(i);
+  end;
+
+  SetLength(FItems, AValue);
+
+  // added positions
+  i := FCount;
+  while i < AValue do
+  begin
+    New(FItems[i]);
+    Inc(i);
+  end;
+
   if FCount > AValue then
     FCount := AValue;
+end;
+
+function TAreaDataList.GetPItem(AIndex: Integer): PAreaData;
+begin
+  Result := FItems[AIndex];
 end;
 
 procedure TAreaDataList.Clear();
@@ -2971,16 +3017,67 @@ begin
   Result := FCount;
   if FCount >= Capacity then
   begin
-    SetLength(Items, (FCount * 3 div 2) + 1);
+    //SetLength(FItems, (FCount * 3 div 2) + 1);
+    SetCapacity((FCount * 3 div 2) + 1);
   end;
-  Items[FCount] := AItem;
+  FItems[FCount]^ := AItem;
   Inc(FCount);
 end;
 
-procedure TAreaDataList.Sort(ASorter: TAreaSorter);
+function CompareAreas(const Area1, Area2): Integer;
+begin
+  Result := CompareAreaData(PAreaData(Area1)^, PAreaData(Area2)^);
+end;
+
+procedure TAreaDataList.QSort(L, R: Integer);
+var
+  I, J : Longint;
+  P, Q : PAreaData;
+begin
+ repeat
+   I := L;
+   J := R;
+   P := FItems[ (L + R) div 2 ];
+   repeat
+     while CompareAreaData(P^, FItems[i]^) > 0 do
+       I := I + 1;
+     while CompareAreaData(P^, FItems[J]^) < 0 do
+       J := J - 1;
+     If I <= J then
+     begin
+       Q := FItems[I];
+       FItems[I] := FItems[J];
+       FItems[J] := Q;
+       I := I + 1;
+       J := J - 1;
+     end;
+   until I > J;
+   // sort the smaller range recursively
+   // sort the bigger range via the loop
+   // Reasons: memory usage is O(log(n)) instead of O(n) and loop is faster than recursion
+   if J - L < R - I then
+   begin
+     if L < J then
+       QSort(L, J);
+     L := I;
+   end
+   else
+   begin
+     if I < R then
+       QSort(I, R);
+     R := J;
+   end;
+ until L >= R;
+end;
+
+procedure TAreaDataList.Sort(ASorter: TAreaDataCompare);
 begin
   //Assert(False, 'not implemented');
   { TODO : implement }
+  //TList.Sort();
+  //AnySort(FItems, FCount, SizeOf(PAreaData), @CompareAreas);
+ if FCount > 1 then
+   QSort(0, FCount-1);
 end;
 
 { TWayPathDataList }
@@ -3098,7 +3195,7 @@ begin
 end;
 
 function TMapPainterNoOp.GetFontHeight(const AProjection: TProjection;
-  const AParameter: TMapParameter; AFontSize: Double): Double;
+  const AParameter: TMapParameter; AFontSize: TReal): TReal;
 const
   // Height of the font in pixel in relation to the given fontSize
   FONT_HEIGHT_FACTOR = 10.0;
@@ -3114,7 +3211,7 @@ end;
 
 procedure TMapPainterNoOp.RegisterRegularLabel(const AProjection: TProjection;
   const AParameter: TMapParameter; const ALabels: TLabelDataList;
-  const APosition: TVertex2D; AObjectWidth: Double);
+  const APosition: TVertex2D; AObjectWidth: TReal);
 begin
   // no code
 end;
@@ -3133,7 +3230,7 @@ begin
 end;
 
 procedure TMapPainterNoOp.DrawIcon(AStyle: TIconStyle; ACenterX,
-  ACenterY: Double; AWidth, Aheight: Double);
+  ACenterY: TReal; AWidth, Aheight: TReal);
 begin
   // no code
 end;
@@ -3141,21 +3238,21 @@ end;
 procedure TMapPainterNoOp.DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
-      X, Y: Double);
+      X, Y: TReal);
 begin
   // no code
 end;
 
 procedure TMapPainterNoOp.DrawPath(const AProjection: TProjection;
-  const AParameter: TMapParameter; const AColor: TMapColor; AWidth: Double;
-  const ADash: array of Double; AStartCap: TLineCapStyle;
+  const AParameter: TMapParameter; const AColor: TMapColor; AWidth: TReal;
+  const ADash: array of TReal; AStartCap: TLineCapStyle;
   AEndCap: TLineCapStyle; ATransStart, ATransEnd: Integer);
 begin
   // no code
 end;
 
 procedure TMapPainterNoOp.DrawContourSymbol(const AProjection: TProjection;
-  const AParameter: TMapParameter; const ASymbol: TMapSymbol; ASpace: Double;
+  const AParameter: TMapParameter; const ASymbol: TMapSymbol; ASpace: TReal;
   ATransStart, ATransEnd: Integer);
 begin
   // no code

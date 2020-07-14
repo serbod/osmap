@@ -117,9 +117,9 @@ type
     Prev: TMapDBId;    // The file offset of the previous route node
     Obj: TObjectFileRef; // The object (way/area) visited from the current route node
 
-    CurrentCost: Double;  // The cost of the current up to the current node
-    EstimateCost: Double; // The estimated cost from here to the target
-    OverallCost: Double;  // The overall costs (currentCost+estimateCost)
+    CurrentCost: TReal;  // The cost of the current up to the current node
+    EstimateCost: TReal; // The estimated cost from here to the target
+    OverallCost: TReal;  // The overall costs (currentCost+estimateCost)
 
     IsAccess: Boolean;    // Flags to signal, if we had access ("access restrictions") to this node
 
@@ -259,24 +259,25 @@ type
     function CanUseBackward(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID; AWay: TMapWay): Boolean; virtual; abstract;
 
     function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      const ARouteNode: TRouteNode; APathIndex: Integer): Double; virtual; overload; abstract;
+      const ARouteNode: TRouteNode; APathIndex: Integer): TReal; virtual; overload; abstract;
     function GetCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      AWay: TMapWay; AWayLength: TDistance): Double; virtual; overload; abstract;
+      AWay: TMapWay; AWayLength: TDistance): TReal; virtual; overload; abstract;
 
     function GetEstimateCosts(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; virtual; abstract;
+      ATargetDistance: TDistance): TReal; virtual; abstract;
     function GetCostLimit(AProfile: TRoutingProfile; ADatabase: TMapDatabaseID;
-      ATargetDistance: TDistance): Double; virtual; abstract;
+      ATargetDistance: TDistance): TReal; virtual; abstract;
 
     function GetRouteNodes(const ARouteNodeIds: TMapDBIdArray; ARouteNodeMap: TRouteNodeMapById): Boolean; virtual; abstract;
     { Return the route node for the given database offset }
     function GetRouteNode(const AId: TMapDBId; out ANode: TRouteNode): Boolean; virtual; abstract;
 
+    { !! offsets only for data files
     function GetWayByOffset(const AOffset: TMapDBFileOffset): TMapWay; virtual; abstract;
     function GetWaysByOffset(const AOffsetList: TMapDBFileOffsetArray; AWayMap: TMapWayDict): Boolean; virtual; abstract;
 
     function GetAreaByOffset(const AOffset: TMapDBFileOffset): TMapArea; virtual; abstract;
-    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual; abstract;
+    function GetAreasByOffset(const AOffsetList: TMapDBFileOffsetArray; AAreaMap: TMapAreaDict): Boolean; virtual; abstract; }
 
     function ResolveRouteDataJunctions(var ARoute: TRouteData): Boolean; virtual; abstract;
 
@@ -451,7 +452,7 @@ type
       var ANodesIgnoredCount: Integer;
       var ACurrentMaxDistance: TDistance;
       const AOverallDistance: TDistance;
-      const ACostLimit: Double): Boolean; virtual;
+      const ACostLimit: TReal): Boolean; virtual;
 
   public
     constructor Create(const AParameter: TRouterParameter);
@@ -627,25 +628,25 @@ end;
 
 function TAbstractRoutingService.GetCosts(AState: TRoutingState;
   ADatabase: TMapDatabaseID; const ARouteNode: TRouteNode;
-  APathIndex: Integer): Double;
+  APathIndex: Integer): TReal;
 begin
   Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetCosts(AState: TRoutingState;
-  ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): Double;
+  ADatabase: TMapDatabaseID; AWay: TMapWay; AWayLength: TDistance): TReal;
 begin
   Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetEstimateCosts(AState: TRoutingState;
-  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): TReal;
 begin
   Result := 0.0;
 end;
 
 function TAbstractRoutingService.GetCostLimit(AState: TRoutingState;
-  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): Double;
+  ADatabase: TMapDatabaseID; ATargetDistance: TDistance): TReal;
 begin
   Result := 0.0;
 end;
@@ -1452,19 +1453,19 @@ function TAbstractRoutingService.WalkPaths(const AState: TRoutingState;
   var ANodesIgnoredCount: Integer;
   var ACurrentMaxDistance: TDistance;
   const AOverallDistance: TDistance;
-  const ACostLimit: Double): Boolean;
+  const ACostLimit: TReal): Boolean;
 var
   dbId: TMapDatabaseId;
   i: Integer;
   path: TRouteNodePath;
   canTurnedInto: Boolean;
   exclude: TRouteNodeExclude;
-  currentCost: Double;
+  currentCost: TReal;
   openEntryIdx: Integer;
   openEntry, node: TRNode;
   nextNode: TRouteNode;
   distanceToTarget: TDistance;
-  estimateCost, overallCost: Double;
+  estimateCost, overallCost: TReal;
 begin
   dbId := ACurrent.Id.DatabaseId;
   i := 0;
@@ -1699,7 +1700,7 @@ var
   nodesLoadedCount, nodesIgnoredCount: Integer;
   maxOpenList, maxClosedSet: Integer;
   currentMaxDistance, overallDistance: TDistance;
-  overallCost, costLimit: Double;
+  overallCost, costLimit: TReal;
   clock: TStopClock;
   current: TRNode;
   currentRouteNode: TRouteNode;

@@ -126,8 +126,11 @@ type
   { from VEHICLE_ constants }
   TVehicleMask = Byte;
 
+  TReal = Real;
+  TSingle = Single;
+
   // distance in meters
-  TDistance = Double;
+  TDistance = TReal;
 
   TMagnificationLevel = LongWord;
 
@@ -136,13 +139,13 @@ type
   TMagnification = object
   private
     FLevel: TMagnificationLevel;
-    FMagnification: Double;
+    FMagnification: TReal;
     procedure SetLevel(ALevel: TMagnificationLevel);
-    procedure SetMagnification(AMagnification: Double);
+    procedure SetMagnification(AMagnification: TReal);
   public
     { Magnification level MAG_LEVEL_ }
     property Level: TMagnificationLevel read FLevel write SetLevel;
-    property Magnification: Double read FMagnification write SetMagnification;
+    property Magnification: TReal read FMagnification write SetMagnification;
 
     function IsEqual(const AValue: TMagnification): Boolean;
     function IsGreater(const AValue: TMagnification): Boolean;
@@ -221,14 +224,14 @@ type
   { Two dimensional coordinate (floating point values,
     negative coordinates possible). }
   TVertex2D = object
-    X: Double;
-    Y: Double;
+    X: TReal;
+    Y: TReal;
 
-    procedure SetValue(AX, AY: Double);
+    procedure SetValue(AX, AY: TReal);
     procedure Assign(AOther: TVertex2D);
     function IsEqual(AOther: TVertex2D): Boolean;
 
-    function DistanceTo(AOther: TVertex2D): Double;
+    function DistanceTo(AOther: TVertex2D): TReal;
   end;
 
   TVertex2DArray = array of TVertex2D;
@@ -236,11 +239,11 @@ type
   { Three dimensional coordinate (floating point values,
     negative coordinates possible). }
   TVertex3D = object
-    X: Double;
-    Y: Double;
-    Z: Double;
+    X: TReal;
+    Y: TReal;
+    Z: TReal;
 
-    procedure SetValue(AX, AY, AZ: Double);
+    procedure SetValue(AX, AY, AZ: TReal);
     procedure Assign(AOther: TVertex3D);
     function IsEqual(AOther: TVertex3D): Boolean;
   end;
@@ -254,7 +257,7 @@ type
   { Returns TObjectFileRef for given file offset and object type (area, way, node) }
   function ObjectFileRef(AOffset: TFileOffset; ARefType: TRefType): TObjectFileRef;
 
-  function Vertex2D(AX, AY: Double): TVertex2D; inline;
+  function Vertex2D(AX, AY: TReal): TVertex2D; inline;
 
   function VehicleTypesToMask(AValue: TVehicleTypes): TVehicleMask;
   function VehicleMaskToTypes(AValue: TVehicleMask): TVehicleTypes;
@@ -278,7 +281,7 @@ begin
   Result.SetValue(AOffset, ARefType);
 end;
 
-function Vertex2D(AX, AY: Double): TVertex2D;
+function Vertex2D(AX, AY: TReal): TVertex2D;
 begin
   Result.X := AX;
   Result.Y := AY;
@@ -396,7 +399,7 @@ begin
   FLevel := AValue.Level;
 end;
 
-procedure TMagnification.SetMagnification(AMagnification: Double);
+procedure TMagnification.SetMagnification(AMagnification: TReal);
 begin
   FMagnification := AMagnification;
   FLevel := Trunc(log2(AMagnification));
@@ -532,7 +535,7 @@ end;
 
 { TVertex2D }
 
-procedure TVertex2D.SetValue(AX, AY: Double);
+procedure TVertex2D.SetValue(AX, AY: TReal);
 begin
   X := AX;
   Y := AY;
@@ -549,9 +552,9 @@ begin
   Result := (X = AOther.X) and (Y = AOther.Y);
 end;
 
-function TVertex2D.DistanceTo(AOther: TVertex2D): Double;
+function TVertex2D.DistanceTo(AOther: TVertex2D): TReal;
 var
-  XD, YD: Double;
+  XD, YD: TReal;
 begin
   XD := X - AOther.X;
   YD := Y - AOther.Y;
@@ -560,7 +563,7 @@ end;
 
 { TVertex3D }
 
-procedure TVertex3D.SetValue(AX, AY, AZ: Double);
+procedure TVertex3D.SetValue(AX, AY, AZ: TReal);
 begin
   X := AX;
   Y := AY;

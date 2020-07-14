@@ -1,4 +1,4 @@
-unit OsMapPainterAgg;
+unit OsMapPainterBGRA;
 
 {$ifdef FPC}
 {$mode objfpc}{$H+}
@@ -7,10 +7,11 @@ unit OsMapPainterAgg;
 interface
 
 uses
-  Classes, SysUtils, OsMapPainter, OsMapLabels, OsMapParameters, OsMapStyles,
+  Types, Classes, SysUtils, Graphics,
+  OsMapPainter, OsMapLabels, OsMapParameters, OsMapStyles,
   OsMapTypes, OsMapTransform, OsMapGeometry, OsMapStyleConfig, OsMapProjection,
   OsMapObjects,
-  Agg2D, AggFontCacheManager, AggPathStorage, AggColor, AggBasics, AggTransAffine;
+  BGRABitmap, BGRABitmapTypes;
 
 type
   //TAggPixelFormat = TAggPixelFormat;
@@ -18,7 +19,7 @@ type
   TNativeGlyph = record
     X: TReal;
     Y: TReal;
-    AggGlyph: TAggGlyphCache;
+    //AggGlyph: TAggGlyphCache;
   end;
 
   TNativeGlyphArray = array of TNativeGlyph;
@@ -28,29 +29,30 @@ type
     Glyphs: TNativeGlyphArray;
   end; }
 
-  { TMapPainterAgg }
+  { TMapPainterBGRA }
 
-  TMapPainterAgg = class(TMapPainter)
+  TMapPainterBGRA = class(TMapPainter)
   private
-    FAgg2D: TAgg2D;
+    FBitmap: TBGRABitmap;
     FLabelLayouter: TLabelLayouter;
     FMutex: TRTLCriticalSection;
 
+    FCanvas: TCanvas;
     FFontSize: TReal;
-    FIsAlienAgg: Boolean;
+    FIsAlienBitmap: Boolean;
     FIsDrawingWayBorder: Boolean;
 
-    function GetAggRgba8(const AColor: TMapColor): TAggRgba8;
-    procedure SetAgg2d(AValue: TAgg2D);
+    function GetBGRAPixel(const AColor: TMapColor): TBGRAPixel;
+    procedure SetBitmap(AValue: TBGRABitmap);
 
     procedure SetFont(AProjection: TProjection; AParameter: TMapParameter;
       ASize: TReal); // agg::glyph_rendering ren_type = agg::glyph_ren_native_gray8
 
     procedure GetTextDimension(const AText: string; out AWidth, AHeight: TReal);
 
-    //procedure DrawText(X, Y: TReal; const AText: string);
+    procedure DrawText(X, Y: TReal; const AText: string);
 
-    procedure DrawGlyph(X, Y: TReal; const AGlyph: TAggGlyphCache);
+    //procedure DrawGlyph(X, Y: TReal; const AGlyph: TAggGlyphCache);
 
     procedure DrawGlyphVector(X, ABaselineY: TReal; const AGlyphs: TNativeGlyphArray);
 
@@ -58,6 +60,9 @@ type
       AParameter: TMapParameter;
       AStyle: TPathTextStyle;
       const AGlyphs: TMapGlyphArray);
+
+    function GetBorderColor(ABorderStyle: TBorderStyle): TBGRAPixel;
+    function GetFillColor(AFillStyle: TFillStyle): TBGRAPixel;
 
     { ex-DrawFill(), set fill and border style }
     procedure DrawFillStyle(AProjection: TProjection; AParameter: TMapParameter;
@@ -143,88 +148,97 @@ type
       AEnableWrapping: Boolean = False;
       AContourLabel: Boolean = False);
   public
-    constructor Create(const AStyleConfig: TStyleConfig);
+    constructor Create(const AStyleConfig: TStyleConfig; ACanvas: TCanvas);
     destructor Destroy; override;
 
     function DrawMap(AProjection: TProjection;
       AParameter: TMapParameter;
       AData: TMapData): Boolean; override;
 
-    property Agg2D: TAgg2D read FAgg2D write SetAgg2d;
+    //property Agg2D: TAgg2D read FAgg2D write SetAgg2d;
+    property Bitmap: TBGRABitmap read FBitmap;
   end;
 
 implementation
 
 uses Math, LazUTF8;
 
-{ TMapPainterAgg }
+{ TMapPainterBGRA }
 
-function TMapPainterAgg.GetAggRgba8(const AColor: TMapColor): TAggRgba8;
+{function TMapPainterBGRA.GetAggRgba8(const AColor: TMapColor): TAggRgba8;
 var
   AggColor: TAggColor;
 begin
   AggColor.FromRgbaDouble(AColor.R, AColor.G, AColor.B, AColor.A);
   Result := AggColor.Rgba8;
-end;
+end; }
 
-procedure TMapPainterAgg.SetAgg2d(AValue: TAgg2D);
+function TMapPainterBGRA.GetBGRAPixel(const AColor: TMapColor): TBGRAPixel;
+var
+  bR, bG, bB, bA: Byte;
 begin
-  if FAgg2D = AValue then Exit;
-  if not FIsAlienAgg then
-  begin
-    FreeAndNil(FAgg2D);
-    FIsAlienAgg := True;
-  end;
-  FAgg2D := AValue;
+  AColor.ToBytes(bR, bG, bB, bA);
+  Result.FromRGB(bR, bG, bB, bA);
 end;
 
-procedure TMapPainterAgg.SetFont(AProjection: TProjection;
+procedure TMapPainterBGRA.SetBitmap(AValue: TBGRABitmap);
+begin
+  if FBitmap = AValue then Exit;
+  if not FIsAlienBitmap then
+  begin
+    FreeAndNil(FBitmap);
+    FIsAlienBitmap := True;
+  end;
+  FBitmap := AValue;
+end;
+
+procedure TMapPainterBGRA.SetFont(AProjection: TProjection;
   AParameter: TMapParameter; ASize: TReal);
 begin
   try
-    // some bitmap format need to flip text upside-down
-    FAgg2D.FlipText := True;
-    if FFontSize <> ASize then
-    begin
-      FAgg2D.Font(PAnsiChar(AParameter.FontName), ASize, False, False, fcVector);
-      FFontSize := ASize;
-    end;
+    Bitmap.FontName := AParameter.FontName;
+    Bitmap.FontHeight := Round(ASize);
+    Bitmap.FontAntialias := True;
+
+    FFontSize := ASize;
   except
     WriteLn('Cannot load font: ', AParameter.FontName);
   end;
 end;
 
-procedure TMapPainterAgg.GetTextDimension(const AText: string; out AWidth,
+procedure TMapPainterBGRA.GetTextDimension(const AText: string; out AWidth,
   AHeight: TReal);
+var
+  SizeRec: TSize;
 begin
-  AWidth := FAgg2D.TextWidth(AText);
-  AHeight := FAgg2D.FontHeight;
+  SizeRec := Bitmap.TextSize(AText);
+  AWidth := SizeRec.cx;
+  AHeight := SizeRec.cy;
 end;
 
-{procedure TMapPainterAgg.DrawText(X, Y: TReal; const AText: string);
+procedure TMapPainterBGRA.DrawText(X, Y: TReal; const AText: string);
 var
   ws: WideString;
 begin
   //s := UTF8ToWinCP(AText);
   //s := UTF8ToSys(AText);
   //s := UTF8ToConsole(AText);
-  ws := UTF8ToUTF16(AText);
-  FAgg2D.FlipText := True;
-  FAgg2D.Text(X, Y, ws);
-end; }
-
-procedure TMapPainterAgg.DrawGlyph(X, Y: TReal; const AGlyph: TAggGlyphCache);
-begin
-  //
+  //ws := UTF8ToUTF16(AText);
+  Bitmap.TextOut(X, Y, AText, nil, False);
 end;
 
-procedure TMapPainterAgg.DrawGlyphVector(X, ABaselineY: TReal;
+{procedure TMapPainterBGRA.DrawGlyph(X, Y: TReal; const AGlyph: TAggGlyphCache);
+begin
+  //
+end; }
+
+procedure TMapPainterBGRA.DrawGlyphVector(X, ABaselineY: TReal;
   const AGlyphs: TNativeGlyphArray);
 begin
   //
 end;
 
-procedure TMapPainterAgg.DrawGlyphs(AProjection: TProjection;
+procedure TMapPainterBGRA.DrawGlyphs(AProjection: TProjection;
   AParameter: TMapParameter;
   AStyle: TPathTextStyle;
   const AGlyphs: TMapGlyphArray);
@@ -233,17 +247,17 @@ var
   layoutGlyph: TMapGlyph;
   //i: Integer;
   TextColor: TMapColor;
-  TmpFontSize: Single;
+  cPen: TBGRAPixel;
+  Angle: Integer;
 begin
   Assert(Assigned(AStyle));
   TextColor.Init(0, 0, 0, 1);
+  cPen := GetBGRAPixel(TextColor);
   //FAgg2D.FillColor := GetAggRgba8(AStyle.TextColor);
-  FAgg2D.FillColor := GetAggRgba8(TextColor);
-  FAgg2D.NoLine();
+  //Bitmap.FillColor := GetAggRgba8(TextColor);
+  //FAgg2D.NoLine();
   //FAgg2D.FlipText := True;
   //FAgg2D.LineColor := GetAggRgba8(AStyle.TextColor);
-  TmpFontSize := AProjection.MillimetersToPixels(AStyle.SizeMM);
-  SetFont(AProjection, AParameter, TmpFontSize);
 
   //matrix := TAggTransAffine.Create();
 
@@ -254,61 +268,81 @@ begin
     // contour labels should always use outline rendering
     //Assert(TNativeGlyph(layoutGlyph.Glyph).AggGlyph.DataType = gdOutline);
 
-    {matrix.Reset();
-    matrix.Rotate(layoutGlyph.Angle);
-    matrix.Translate(layoutGlyph.Position.X, layoutGlyph.Position.Y);
-
-    agg::conv_transform<AggTextCurveConverter> ftrans( *convTextCurves, matrix);
-
-    rasterizer->reset();
-    fontCacheManager->init_embedded_adaptors(layoutGlyph.glyph.aggGlyph,
-                                             0, 0);
-    rasterizer->add_path(ftrans);
-    agg::render_scanlines( *rasterizer,
-                          *scanlineP8,
-                          *renderer_aa);   }
-
-    //FAgg2D.FontHeight := layoutGlyph.Height;
-    FAgg2D.TextAngle := layoutGlyph.Angle;
-    FAgg2D.Text(layoutGlyph.Position.X,
-      layoutGlyph.Position.Y,
-      layoutGlyph.TextChar);
+    Angle := -Round(radtodeg(layoutGlyph.Angle) * 10);
+    Bitmap.TextOutAngle(
+      layoutGlyph.Position.X,
+      layoutGlyph.Position.Y - layoutGlyph.Height,
+      Angle,
+      layoutGlyph.TextChar,
+      cPen,
+      taCenter);
   end;
 end;
 
-procedure TMapPainterAgg.DrawFillStyle(AProjection: TProjection;
+function TMapPainterBGRA.GetBorderColor(ABorderStyle: TBorderStyle): TBGRAPixel;
+begin
+  if Assigned(ABorderStyle) and ABorderStyle.Color.IsVisible then
+  begin
+    Result := GetBGRAPixel(ABorderStyle.Color);
+  end
+  else
+    Result.FromRGB(0,0,0,0);
+end;
+
+function TMapPainterBGRA.GetFillColor(AFillStyle: TFillStyle): TBGRAPixel;
+begin
+  if Assigned(AFillStyle) and AFillStyle.FillColor.IsVisible then
+  begin
+    Result := GetBGRAPixel(AFillStyle.FillColor);
+  end
+  else
+    Result.FromRGB(0,0,0,0);
+end;
+
+procedure TMapPainterBGRA.DrawFillStyle(AProjection: TProjection;
+  AParameter: TMapParameter; AFillStyle: TFillStyle;
+  ABorderStyle: TBorderStyle);
+begin
+
+end;
+
+{procedure TMapPainterBGRA.DrawFillStyle(AProjection: TProjection;
   AParameter: TMapParameter;
   AFillStyle: TFillStyle;
   ABorderStyle: TBorderStyle);
 var
   borderWidth: TReal;
   i: Integer;
+  LineWidth: Single;
+  cPen, cFill: TBGRAPixel;
 begin
   if Assigned(AFillStyle) and AFillStyle.FillColor.IsVisible then
   begin
-    FAgg2D.FillColor := GetAggRgba8(AFillStyle.FillColor);
+    cFill := GetBGRAPixel(AFillStyle.FillColor);
   end
   else
-    FAgg2D.NoFill();
+    cFill.FromRGB(0,0,0,0);
 
-  FAgg2D.RemoveAllDashes();
+  //Bitmap.PenStyle := psClear;
+
+  //FAgg2D.RemoveAllDashes();
 
   if Assigned(ABorderStyle) then
   begin
-    borderWidth := AProjection.MillimetersToPixels(ABorderStyle.WidthMM);
+    borderWidth := AProjection.ConvertWidthToPixel(ABorderStyle.Width);
 
     if (borderWidth >= AParameter.LineMinWidthPixel) then
     begin
-      FAgg2D.LineColor := GetAggRgba8(ABorderStyle.Color);
+      //Bitmap.Pen. Color := GetAggRgba8(ABorderStyle.Color);
 
       if Length(ABorderStyle.Dash) = 0 then
       begin
-        FAgg2D.LineWidth := borderWidth;
+        LineWidth := borderWidth;
         FAgg2D.LineCap := lcRound;
       end
       else
       begin
-        FAgg2D.LineWidth := borderWidth;
+        LineWidth := borderWidth;
         FAgg2D.LineCap := lcButt;
         i := 0;
         while i < Length(ABorderStyle.Dash)-1 do
@@ -320,45 +354,36 @@ begin
       end;
     end;
   end;
-end;
+end; }
 
-function TMapPainterAgg.HasIcon(AStyleConfig: TStyleConfig;
+function TMapPainterBGRA.HasIcon(AStyleConfig: TStyleConfig;
   AProjection: TProjection; AParameter: TMapParameter; AStyle: TIconStyle): Boolean;
 begin
   Result := False;
 end;
 
-function TMapPainterAgg.GetFontHeight(const AProjection: TProjection;
+function TMapPainterBGRA.GetFontHeight(const AProjection: TProjection;
   const AParameter: TMapParameter; AFontSize: TReal): TReal;
 begin
   if (FFontSize <> 0) then
-    Result := FAgg2D.FontHeight / FFontSize * AFontSize
+    Result := Bitmap.FontHeight / FFontSize * AFontSize
   else
-    Result := FAgg2D.FontHeight;
+    Result := Bitmap.FontHeight;
 end;
 
-procedure TMapPainterAgg.DrawGround(const AProjection: TProjection;
+procedure TMapPainterBGRA.DrawGround(const AProjection: TProjection;
   const AParameter: TMapParameter; const AStyle: TFillStyle);
 begin
-  FAgg2D.ResetPath();
-  FAgg2D.FillColor := GetAggRgba8(AStyle.FillColor);
-  FAgg2D.FillEvenOdd := False; // FillNonZero
-
-  FAgg2D.MoveTo(0, 0);
-  FAgg2D.LineTo(AProjection.Width, 0);
-  FAgg2D.LineTo(AProjection.Width, AProjection.Height);
-  FAgg2D.LineTo(0, AProjection.Height);
-  FAgg2D.ClosePolygon();
-  FAgg2D.DrawPath(dpfFillOnly);
+  Bitmap.Rectangle(0, 0, AProjection.Width, AProjection.Height, GetBGRAPixel(AStyle.FillColor));
 end;
 
-procedure TMapPainterAgg.DrawIcon(AStyle: TIconStyle; ACenterX,
+procedure TMapPainterBGRA.DrawIcon(AStyle: TIconStyle; ACenterX,
   ACenterY: TReal; AWidth, Aheight: TReal);
 begin
   //
 end;
 
-procedure TMapPainterAgg.DrawSymbol(AProjection: TProjection;
+procedure TMapPainterBGRA.DrawSymbol(AProjection: TProjection;
       AParameter: TMapParameter;
       ASymbol: TMapSymbol;
       X, Y: TReal);
@@ -373,6 +398,10 @@ var
   i: Integer;
   Pixel: TVertex2D;
   xPos, yPos, width, height, radius: TReal;
+
+  points: array of TPointF;
+  cPen, cFill: TBGRAPixel;
+  PenWidth: Single;
 begin
   ASymbol.GetBoundingBox(minX, minY, maxX, maxY);
 
@@ -387,26 +416,20 @@ begin
       fillStyle := polygon.FillStyle;
       borderStyle := polygon.BorderStyle;
 
-      FAgg2D.ResetPath();
+      SetLength(points, Length(Polygon.Coords));
       { set fill style }
       DrawFillStyle(AProjection, AParameter, fillStyle, borderStyle);
+      cPen :=  GetBorderColor(borderStyle);
+      cFill := GetFillColor(fillStyle);
+      PenWidth := AProjection.MillimetersToPixels(borderStyle.WidthMM);
 
       for i := 0 to Length(Polygon.Coords)-1 do
       begin
         Pixel := Polygon.Coords[i];
-        if i = 0 then
-        begin
-          FAgg2D.MoveTo(X + AProjection.MillimetersToPixels(Pixel.X - centerX),
-                        Y + AProjection.MillimetersToPixels(Pixel.Y - centerY));
-        end
-        else
-        begin
-          FAgg2D.MoveTo(X + AProjection.MillimetersToPixels(Pixel.X - centerX),
-                        Y + AProjection.MillimetersToPixels(Pixel.Y - centerY));
-        end;
+        points[i].x := X + AProjection.MillimetersToPixels(Pixel.X - centerX);
+        Points[i].y := Y + AProjection.MillimetersToPixels(Pixel.Y - centerY);
       end;
-      FAgg2D.ClosePolygon();
-      FAgg2D.DrawPath(dpfFillAndStroke);
+      Bitmap.DrawPolygonAntialias(points, cPen, PenWidth, cFill);
     end
     else if (Primitive is TRectanglePrimitive) then
     begin
@@ -418,17 +441,13 @@ begin
       width := AProjection.MillimetersToPixels(TmpRectangle.Width);
       height := AProjection.MillimetersToPixels(TmpRectangle.Height);
 
-      FAgg2D.ResetPath();
       { set fill style }
       DrawFillStyle(AProjection, AParameter, fillStyle, borderStyle);
+      cPen :=  GetBorderColor(borderStyle);
+      cFill := GetFillColor(fillStyle);
+      PenWidth := AProjection.MillimetersToPixels(borderStyle.WidthMM);
 
-      FAgg2D.MoveTo(xPos, yPos);
-      FAgg2D.LineTo(xPos + width, yPos);
-      FAgg2D.LineTo(xPos + width, yPos + height);
-      FAgg2D.LineTo(xPos, yPos + height);
-
-      FAgg2D.ClosePolygon();
-      FAgg2D.DrawPath(dpfFillAndStroke);
+      Bitmap.RectangleAntialias(xPos, yPos, xPos + width, yPos + height, cPen, PenWidth, cFill);
     end
     else if (Primitive is TCirclePrimitive) then
     begin
@@ -437,26 +456,29 @@ begin
       borderStyle := TmpCircle.BorderStyle;
       radius := AProjection.MillimetersToPixels(TmpCircle.Radius);
 
-      FAgg2D.ResetPath();
       { set fill style }
       DrawFillStyle(AProjection, AParameter, fillStyle, borderStyle);
+      cPen :=  GetBorderColor(borderStyle);
+      cFill := GetFillColor(fillStyle);
+      PenWidth := AProjection.MillimetersToPixels(borderStyle.WidthMM);
 
-
-      FAgg2D.Ellipse(X + AProjection.MillimetersToPixels(TmpCircle.Center.X - centerX),
-                     Y + AProjection.MillimetersToPixels(TmpCircle.Center.Y - centerY),
-                     radius, radius);
-
-      FAgg2D.DrawPath(dpfFillAndStroke);
+      Bitmap.EllipseAntialias(
+        X + AProjection.MillimetersToPixels(TmpCircle.Center.X - centerX),
+        Y + AProjection.MillimetersToPixels(TmpCircle.Center.Y - centerY),
+        radius,
+        radius,
+        cPen, PenWidth, cFill);
     end;
   end;
 end;
 
-procedure TMapPainterAgg.DrawLabel(AProjection: TProjection;
+procedure TMapPainterBGRA.DrawLabel(AProjection: TProjection;
   AParameter: TMapParameter; X, Y: TReal; const AMapLabel: TMapLabel;
   const ALabel: TLabelData);
 var
   TmpStyle: TTextStyle;
   TextColor: TMapColor;
+  cPen, cFill: TBGRAPixel;
 begin
   if (ALabel.Style is TTextStyle) then
   begin
@@ -466,19 +488,17 @@ begin
     begin
       TextColor := TmpStyle.TextColor;
       //TextColor.A := ALabel.Alpha;
-      //FAgg2D.LineColor := GetAggRgba8(TextColor);
-      FAgg2D.FillColor := GetAggRgba8(TextColor);
-      FAgg2D.NoLine();
+      cFill := GetBGRAPixel(TextColor);
     end
     else if (TmpStyle.Style = tssEmphasize) then
     begin
       // draw white border around text
       TextColor.Init(1, 1, 1, ALabel.Alpha);
-      FAgg2D.LineColor := GetAggRgba8(TextColor);
+      cPen := GetBGRAPixel(TextColor);
 
       TextColor := TmpStyle.TextColor;
       //TextColor.A := ALabel.Alpha;
-      FAgg2D.FillColor := GetAggRgba8(TextColor);
+      cFill := GetBGRAPixel(TextColor);
 
 
       {DrawGlyphVector(X-1, Y + AMapLabel.Height, AMapLabel.glyphs);
@@ -487,11 +507,8 @@ begin
       DrawGlyphVector(X, Y+1 + AMapLabel.Height, layout.glyphs);}
 
     end;
-    //FAgg2D.FontHeight := ALabel.FontSize;
-    SetFont(AProjection, AParameter, ALabel.FontSize);
-    FAgg2D.FlipText := True;
-    FAgg2D.TextAngle := 0;
-    FAgg2D.Text(X, Y, UTF8ToUTF16(AMapLabel.Text));
+    Bitmap.FontHeight := Round(ALabel.FontSize);
+    Bitmap.TextOut(X, Y, AMapLabel.Text, cFill);
 
     {DrawGlyphVector(labelRectangle.x,
                     labelRectangle.y + labelRectangle.height,
@@ -499,13 +516,17 @@ begin
   end;
 end;
 
-procedure TMapPainterAgg.DrawPath(const AProjection: TProjection;
+procedure TMapPainterBGRA.DrawPath(const AProjection: TProjection;
   const AParameter: TMapParameter; const AColor: TMapColor; AWidth: TReal;
   const ADash: array of TReal; AStartCap: TLineCapStyle;
   AEndCap: TLineCapStyle; ATransStart, ATransEnd: Integer);
 var
-  i: Integer;
+  i, n: Integer;
   Pixel: TVertex2D;
+
+  points: array of TPointF;
+  cPen, cFill: TBGRAPixel;
+  PenWidth: Single;
 begin
   if AParameter.IsDrawWaysBorder and (not FIsDrawingWayBorder) then
   begin
@@ -519,61 +540,65 @@ begin
   // !!
   if AWidth = 0 then AWidth := 0.5;
 
-  FAgg2D.ResetPath();
-  FAgg2D.LineColor := GetAggRgba8(AColor);
-  FAgg2D.RemoveAllDashes();
-  FAgg2D.LineWidth := AWidth;
+  //FAgg2D.ResetPath();
+  cPen := GetBGRAPixel(AColor);
+  Bitmap.PenStyle := psSolid;
+  PenWidth := AWidth;
 
-  if (AStartCap = capButt) or (AEndCap = capButt) then
+  {if (AStartCap = capButt) or (AEndCap = capButt) then
     FAgg2D.LineCap := lcButt
   else if (AStartCap = capSquare) or (AEndCap = capSquare) then
     FAgg2D.LineCap := lcSquare
   else
-    FAgg2D.LineCap := lcRound;
+    FAgg2D.LineCap := lcRound;  }
 
   if Length(ADash) <> 0 then
   begin
-    i := 0;
+    Bitmap.PenStyle := psDash;
+    {i := 0;
     while i < Length(ADash)-1 do
     begin
       FAgg2D.AddDash(ADash[i] * AWidth, ADash[i+1] * AWidth);
       Inc(i, 2);
-    end;
+    end; }
   end;
 
+  n := ATransEnd - ATransStart + 1;
+  SetLength(points, n);
   for i := ATransStart to ATransEnd do
   begin
-    if (i = ATransStart) then
+    Pixel := FTransBuffer.Buffer[i];
+    points[i-ATransStart] := PointF(Pixel.X, Pixel.Y);
+    {if (i = ATransStart) then
     begin
-      Pixel := FTransBuffer.Buffer[i];
       FAgg2D.MoveTo(Pixel.X, Pixel.Y);
     end
     else
     begin
-      Pixel := FTransBuffer.Buffer[i];
       FAgg2D.LineTo(Pixel.X, Pixel.Y);
-    end;
+    end;}
   end;
-  FAgg2D.DrawPath(dpfStrokeOnly);
+  // dpfStrokeOnly
+  Bitmap.DrawPolyLineAntialias(points, cPen, PenWidth);
 
   // TODO: End point caps "dots"
 end;
 
-procedure TMapPainterAgg.RegisterRegularLabel(const AProjection: TProjection;
+procedure TMapPainterBGRA.RegisterRegularLabel(const AProjection: TProjection;
   const AParameter: TMapParameter; const ALabels: TLabelDataList;
   const APosition: TVertex2D; AObjectWidth: TReal);
 begin
   FLabelLayouter.RegisterLabel(AProjection, AParameter, APosition, ALabels, AObjectWidth);
 end;
 
-procedure TMapPainterAgg.RegisterContourLabel(const AProjection: TProjection;
+procedure TMapPainterBGRA.RegisterContourLabel(const AProjection: TProjection;
   const AParameter: TMapParameter; const ALabel: TPathLabelData;
   const ALabelPath: TLabelPath);
 begin
   FLabelLayouter.RegisterContourLabel(AProjection, AParameter, ALabel, ALabelPath);
 end;
 
-procedure TMapPainterAgg.DrawLabels(const AProjection: TProjection;
+procedure TMapPainterBGRA.DrawLabels(const AProjection: TProjection;
   const AParameter: TMapParameter; const AData: TMapData);
 var
   TextLabel: TTextLabel;
@@ -647,7 +672,7 @@ begin
   FLabelLayouter.Reset();
 end;
 
-procedure TMapPainterAgg.BeforeDrawing(const AStyleConfig: TStyleConfig;
+procedure TMapPainterBGRA.BeforeDrawing(const AStyleConfig: TStyleConfig;
   const AProjection: TProjection; const AParameter: TMapParameter;
   const AData: TMapData);
 var
@@ -661,68 +686,77 @@ begin
     FLabelLayouter.SetLayoutOverlap(1);
 end;
 
-procedure TMapPainterAgg.DrawContourSymbol(const AProjection: TProjection;
+procedure TMapPainterBGRA.DrawContourSymbol(const AProjection: TProjection;
   const AParameter: TMapParameter; const ASymbol: TMapSymbol; ASpace: TReal;
   ATransStart, ATransEnd: Integer);
 begin
   //
 end;
 
-procedure TMapPainterAgg.DrawArea(const AProjection: TProjection;
+procedure TMapPainterBGRA.DrawArea(const AProjection: TProjection;
   const AParameter: TMapParameter; const AAreaData: TAreaData);
 var
-  i: Integer;
+  i, n: Integer;
   data: TPolyData;
   Pixel: TVertex2D;
-begin
-  FAgg2D.ResetPath();
-  DrawFillStyle(AProjection, AParameter, AAreaData.FillStyle, AAreaData.BorderStyle);
 
-  if Length(AAreaData.Clippings) = 0 then
+  points: array of TPointF;
+  cPen, cFill: TBGRAPixel;
+  PenWidth: Single;
+begin
+  //FAgg2D.ResetPath();
+  DrawFillStyle(AProjection, AParameter, AAreaData.FillStyle, AAreaData.BorderStyle);
+  cPen :=  GetBorderColor(AAreaData.BorderStyle);
+  cFill := GetFillColor(AAreaData.FillStyle);
+  PenWidth := AProjection.MillimetersToPixels(AAreaData.BorderStyle.WidthMM);
+
+  {if Length(AAreaData.Clippings) = 0 then
     FAgg2D.FillEvenOdd := True
   else
-    FAgg2D.FillEvenOdd := False; // NonZero (Winding) rule
+    FAgg2D.FillEvenOdd := False; // NonZero (Winding) rule }
 
-  Pixel := FTransBuffer.Buffer[AAreaData.TransStart];
-  FAgg2D.MoveTo(Pixel.X, Pixel.Y);
+  n := AAreaData.TransEnd - AAreaData.TransStart + 1;
+  SetLength(points, n);
 
-  for i := AAreaData.TransStart+1 to AAreaData.TransEnd do
+  for i := AAreaData.TransStart to AAreaData.TransEnd do
   begin
     Pixel := FTransBuffer.Buffer[i];
-    FAgg2D.LineTo(Pixel.X, Pixel.Y);
+    points[i - AAreaData.TransStart] := PointF(Pixel.X, Pixel.Y);
   end;
-  FAgg2D.ClosePolygon();
+
+  //FAgg2D.DrawPath(dpfFillAndStroke);
+  Bitmap.DrawPolygonAntialias(points, cPen, PenWidth, cFill);
 
   if Length(AAreaData.Clippings) <> 0 then
   begin
     for data in AAreaData.Clippings do
     begin
-      FAgg2D.MoveTo(FTransBuffer.Buffer[data.TransStart].X,
-                     FTransBuffer.Buffer[data.TransStart].Y);
-      for i := data.TransStart+1 to data.TransEnd do
+      n := data.TransEnd - data.TransStart + 1;
+      SetLength(points, n);
+
+      for i := data.TransStart to data.TransEnd do
       begin
-        FAgg2D.LineTo(FTransBuffer.Buffer[i].X,
-                      FTransBuffer.Buffer[i].Y);
+        points[i - data.TransStart] := PointF(FTransBuffer.Buffer[i].X, FTransBuffer.Buffer[i].Y);
       end;
-      FAgg2D.ClosePolygon();
+      Bitmap.DrawPolygonAntialias(points, cPen, PenWidth, cFill);
     end;
   end;
 
-  FAgg2D.DrawPath(dpfFillAndStroke);
+  //FAgg2D.DrawPath(dpfFillAndStroke);
 
   // center point
   Pixel := FTransBuffer.Polylabel(AAreaData.TransStart, AAreaData.TransEnd);
-  FAgg2D.Circle(Pixel.X, Pixel.Y, 2);
+  Bitmap.Ellipse(Pixel.X, Pixel.Y, 2, 2, cPen, PenWidth, TDrawMode.dmLinearBlend);
 end;
 
-{procedure TMapPainterAgg.DrawLabelNative(AProjection: TProjection;
+{procedure TMapPainterBGRA.DrawLabelNative(AProjection: TProjection;
   AParameter: TMapParameter; const ALabelRectangle: TDoubleRectangle;
   const ALabel: TLabelData; const ALayout: TNativeLabel);
 begin
 
 end;
 
-procedure TMapPainterAgg.DrawGlyphsNative(AProjection: TProjection;
+procedure TMapPainterBGRA.DrawGlyphsNative(AProjection: TProjection;
   AParameter: TMapParameter; AStyle: TPathTextStyle;
   const AGlyphs: TNativeGlyphArray);
 begin
@@ -730,7 +764,7 @@ begin
 end; }
 
 {
-procedure TMapPainterAgg.OnGlyphBoundingBoxHandler(const AGlyph: TMapGlyph;
+procedure TMapPainterBGRA.OnGlyphBoundingBoxHandler(const AGlyph: TMapGlyph;
   out ARect: TDoubleRectangle);
 begin
   //Assert(False);
@@ -743,7 +777,7 @@ begin
 end;
 }
 
-procedure TMapPainterAgg.OnTextLayoutHandler(out ALabel: TMapLabel;
+procedure TMapPainterBGRA.OnTextLayoutHandler(out ALabel: TMapLabel;
   AProjection: TProjection; AParameter: TMapParameter; const AText: string;
   AFontSize, AObjectWidth: TReal; AEnableWrapping: Boolean;
   AContourLabel: Boolean);
@@ -754,8 +788,8 @@ var
 begin
   //Assert(False, 'not needed');
 
-  SetFont(AProjection, AParameter, AFontSize);
-  //FAgg2D.FontHeight := AFontSize;
+  //SetFont(AProjection, AParameter, AFontSize);
+  Bitmap.FontHeight := Round(AFontSize);
 
   {if AContourLabel then
     agg::glyph_ren_outline
@@ -763,10 +797,11 @@ begin
     agg::glyph_ren_native_gray8;}
 
   //fontCacheManager->reset_last_glyph();
+  h := Round(AFontSize);
   x := 0;
   y := 0;
   w := 0;
-  h := FAgg2D.FontHeight;
+  y := Bitmap.FontVerticalAnchorOffset;
 
   ws := UTF8ToUTF16(AText);
   if AContourLabel then
@@ -775,10 +810,7 @@ begin
     for i := 1 to Length(ws) do
     begin
       // get single character glyph bounds
-      //const agg::glyph_cache *glyph = fontCacheManager->glyph(i);
-      //fontCacheManager->add_kerning(&x, &y);
-      //label.glyphs.emplace_back(std::move(MapPainterAgg::NativeGlyph{x, y, glyph}));
-      cw := FAgg2D.TextWidth(ws[i]);
+      cw := Bitmap.TextSize(ws[i]).cx;
 
       ALabel.Glyphs[i-1].Position.X := x;
       ALabel.Glyphs[i-1].Position.Y := y;
@@ -795,7 +827,7 @@ begin
   end
   else
   begin
-    w := FAgg2D.TextWidth(ws);
+    w := Bitmap.TextSize(ws).cx;
   end;
 
   //ALabel.pLabel := Addr(FNativeLabel);
@@ -806,11 +838,17 @@ begin
   ALabel.Text := AText;
 end;
 
-constructor TMapPainterAgg.Create(const AStyleConfig: TStyleConfig);
+constructor TMapPainterBGRA.Create(const AStyleConfig: TStyleConfig; ACanvas: TCanvas);
+var
+  x, y: Integer;
 begin
   inherited Create(AStyleConfig);
 
-  FAgg2D := TAgg2D.Create();
+  FCanvas := ACanvas;
+
+  x := FCanvas.Width;
+  y := FCanvas.Height;
+  FBitmap := TBGRABitmap.Create(x, y);
   FLabelLayouter := TLabelLayouter.Create();
   //FLabelLayouter.OnGlyphBoundingBox := @OnGlyphBoundingBoxHandler;
   FLabelLayouter.OnTextLayout := @OnTextLayoutHandler;
@@ -819,28 +857,32 @@ begin
   FFontSize := 0;
 end;
 
-destructor TMapPainterAgg.Destroy;
+destructor TMapPainterBGRA.Destroy;
 begin
   DoneCriticalsection(FMutex);
   FreeAndNil(FLabelLayouter);
-  if not FIsAlienAgg then
+  if not FIsAlienBitmap then
   begin
-    FreeAndNil(FAgg2D);
+    FreeAndNil(FBitmap);
   end;
   inherited Destroy;
 end;
 
-function TMapPainterAgg.DrawMap(AProjection: TProjection;
+function TMapPainterBGRA.DrawMap(AProjection: TProjection;
   AParameter: TMapParameter; AData: TMapData): Boolean;
 begin
   EnterCriticalsection(FMutex);
   try
-    FAgg2D.ClearAll(255, 255, 255);
+    //FAgg2D.ClearAll(255, 255, 255);
+    FBitmap.Fill(TBGRAPixel.New(255, 255, 255));
 
     if FFontSize = 0 then
       SetFont(AProjection, AParameter, AParameter.FontSize);
 
     Result := inherited DrawMap(AProjection, AParameter, AData);
+
+    if Result then
+      FBitmap.Draw(FCanvas, 0, 0, True);
   finally
     LeaveCriticalsection(FMutex);
   end;

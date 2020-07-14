@@ -189,7 +189,7 @@ type
     procedure CombineNameRef(out AValue: string; const AName, ARef: string);
     procedure ExtractNameRef(const AValue: string; out AName, ARef: string);
     function GetValue(AIndex: Integer): string;
-    function AngleToDirectionStr(AAngle: Double): string;
+    function AngleToDirectionStr(AAngle: TReal): string;
 
     // riStart, riTarget, riName
     // riMotorwayEnter, riMotorwayLeave, riMotorwayJunction
@@ -209,9 +209,9 @@ type
        The curve is a heuristic measurement that not only take the next node of the target way into
      account (which could only the start of a slight curve) but tries to determine the last node
      of the curve and this gives a better description of the curve the vehicle needs to take. }
-    procedure SetDirection(ATurnAngle, ACurveAngle: Double);
-    function GetTurnAngle(): Double;
-    function GetCurveAngle(): Double;
+    procedure SetDirection(ATurnAngle, ACurveAngle: TReal);
+    function GetTurnAngle(): TReal;
+    function GetCurveAngle(): TReal;
     function GetTurn(): string;
     function GetCurve(): string;
     // riRoundaboutLeave
@@ -455,7 +455,7 @@ type
   public
     function GetVehicle(): TVehicleType; virtual; abstract;
     function GetCostLimitDistance(): TDistance; virtual; abstract;
-    function GetCostLimitFactor(): Double; virtual; abstract;
+    function GetCostLimitFactor(): TReal; virtual; abstract;
 
     function CanUse(const ACurrentNode: TRouteNode;
       const AObjectVariantDataArr: TObjectVariantDataArray;
@@ -467,16 +467,16 @@ type
 
     function GetCosts(const ACurrentNode: TRouteNode;
       const AObjectVariantDataArr: TObjectVariantDataArray;
-      APathIndex: Integer): Double; virtual; abstract; overload;
-    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; virtual; abstract; overload;
-    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; virtual; abstract; overload;
-    function GetCosts(const ADistance: TDistance): Double; virtual; abstract; overload;
+      APathIndex: Integer): TReal; virtual; abstract; overload;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): TReal; virtual; abstract; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): TReal; virtual; abstract; overload;
+    function GetCosts(const ADistance: TDistance): TReal; virtual; abstract; overload;
 
     function GetTime(AArea: TMapArea; const ADistance: TDistance): TDateTime; virtual; abstract;
     function GetTime(AWay: TMapWay; const ADistance: TDistance): TDateTime; virtual; abstract; overload;
   end;
 
-  TSpeedMap = specialize TFPGMap<string, Double>;
+  TSpeedMap = specialize TFPGMap<string, TReal>;
 
   { Common base class for our concrete profile instantiations. Offers a number of profile
     type independent interface implementations and helper methods. }
@@ -491,11 +491,11 @@ type
     FVehicle: TVehicleType;
     FVehicleRouteNodeMask: TVehicleMask;
     FCostLimitDistance: TDistance;
-    FCostLimitFactor: Double;
-    FSpeeds: array of Double;
-    FMinSpeed: Double;
-    FMaxSpeed: Double;
-    FVehicleMaxSpeed: Double;
+    FCostLimitFactor: TReal;
+    FSpeeds: array of TReal;
+    FMinSpeed: TReal;
+    FMaxSpeed: TReal;
+    FVehicleMaxSpeed: TReal;
 
     procedure SetVehicle(const AValue: TVehicleType);
   public
@@ -503,15 +503,15 @@ type
 
     function GetVehicle(): TVehicleType; override;
     function GetCostLimitDistance(): TDistance; override;
-    function GetCostLimitFactor(): Double; override;
+    function GetCostLimitFactor(): TReal; override;
 
-    procedure ParametrizeForFoot(ATypeConfig: TTypeConfig; AMaxSpeed: Double);
-    procedure ParametrizeForBicycle(ATypeConfig: TTypeConfig; AMaxSpeed: Double);
+    procedure ParametrizeForFoot(ATypeConfig: TTypeConfig; AMaxSpeed: TReal);
+    procedure ParametrizeForBicycle(ATypeConfig: TTypeConfig; AMaxSpeed: TReal);
     function ParametrizeForCar(ATypeConfig: TTypeConfig;
       const ASpeedMap: TSpeedMap;
-      AMaxSpeed: Double): Boolean;
+      AMaxSpeed: TReal): Boolean;
 
-    procedure AddType(const AType: TTypeInfo; ASpeed: Double);
+    procedure AddType(const AType: TTypeInfo; ASpeed: TReal);
 
     function CanUse(const ACurrentNode: TRouteNode;
       const AObjectVariantDataArr: TObjectVariantDataArray;
@@ -527,13 +527,13 @@ type
     { for shortest path by default }
     function GetCosts(const ACurrentNode: TRouteNode;
       const AObjectVariantDataArr: TObjectVariantDataArray;
-      APathIndex: Integer): Double; override;
-    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; override; overload;
-    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; override; overload;
-    function GetCosts(const ADistance: TDistance): Double; override; overload;
+      APathIndex: Integer): TReal; override;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): TReal; override; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): TReal; override; overload;
+    function GetCosts(const ADistance: TDistance): TReal; override; overload;
 
     property Vehicle: TVehicleType read GetVehicle write SetVehicle;
-    property VehicleMaxSpeed: Double read FVehicleMaxSpeed write FVehicleMaxSpeed;
+    property VehicleMaxSpeed: TReal read FVehicleMaxSpeed write FVehicleMaxSpeed;
     { static distance value added to the maximum cost }
     property CostLimitDistance: TDistance read GetCostLimitDistance write FCostLimitDistance;
 
@@ -555,7 +555,7 @@ type
 
       So the resulting maxium cost are profile.GetCosts(profile.GetCostLimitDistance())+
       profile.GetCosts(distance)*profile.GetCostLimitFactor(). }
-    property CostLimitFactor: Double read GetCostLimitFactor write FCostLimitFactor;
+    property CostLimitFactor: TReal read GetCostLimitFactor write FCostLimitFactor;
   end;
 
   { Profile that defines costs base of the time the traveling device needs
@@ -567,10 +567,10 @@ type
   public
     function GetCosts(const ACurrentNode: TRouteNode;
       const AObjectVariantDataArr: TObjectVariantDataArray;
-      APathIndex: Integer): Double; override;
-    function GetCosts(AArea: TMapArea; const ADistance: TDistance): Double; override; overload;
-    function GetCosts(AWay: TMapWay; const ADistance: TDistance): Double; override; overload;
-    function GetCosts(const ADistance: TDistance): Double; override; overload;
+      APathIndex: Integer): TReal; override;
+    function GetCosts(AArea: TMapArea; const ADistance: TDistance): TReal; override; overload;
+    function GetCosts(AWay: TMapWay; const ADistance: TDistance): TReal; override; overload;
+    function GetCosts(const ADistance: TDistance): TReal; override; overload;
   end;
 
 
@@ -753,7 +753,7 @@ begin
     Result := '';
 end;
 
-function TRouteItemDescription.AngleToDirectionStr(AAngle: Double): string;
+function TRouteItemDescription.AngleToDirectionStr(AAngle: TReal): string;
 begin
   if (AAngle >= -10.0) and (AAngle <= 10.0) then
     Result := '^'
@@ -837,7 +837,7 @@ begin
     Result := 0;
 end;
 
-procedure TRouteItemDescription.SetDirection(ATurnAngle, ACurveAngle: Double);
+procedure TRouteItemDescription.SetDirection(ATurnAngle, ACurveAngle: TReal);
 begin
   ItemType := riDirection;
   if Length(Values) < 4 then
@@ -848,12 +848,12 @@ begin
   Values[3] := AngleToDirectionStr(ACurveAngle);
 end;
 
-function TRouteItemDescription.GetTurnAngle(): Double;
+function TRouteItemDescription.GetTurnAngle(): TReal;
 begin
   Result := StrToFloatDef(GetValue(0), 0);
 end;
 
-function TRouteItemDescription.GetCurveAngle(): Double;
+function TRouteItemDescription.GetCurveAngle(): TReal;
 begin
   Result := StrToFloatDef(GetValue(1), 0);
 end;
@@ -1295,7 +1295,7 @@ begin
   Result := FCostLimitDistance;
 end;
 
-function TRoutingProfile.GetCostLimitFactor(): Double;
+function TRoutingProfile.GetCostLimitFactor(): TReal;
 begin
   Result := FCostLimitFactor;
 end;
@@ -1330,7 +1330,7 @@ begin
 end;
 
 procedure TRoutingProfile.ParametrizeForFoot(ATypeConfig: TTypeConfig;
-  AMaxSpeed: Double);
+  AMaxSpeed: TReal);
 var
   ti: TTypeInfo;
 begin
@@ -1345,7 +1345,7 @@ begin
 end;
 
 procedure TRoutingProfile.ParametrizeForBicycle(ATypeConfig: TTypeConfig;
-  AMaxSpeed: Double);
+  AMaxSpeed: TReal);
 var
   ti: TTypeInfo;
 begin
@@ -1360,10 +1360,10 @@ begin
 end;
 
 function TRoutingProfile.ParametrizeForCar(ATypeConfig: TTypeConfig;
-  const ASpeedMap: TSpeedMap; AMaxSpeed: Double): Boolean;
+  const ASpeedMap: TSpeedMap; AMaxSpeed: TReal): Boolean;
 var
   ti: TTypeInfo;
-  speed: Double;
+  speed: TReal;
 begin
   Result := True;
   SetLength(FSpeeds, 0);
@@ -1385,7 +1385,7 @@ begin
   end;
 end;
 
-procedure TRoutingProfile.AddType(const AType: TTypeInfo; ASpeed: Double);
+procedure TRoutingProfile.AddType(const AType: TTypeInfo; ASpeed: TReal);
 var
   n, i: Integer;
 begin
@@ -1505,7 +1505,7 @@ end;
 function TRoutingProfile.GetTime(AArea: TMapArea;
   const ADistance: TDistance): TDateTime;
 var
-  speed: Double;
+  speed: TReal;
 begin
   speed := FSpeeds[AArea.GetType().Index];
 
@@ -1520,7 +1520,7 @@ end;
 function TRoutingProfile.GetTime(AWay: TMapWay;
   const ADistance: TDistance): TDateTime;
 var
-  speed: Double;
+  speed: TReal;
   maxSpeedValue: Byte;
 begin
   maxSpeedValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftMaxSpeed), 0);
@@ -1539,24 +1539,24 @@ end;
 
 function TRoutingProfile.GetCosts(const ACurrentNode: TRouteNode;
   const AObjectVariantDataArr: TObjectVariantDataArray;
-  APathIndex: Integer): Double;
+  APathIndex: Integer): TReal;
 begin
   Result := ACurrentNode.Paths[APathIndex].Distance / 1000;
 end;
 
 function TRoutingProfile.GetCosts(AArea: TMapArea;
-  const ADistance: TDistance): Double;
+  const ADistance: TDistance): TReal;
 begin
   Result := ADistance / 1000;
 end;
 
 function TRoutingProfile.GetCosts(AWay: TMapWay;
-  const ADistance: TDistance): Double;
+  const ADistance: TDistance): TReal;
 begin
   Result := ADistance / 1000;
 end;
 
-function TRoutingProfile.GetCosts(const ADistance: TDistance): Double;
+function TRoutingProfile.GetCosts(const ADistance: TDistance): TReal;
 begin
   Result := ADistance / 1000;
 end;
@@ -1565,9 +1565,9 @@ end;
 
 function TFastestPathRoutingProfile.GetCosts(const ACurrentNode: TRouteNode;
   const AObjectVariantDataArr: TObjectVariantDataArray;
-  APathIndex: Integer): Double;
+  APathIndex: Integer): TReal;
 var
-  speed: Double;
+  speed: TReal;
   objIndex: Integer;
   ti: TTypeInfo;
 begin
@@ -1592,9 +1592,9 @@ begin
 end;
 
 function TFastestPathRoutingProfile.GetCosts(AArea: TMapArea;
-  const ADistance: TDistance): Double;
+  const ADistance: TDistance): TReal;
 var
-  speed: Double;
+  speed: TReal;
 begin
   speed := FSpeeds[AArea.GetType().Index];
 
@@ -1607,9 +1607,9 @@ begin
 end;
 
 function TFastestPathRoutingProfile.GetCosts(AWay: TMapWay;
-  const ADistance: TDistance): Double;
+  const ADistance: TDistance): TReal;
 var
-  speed: Double;
+  speed: TReal;
   maxSpeedValue: Byte;
 begin
   maxSpeedValue := StrToIntDef(AWay.FeatureValueBuffer.GetFeatureValue(ftMaxSpeed), 0);
@@ -1626,9 +1626,9 @@ begin
     Result := 0.0;
 end;
 
-function TFastestPathRoutingProfile.GetCosts(const ADistance: TDistance): Double;
+function TFastestPathRoutingProfile.GetCosts(const ADistance: TDistance): TReal;
 var
-  speed: Double;
+  speed: TReal;
 begin
   speed := Min(FVehicleMaxSpeed, FMaxSpeed);
 

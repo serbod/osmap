@@ -2,13 +2,16 @@ unit MainForm;
 
 {$mode objfpc}{$H+}
 
+{$define AggPainter}
+{//$define BGRAPainter}
+
 interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
-  Spin, Agg2DControl, OsMapPainter, OsMapPainterAgg, OsMapProjection,
+  Spin, Menus, OsMapPainter, OsMapPainterAgg, OsMapPainterBGRA, OsMapProjection,
   OsMapStyleConfig, OsMapObjTypes, OsMapManager, OsMapFormatMp, OsMapTypes,
-  OsMapGeometry, Types, Agg2D;
+  OsMapGeometry, Types, PainterAggForm, PainterBgraForm;
 
 type
 
@@ -17,13 +20,15 @@ type
   TForm1 = class(TForm)
     btnStart: TButton;
     btnShow: TButton;
-    Agg2DControl1: TAgg2DControl;
     btnTest: TButton;
     edSearch: TEdit;
     fseLat: TFloatSpinEdit;
     fseLon: TFloatSpinEdit;
     lbState: TLabel;
+    miLoadMapFiles: TMenuItem;
+    miSaveMapFiles: TMenuItem;
     panBottom: TPanel;
+    pmMain: TPopupMenu;
     seMagLevel: TSpinEdit;
     Timer100ms: TTimer;
     procedure Agg2DControl1MouseDown(Sender: TObject; Button: TMouseButton;
@@ -36,12 +41,27 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
+    procedure miLoadMapFilesClick(Sender: TObject);
+    procedure miSaveMapFilesClick(Sender: TObject);
     procedure Timer100msTimer(Sender: TObject);
   private
+    FMapProjection: TMercatorProjection;
     FMapManager: TMapManager;
-    FMapPainter: TMapPainterAgg;
-  public
 
+    {$ifdef AggPainter}
+    FMapPainter: TMapPainterAgg;
+    FPainterForm: TFormPainterAgg;
+    {$endif}
+    {$ifdef BGRAPainter}
+    FMapPainter: TMapPainterBGRA;
+    FPainterForm: TFormPainterBGRA;
+    {$endif}
+
+    Fsl: TStringList;
+  public
+    procedure ShowObjectsAt(ALon, ALat: Real);
+
+    property MapManager: TMapManager read FMapManager;
   end;
 
 var
@@ -60,7 +80,7 @@ var
   Bitmap: TBitmap;
 
 begin
-  ImportFromMpFile(FMapManager, 'minsk.mp');
+  ImportFromMpFile(FMapManager, 'minsk.mp');   // 26212 ways
   ImportFromMpFile(FMapManager, 'minsk_obl.mp');
   ImportFromMpFile(FMapManager, 'brest.mp');
   ImportFromMpFile(FMapManager, 'gomel.mp');
@@ -80,42 +100,8 @@ end;
 
 procedure TForm1.btnTestClick(Sender: TObject);
 var
-  vg: TAgg2D;
-  x, y: Double;
   pt: TGeoPoint;
 begin
-  {
-  vg := Agg2DControl1.Agg2D;
-
-  // init font
-  vg.Font('Tahoma', 40, True, False, fcVector, 0);
-  vg.FlipText := True;
-
-  vg.ClearAll(255, 255, 255);
-  //vg.NoFill();
-  vg.FillColor.Initialize($FF, $00, $00, 255);
-  vg.LineColor.Initialize($FF, $FF, $FF, 255);
-
-  x := 40;
-  y := 70;
-  // letters
-  vg.Text(x, y, 'T');
-
-  x := x + 40;
-  vg.TextAngle := degtorad(10);
-  vg.Text(x, y, 'E');
-
-  x := x + 40;
-  vg.TextAngle := degtorad(20);
-  vg.Text(x, y, 'S');
-
-  x := x + 40;
-  vg.TextAngle := degtorad(30);
-  vg.Text(x, y, 'T');
-
-  Agg2DControl1.Invalidate();  }
-
-
   if FMapManager.MapGeocoder.GetStreetStart(edSearch.Text, pt) then
   begin
     fseLat.Value := pt.Lat;
@@ -126,14 +112,37 @@ end;
 
 procedure TForm1.FormCreate(Sender: TObject);
 begin
+  {$ifdef AggPainter}
+  FPainterForm := TFormPainterAgg.Create(Self);
+  {$endif}
+  {$ifdef BGRAPainter}
+  FPainterForm := TFormPainterBGRA.Create(Self);
+  {$endif}
+  FPainterForm.Parent := Self;
+  FPainterForm.Align := alClient;
+  FPainterForm.BorderStyle := bsNone;
+  FPainterForm.Visible := True;
+
+  FMapProjection := TMercatorProjection.Create();
+
   FMapManager := TMapManager.Create(Self);
+  FMapManager.MapProjection := FMapProjection;
   FMapManager.InitTypesFromIni('style.ini');
+
+  {$ifdef AggPainter}
   FMapPainter := TMapPainterAgg.Create(FMapManager.MapStyleConfig);
-  FMapPainter.Agg2D := Agg2DControl1.Agg2D;
+  FMapPainter.Agg2D := FPainterForm.Agg2DControl1.Agg2D;
+  {$endif}
+  {$ifdef BGRAPainter}
+  FMapPainter := TMapPainterBGRA.Create(FMapManager.MapStyleConfig, FPainterForm.Canvas);
+  FPainterForm.Bitmap := FMapPainter.Bitmap;
+  {$endif}
+
   FMapManager.MapPainter := FMapPainter;
 
-  Agg2DControl1.DoubleBuffered := True;
-  btnStartClick(nil);
+
+  Fsl := TStringList.Create();
+  //btnStartClick(nil);
 end;
 
 procedure TForm1.FormMouseWheel(Sender: TObject; Shift: TShiftState;
@@ -145,10 +154,48 @@ begin
     seMagLevel.Value := seMagLevel.Value - 1;
 end;
 
+procedure TForm1.miLoadMapFilesClick(Sender: TObject);
+begin
+  MapManager.LoadWaysFromFile(MapManager.WaysFileName);
+  //MapManager.LoadAreasFromFile(MapManager.AreasFileName);
+  ShowMessage('Loaded!');
+end;
+
+procedure TForm1.miSaveMapFilesClick(Sender: TObject);
+begin
+  MapManager.SaveWaysToFile(MapManager.WaysFileName);
+  //MapManager.SaveAreasToFile(MapManager.AreasFileName);
+  ShowMessage('Saved!');
+end;
+
 procedure TForm1.Timer100msTimer(Sender: TObject);
 begin
   lbState.Caption := FMapManager.MapPainter.GetStateStr();
-  Agg2DControl1.Invalidate();
+  {$ifdef AggPainter}
+  FPainterForm.Agg2DControl1.Invalidate();
+  {$endif}
+  {$ifdef BGRAPainter}
+  {$endif}
+end;
+
+procedure TForm1.ShowObjectsAt(ALon, ALat: Real);
+var
+  i: Integer;
+  mpt: TGeoPoint;
+  s: string;
+begin
+  FSl.Clear();
+  mpt.Init(ALat, ALon);
+  for i := 0 to FMapManager.MapData.AreaList.Count-1 do
+  begin
+    if FMapManager.MapData.AreaList.Items[i].Rings[0].IsPointInside(mpt) then
+    begin
+      Fsl.Add(FMapManager.MapData.AreaList.Items[i].GetType().TypeName);
+    end;
+  end;
+
+  s := FSl.Text;
+  ShowMessage(s);
 end;
 
 procedure TForm1.btnShowClick(Sender: TObject);
@@ -160,8 +207,10 @@ begin
   Coord.Lon := fseLon.Value; // 27.54783
   //Maglev := MAG_LEVEL_DETAIL;
   Maglev := Byte(seMagLevel.Value);
+  //{$ifdef AggPainter}
   FMapManager.MapProjection.Setup(Coord, 0, Magnification(MagLev), Screen.PixelsPerInch,
-    Agg2DControl1.Width, Agg2DControl1.Height);
+    FPainterForm.Width, FPainterForm.Height);
+  //{$endif}
 
   FMapManager.Render();
 
@@ -184,7 +233,12 @@ end;
 procedure TForm1.Agg2DControl1MouseDown(Sender: TObject; Button: TMouseButton;
   Shift: TShiftState; X, Y: Integer);
 begin
-  btnShowClick(nil);
+  if ssShift in Shift then
+  begin
+    ShowObjectsAt(fseLon.Value, fseLat.Value);
+  end
+  else
+    btnShowClick(nil);
 end;
 
 end.

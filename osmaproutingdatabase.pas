@@ -24,13 +24,8 @@
 *)
 (*
 
-ObjectVariantDataFile
-
-routing/RouteNodeDataFile
-  RouteNodeDataFile
-
 routing/RoutingDB
-  RoutingDatabase
+  RoutingDatabase ...
 *)
 
 unit OsMapRoutingDatabase;
@@ -47,153 +42,36 @@ uses
 
 type
 
-  { DataFile class for loading the object variant data, which is part of the
-    routing graph. The object variat data contains a lookup table for path
-    attributes. Since the number of attribute value combinations is much
-    smaller then the actual number of elements in the route graph it makes
-    sense to store all possible combinations in a lookup table and just
-    index them from the routing graph paths. }
-
-  { TObjectVariantDataFile }
-
-  TObjectVariantDataFile = object
-    Data: TObjectVariantDataArray;
-    IsLoaded: Boolean;
-    Filename: string;
-
-    procedure Init();
-    function Load(ATypeConfig: TTypeConfig; AFilename: string): Boolean;
-  end;
-
-  TRouteNodeDataFile = class
-  private
-    // type TValueCache = TCache<Id, IndexPage>
-    FDataFile: string;
-    FDataFileName: string; // complete filename for data file
-
-    FTypeConfig: TTypeConfig;
-
-    //FIndex: TMap<Pixel, IndexEntry>;
-    //FCache: TValueCache;
-    FScanner: TFileScanner; // File stream to the data file
-    //FAccessMutex: TMutex; // Mutex to secure multi-thread access
-    FMagnification: TMagnification; // Magnification of tiled index
-
-    {function LoadIndexPage(const ATile: TPixel;
-      var ACache: TValueCache): Boolean;
-    function GetIndexPage(const ATile: TPixel;
-      var ACache: TValueCache): Boolean; }
-
-  public
-    constructor Create(const ADataFile: string; ACacheSize: Integer);
-
-    function Open(ATypeConfig: TTypeConfig;
-      const APath: string;
-      AMemoryMappedData: Boolean): Boolean;
-
-    function IsOpen(): Boolean; virtual;
-    function Close(): Boolean; virtual;
-
-    function GetTile(const ACoord: TGeoPoint): TPixel;
-    function IsCovered(const ATile: TPixel): Boolean;
-
-    function Get(AId: TId; ANode: TRouteNode): Boolean; overload;
-
-    function Get(ABegin, AEnd, ASize: Integer;
-      AData: TRouteNodeList): Boolean; overload;
-
-    function Get(ABegin, AEnd, ASize: Integer;
-      AData: TRouteNodeMapById): Boolean; overload;
-  end;
-
-
-  TIntersectionDataFile = class(TIndexedDataFile)
-
-  end;
-
   { Encapsulation of the routing relevant data files, similar to Database. }
   TRoutingDatabase = class(TObject)
-  private
+  protected
     FTypeConfig: TTypeConfig;
     FPath: string;
-    FRouteNodeDataFile: TRouteNodeDataFile;
-    FJunctionDataFile: TIntersectionDataFile; // Cached access to the 'junctions.dat' file
-    FObjectVariantDataFile: TObjectVariantDataFile;
   public
     constructor Create();
 
-    function Open(ADatabase: TMapDatabaseId): Boolean;
+    function Open(ADatabase: TMapDatabaseId): Boolean; virtual; abstract;
     procedure Close();
 
-    function GetRouteNode(const AId: TId; ANode: TRouteNode): Boolean;
+    function GetRouteNode(const AId: TId; ANode: TRouteNode): Boolean; virtual; abstract;
 
     function GetRouteNodes(ABegin, AEnd: Integer; ASize: Integer;
-      ARouteNodeMap: TRouteNodeMapById): Boolean; overload;
+      ARouteNodeMap: TRouteNodeMapById): Boolean; overload; virtual; abstract;
 
     function GetRouteNodes(ABegin, AEnd: Integer; ASize: Integer;
-      ARouteNodes: TRouteNodeList): Boolean; overload;
+      ARouteNodes: TRouteNodeList): Boolean; overload; virtual; abstract;
 
     { Junction = Intersection }
     function GetJunctions(const AIds: array of TId;
-      var AJunctions: TIntersectionArray): Boolean;
+      var AJunctions: TIntersectionArray): Boolean; virtual; abstract;
 
-    function GetObjectVariantData(): TObjectVariantDataArray;
+    function GetObjectVariantData(): TObjectVariantDataArray; virtual; abstract;
 
-    function ContainsNode(const AId: TId): Boolean;
+    function ContainsNode(const AId: TId): Boolean; virtual; abstract;
   end;
 
 
 implementation
-
-type
-  TIndexEntry = record
-    FileOffset: TFileOffset;
-    Count: Integer;
-  end;
-
-  TIndexPage = record
-    FileOffset: TFileOffset;
-    Remaining: Integer;
-    NodeMap: TRouteNodeMapById;
-
-    function Find(AScanner: TFileScanner; AId: TId): TRouteNode;
-  end;
-
-{ TObjectVariantDataFile }
-
-procedure TObjectVariantDataFile.Init();
-begin
-  SetLength(Data, 0);
-  IsLoaded := False;
-  Filename := '';
-end;
-
-function TObjectVariantDataFile.Load(ATypeConfig: TTypeConfig;
-  AFilename: string): Boolean;
-var
-  Scanner: TFileScanner;
-  i, iDataCount: Integer;
-begin
-  Init();
-  Filename := AFilename;
-
-  Scanner := TFileScanner.Create();
-  try
-    Scanner.Open(Filename, fsmSequential, True);
-
-    Scanner.Read(iDataCount);
-    SetLength(Data, iDataCount);
-    for i := 0 to iDataCount-1 do
-    begin
-      Data[i].Read(ATypeConfig, Scanner);
-    end;
-    Scanner.Close();
-    IsLoaded := True;
-  finally
-    Scanner.Free();
-  end;
-  Result := IsLoaded;
-end;
 
 
 end.

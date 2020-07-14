@@ -170,6 +170,9 @@ type
 
     procedure FillBoundingBox(out ABoundingBox: TGeoBox);
     function GetBoundingBox(): TGeoBox;
+
+    { Return True if given point inside this Ring polygon }
+    function IsPointInside(const APoint: TGeoPoint): Boolean;
   end;
 
   { Node data read/write mode for TArea.Read() and TArea.Write()
@@ -347,8 +350,8 @@ type
     YAbs: Integer;              // Absolute y coordinate of the cell in relation to level and cell size
     XRel: Integer;              // X coordinate of cell in relation to cell index of this level
     YRel: Integer;              // Y coordinate of cell in relation to cell index of this level
-    CellWidth: Double;          // Width of cell
-    CellHeight: Double;         // Height of cell
+    CellWidth: TReal;          // Width of cell
+    CellHeight: TReal;         // Height of cell
     Coords: TGroundTileCoordArray;  // Optional coordinates for coastline
   end;
 
@@ -356,6 +359,9 @@ type
   TGroundTileList = array of TGroundTile;
 
   { This is the data structure holding all to be rendered data. }
+
+  { TMapData }
+
   TMapData = class
   private
     FNodeList: TMapNodeList;
@@ -593,6 +599,25 @@ begin
   FillBoundingBox(Result);
 end;
 
+function TMapAreaRing.IsPointInside(const APoint: TGeoPoint): Boolean;
+var
+  ZeroPt, TmpPt: TGeoPoint;
+  i, n: Integer;
+begin
+  Result := GetBoundingBox().IsIncludes(APoint);
+  if Result then
+  begin
+    ZeroPt.Init(0, 0);
+    n := 0;
+    for i := 1 to Length(Nodes)-1 do
+    begin
+      if GetLineIntersection(ZeroPt, APoint, Nodes[i-1], Nodes[i], TmpPt) then
+        Inc(n);
+    end;
+    Result := ((n mod 2) <> 0);
+  end;
+end;
+
 { TMapArea }
 
 procedure TMapArea.AfterConstruction();
@@ -783,6 +808,7 @@ var
   IsMultipleRings, HasMaster, IsUseIds: Boolean;
   RingCount: Integer;
   i: Integer;
+  DebugPos: Int64;
   pRing: ^TMapAreaRing;
 begin
   RingCount := Length(Rings);
@@ -801,6 +827,7 @@ begin
 
   // Master/Outer ring
   pRing := @Rings[0];
+  DebugPos := AWriter.Stream.Position;
   AWriter.WriteTypeId(pRing^.GetType().AreaId,
                       ATypeConfig.AreaTypeIdBytes);
 
@@ -998,6 +1025,7 @@ var
   TypeId: TTypeId;
   TypeInfo: TTypeInfo;
   IsUseIds: Boolean;
+  DebugPos: Int64;
 begin
   FileOffset := AScanner.Stream.Position;
   AScanner.ReadTypeId(TypeId, ATypeConfig.WayTypeIdBytes);
@@ -1005,6 +1033,7 @@ begin
   FeatureValueBuffer.SetType(TypeInfo);
   FeatureValueBuffer.Read(AScanner);
 
+  DebugPos := AScanner.Stream.Position;
   case ADataMode of
     ndmAuto: IsUseIds := (TypeInfo.CanRoute or TypeInfo.OptimizeLowZoom);
     ndmAll:  IsUseIds := True;
@@ -1032,13 +1061,16 @@ procedure TMapWay.WriteData(ATypeConfig: TTypeConfig; AWriter: TFileWriter;
   ADataMode: TNodeDataMode);
 var
   IsUseIds: Boolean;
+  //DebugPos: Int64;
 begin
   Assert(Length(Nodes) > 0);
 
+  //DebugPos := AWriter.Stream.Position;
   AWriter.WriteTypeId(FeatureValueBuffer.TypeInfo.WayId,
                       ATypeConfig.WayTypeIdBytes);
 
   FeatureValueBuffer.Write(AWriter);
+  //DebugPos := AWriter.Stream.Position;
 
   case ADataMode of
     ndmAuto: IsUseIds := (FeatureValueBuffer.TypeInfo.CanRoute or FeatureValueBuffer.TypeInfo.OptimizeLowZoom);

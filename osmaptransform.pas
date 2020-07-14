@@ -52,8 +52,8 @@ type
   public
     IsVisible: Boolean; // point visible on screen area
     IsDraw: Boolean;    // point visible or connected to visible
-    XLon: Double;
-    YLat: Double;
+    XLon: TReal;
+    YLat: TReal;
     Index: Integer;     // original index, for copy of point
 
     function IsEqual(AOther: TTransPoint): Boolean; inline;
@@ -85,11 +85,11 @@ type
   TPolyCell = object
   public
     CellCenter: TVertex2D; // cell center
-    HalfSize: Double;      // half the cell size
-    Dist: Double;          // distance from cell center to polygon
-    MaxDist: Double;       // max distance to polygon within a cell
+    HalfSize: TReal;      // half the cell size
+    Dist: TReal;          // distance from cell center to polygon
+    MaxDist: TReal;       // max distance to polygon within a cell
 
-    procedure Init(AX, AY: Double; AHalfSize: Double; const APoly: TVertex2DArray);
+    procedure Init(AX, AY: TReal; AHalfSize: TReal; const APoly: TVertex2DArray);
     // set as polygon centroid
     procedure InitCentroid(const APoly: TVertex2DArray);
   end;
@@ -102,7 +102,7 @@ type
     FCount: Integer;
     FStartIndex: Integer;
     FEndIndex: Integer;
-    FMaxDistMax: Double;
+    FMaxDistMax: TReal;
   public
     procedure Init();
     procedure Push(const AItem: TPolyCell);
@@ -125,10 +125,10 @@ type
 
     procedure TransformGeoToPixel(const AProjection: TProjection;
                              const ANodes: TGeoPointArray);
-    procedure DropSimilarPoints(AOptimizeErrorTolerance: Double);
+    procedure DropSimilarPoints(AOptimizeErrorTolerance: TReal);
     { Drop every point that is (more or less) on direct line between two points A and B }
-    procedure DropRedundantPointsFast(AOptimizeErrorTolerance: Double);
-    procedure DropRedundantPointsDouglasPeucker(AOptimizeErrorTolerance: Double; AIsArea: Boolean);
+    procedure DropRedundantPointsFast(AOptimizeErrorTolerance: TReal);
+    procedure DropRedundantPointsDouglasPeucker(AOptimizeErrorTolerance: TReal; AIsArea: Boolean);
     procedure DropEqualPoints();
 
     { Returns true, if the lines defined by the given coordinates intersect. }
@@ -166,22 +166,22 @@ type
     procedure TransformArea(const AProjection: TProjection;
                        AOptimize: TTransOptimizeMethod;
                        const ANodes: TGeoPointArray;
-                       AOptimizeErrorTolerance: Double;
+                       AOptimizeErrorTolerance: TReal;
                        AConstraint: TTransOutputConstraint = tocNoConstraint);
 
     procedure TransformWay(const AProjection: TProjection;
                        AOptimize: TTransOptimizeMethod;
                        const ANodes: TGeoPointArray;
-                       AOptimizeErrorTolerance: Double;
+                       AOptimizeErrorTolerance: TReal;
                        AConstraint: TTransOutputConstraint = tocNoConstraint);
 
     procedure TransformBoundingBox(const AProjection: TProjection;
                        AOptimize: TTransOptimizeMethod;
                        const ABoundingBox: TGeoBox;
-                       AOptimizeErrorTolerance: Double;
+                       AOptimizeErrorTolerance: TReal;
                        AConstraint: TTransOutputConstraint = tocNoConstraint);
 
-    function GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double): Boolean;
+    function GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal): Boolean;
 
     property PointsCount: Integer read FLength;
     property StartIndex: Integer read FStart;
@@ -202,32 +202,32 @@ type
     procedure Init();
     procedure Reset();
     procedure Assign(AOther: TTransBuffer);
-    function PushCoord(X, Y: Double): Integer;
+    function PushCoord(X, Y: TReal): Integer;
 
     procedure TransformArea(const AProjection: TProjection;
                        AOptimize: TTransOptimizeMethod;
                        const ANodes: TGeoPointArray;
                        out AStart, AEnd: Integer;
-                       AOptimizeErrorTolerance: Double);
+                       AOptimizeErrorTolerance: TReal);
 
     function TransformWay(const AProjection: TProjection;
                        AOptimize: TTransOptimizeMethod;
                        const ANodes: TGeoPointArray;
                        out AStart, AEnd: Integer;
-                       AOptimizeErrorTolerance: Double): Boolean;
+                       AOptimizeErrorTolerance: TReal): Boolean;
 
     { Generate parallel way to way stored in this buffer on range orgStart, orgEnd (inclusive)
       Result is stored after the last valid point. Generated way offsets are returned
       in start and end. }
     function GenerateParallelWay(AOrgStart, AOrgEnd: Integer;
-                       AOffset: Double;
+                       AOffset: TReal;
                        out AStart, AEnd: Integer): Boolean;
 
     { A fast algorithm for finding polygon pole of inaccessibility, the most
       distant internal point from the polygon outline (not to be confused with
       centroid). Useful for optimal placement of a text label on a polygon.
       https://github.com/mapbox/polylabel }
-    function Polylabel(AStart, AEnd: Integer; APrecision: Double = 1.0): TVertex2D;
+    function Polylabel(AStart, AEnd: Integer; APrecision: TReal = 1.0): TVertex2D;
 
     procedure FillVertex2DArray(out APolyArr: TVertex2DArray; AStart, AEnd: Integer);
 
@@ -240,15 +240,15 @@ type
 
   TTransLineSegment = object
     Ref: TTransPoint;
-    XDelta: Double;
-    YDelta: Double;
-    InverseLength: Double;
+    XDelta: TReal;
+    YDelta: TReal;
+    InverseLength: TReal;
 
     procedure Init(const A, B: TTransPoint);
 
     function IsValid(): Boolean;
 
-    function CalculateDistanceSquared(const p: TTransPoint): Double;
+    function CalculateDistanceSquared(const p: TTransPoint): TReal;
   end;
 
 implementation
@@ -258,7 +258,7 @@ uses Math;
 const
   SQRT2 = 1.41421356237; // sqrt(2);
 
-function fabs(a: Double): Double; inline;
+function fabs(a: TReal): TReal; inline;
 begin
   Result := abs(a);
 end;
@@ -267,9 +267,9 @@ end;
   p - The point in distance to a line
   a - One point defining the line
   b - Another point defining the line }
-function CalculateDistancePointToLineSegment(const p, a, b: TTransPoint): Double;
+function CalculateDistancePointToLineSegment(const p, a, b: TTransPoint): TReal;
 var
-  xdelta, ydelta, u, cx, cy, dx, dy: Double;
+  xdelta, ydelta, u, cx, cy, dx, dy: TReal;
 begin
   xdelta := b.XLon - a.XLon;
   ydelta := b.YLat - a.YLat;
@@ -304,9 +304,9 @@ begin
   Result := sqrt((dx * dx) + (dy * dy));
 end;
 
-function CalculateDistancePointToPoint(const a, b: TTransPoint): Double;
+function CalculateDistancePointToPoint(const a, b: TTransPoint): TReal;
 var
-  dx, dy: Double;
+  dx, dy: TReal;
 begin
   dx := b.XLon - a.XLon;
   dy := b.YLat - a.YLat;
@@ -315,9 +315,9 @@ begin
 end;
 
 // get squared distance from a point (P) to a segment (A, B)
-function CalculateSquaredDistancePointToLineSegment(const P, A, B: TVertex2D): Double;
+function CalculateSquaredDistancePointToLineSegment(const P, A, B: TVertex2D): TReal;
 var
-  X, Y, DX, DY, T: Double;
+  X, Y, DX, DY, T: TReal;
 begin
   X := A.X;
   Y := A.Y;
@@ -348,10 +348,10 @@ end;
 
 procedure SimplifyPolyLineDouglasPeucker(var APoints: TTransPointArray;
   ABeginIndex, AEndIndex, AEndValueIndex: Integer;
-  AOptimizeErrorToleranceSquared: Double);
+  AOptimizeErrorToleranceSquared: TReal);
 var
   LineSegment: TTransLineSegment;
-  distanceSquared, maxDistanceSquared: Double;
+  distanceSquared, maxDistanceSquared: TReal;
   i, maxDistanceIndex: Integer;
 begin
   LineSegment.Init(APoints[ABeginIndex], APoints[AEndValueIndex]);
@@ -528,7 +528,7 @@ begin
   end;
 end;
 
-procedure TTransPolygon.DropSimilarPoints(AOptimizeErrorTolerance: Double);
+procedure TTransPolygon.DropSimilarPoints(AOptimizeErrorTolerance: TReal);
 var
   i, j: Integer;
 begin
@@ -554,10 +554,10 @@ begin
   end;
 end;
 
-procedure TTransPolygon.DropRedundantPointsFast(AOptimizeErrorTolerance: Double);
+procedure TTransPolygon.DropRedundantPointsFast(AOptimizeErrorTolerance: TReal);
 var
   prev, cur, next: Integer;
-  distance: Double;
+  distance: TReal;
 begin
   // Drop every point that is (more or less) on direct line between two points A and B
   prev := 0;
@@ -601,11 +601,11 @@ begin
 end;
 
 procedure TTransPolygon.DropRedundantPointsDouglasPeucker(
-  AOptimizeErrorTolerance: Double; AIsArea: Boolean);
+  AOptimizeErrorTolerance: TReal; AIsArea: Boolean);
 var
-  optimizeErrorToleranceSquared: Double;
+  optimizeErrorToleranceSquared: TReal;
   i, iBeg, iEnd, maxDistIndex: Integer;
-  maxDist, dist: Double;
+  maxDist, dist: TReal;
 begin
   // An implementation of Douglas-Peuker algorithm http://softsurfer.com/Archive/algorithm_0205/algorithm_0205.htm
 
@@ -703,7 +703,7 @@ end;
 
 function TTransPolygon.IsLinesIntersect(const A1, A2, B1, B2: TTransPoint): Boolean;
 var
-  denr, ua_numr, ub_numr, ua, ub: Double;
+  denr, ua_numr, ub_numr, ua, ub: TReal;
   aBox, bBox: TGeoBox;
 begin
   if A1.IsEqual(B1)
@@ -762,7 +762,7 @@ procedure TTransPolygon.GetSegmentBoundingBox(const APoints: TTransPointArray;
   AFrom, ATo: Integer; out ABoundingBox: TGeoBox);
 var
   i, iCount: Integer;
-  MinLon, MinLat, MaxLon, MaxLat: Double;
+  MinLon, MinLat, MaxLon, MaxLat: TReal;
 begin
   iCount := Length(APoints);
   if (iCount = 0) or (AFrom >= ATo) then
@@ -973,7 +973,7 @@ end;
 procedure TTransPolygon.TransformArea(const AProjection: TProjection;
   AOptimize: TTransOptimizeMethod;
   const ANodes: TGeoPointArray;
-  AOptimizeErrorTolerance: Double;
+  AOptimizeErrorTolerance: TReal;
   AConstraint: TTransOutputConstraint);
 begin
   if not CheckCapacity(Length(ANodes), 2) then
@@ -1002,7 +1002,7 @@ end;
 
 procedure TTransPolygon.TransformWay(const AProjection: TProjection;
   AOptimize: TTransOptimizeMethod; const ANodes: TGeoPointArray;
-  AOptimizeErrorTolerance: Double; AConstraint: TTransOutputConstraint);
+  AOptimizeErrorTolerance: TReal; AConstraint: TTransOutputConstraint);
 begin
   if not CheckCapacity(Length(ANodes), 1) then
     Exit;
@@ -1031,7 +1031,7 @@ end;
 procedure TTransPolygon.TransformBoundingBox(const AProjection: TProjection;
   AOptimize: TTransOptimizeMethod;
   const ABoundingBox: TGeoBox;
-  AOptimizeErrorTolerance: Double;
+  AOptimizeErrorTolerance: TReal;
   AConstraint: TTransOutputConstraint);
 var
   Coords: TGeoPointArray;
@@ -1056,7 +1056,7 @@ begin
                 AConstraint);
 end;
 
-function TTransPolygon.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double): Boolean;
+function TTransPolygon.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal): Boolean;
 var
   iPos: Integer;
 begin
@@ -1112,7 +1112,7 @@ begin
   FCount := 0;
 end;
 
-function TTransBuffer.PushCoord(X, Y: Double): Integer;
+function TTransBuffer.PushCoord(X, Y: TReal): Integer;
 var
   NewSize: Integer;
 begin
@@ -1127,11 +1127,11 @@ begin
 end;
 
 function TTransBuffer.GenerateParallelWay(AOrgStart, AOrgEnd: Integer;
-  AOffset: Double; out AStart, AEnd: Integer): Boolean;
+  AOffset: TReal; out AStart, AEnd: Integer): Boolean;
 var
-  OAX, OAY, OBX, OBY: Double;
+  OAX, OAY, OBX, OBY: TReal;
   i: Integer;
-  det1, det2, addX, addY: Double;
+  det1, det2, addX, addY: TReal;
 begin
   Result := False;
   if ((AOrgStart+1) > AOrgEnd) or (AOrgEnd >= Count) then
@@ -1210,10 +1210,10 @@ begin
   end;
 end;
 
-function TTransBuffer.Polylabel(AStart, AEnd: Integer; APrecision: Double): TVertex2D;
+function TTransBuffer.Polylabel(AStart, AEnd: Integer; APrecision: TReal): TVertex2D;
 var
-  MinX, MinY, MaxX, MaxY: Double;
-  width, height, cellSize, h, x, y: Double;
+  MinX, MinY, MaxX, MaxY: TReal;
+  width, height, cellSize, h, x, y: TReal;
   i, numProbes: Integer;
   TmpCell, BestCell, BBoxCell: TPolyCell;
   c: TVertex2D;
@@ -1324,7 +1324,7 @@ end;
 
 procedure TTransBuffer.TransformArea(const AProjection: TProjection;
   AOptimize: TTransOptimizeMethod; const ANodes: TGeoPointArray; out AStart,
-  AEnd: Integer; AOptimizeErrorTolerance: Double);
+  AEnd: Integer; AOptimizeErrorTolerance: TReal);
 var
   IsStart: Boolean;
   i: Integer;
@@ -1351,7 +1351,7 @@ end;
 
 function TTransBuffer.TransformWay(const AProjection: TProjection;
   AOptimize: TTransOptimizeMethod; const ANodes: TGeoPointArray; out AStart,
-  AEnd: Integer; AOptimizeErrorTolerance: Double): Boolean;
+  AEnd: Integer; AOptimizeErrorTolerance: TReal): Boolean;
 var
   IsStart: Boolean;
   i, n, iFirstDraw, iLastDraw: Integer;
@@ -1422,9 +1422,9 @@ begin
   Result := not ((XDelta = 0.0) and (YDelta = 0.0));
 end;
 
-function TTransLineSegment.CalculateDistanceSquared(const p: TTransPoint): Double;
+function TTransLineSegment.CalculateDistanceSquared(const p: TTransPoint): TReal;
 var
-  cx, cy, dx, dy, u: Double;
+  cx, cy, dx, dy, u: TReal;
 begin
   cx := p.XLon - Ref.XLon;
   cy := p.YLat - Ref.YLat;
@@ -1440,11 +1440,11 @@ end;
 
 { TPolyCell }
 
-procedure TPolyCell.Init(AX, AY: Double; AHalfSize: Double;
+procedure TPolyCell.Init(AX, AY: TReal; AHalfSize: TReal;
   const APoly: TVertex2DArray);
 var
   IsInside: Boolean;
-  minDistSq: Double;
+  minDistSq: TReal;
   i, j, len: Integer;
   A, B: TVertex2D;
 begin
@@ -1482,7 +1482,7 @@ end;
 
 procedure TPolyCell.InitCentroid(const APoly: TVertex2DArray);
 var
-  Area, X, Y, F: Double;
+  Area, X, Y, F: TReal;
   i, j, len: Integer;
   A, B, C: TVertex2D;
 begin

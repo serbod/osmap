@@ -10,9 +10,8 @@ uses
   Forms, MainForm, OsMapPainter, OsMapTypes, OsMapStyles, OsMapGeometry,
   OsMapObjects, OsMapParameters, OsMapObjTypes, OsMapTags, OsMapFiles,
   OsMapUtils, OsMapObjFeatures, OsMapStyleConfig, OsMapLabels, OsMapTransform,
-  OsMapPainterAgg, OsMapProjection, OsMapManager, OsMapFormatMp, OsMapRouting,
-  OsMapRoutingService, OsMapRoutingSimple, OsMapRoutingDatabase, OsMapDatabase,
-  OsMapDataFiles;
+  OsMapPainterAgg, OsMapProjection, OsMapManager, OsMapFormatMp,
+  OsMapDataFiles, PainterAggForm, PainterBgraForm;
 
 {$R *.res}
 
@@ -21,6 +20,7 @@ begin
   Application.Scaled := True;
   Application.Initialize;
   Application.CreateForm(TForm1, Form1);
+  Application.CreateForm(TFormPainterBGRA, FormPainterBGRA);
   Application.Run;
 end.
 

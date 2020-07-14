@@ -106,22 +106,24 @@ type
 
   TMapColor = object
   public
-    R: Double; // Red   (0.0 .. 1.0)
-    G: Double; // Green (0.0 .. 1.0)
-    B: Double; // Blue  (0.0 .. 1.0)
-    A: Double; // Alpha (0.0 .. 1.0)
+    R: TReal; // Red   (0.0 .. 1.0)
+    G: TReal; // Green (0.0 .. 1.0)
+    B: TReal; // Blue  (0.0 .. 1.0)
+    A: TReal; // Alpha (0.0 .. 1.0)
 
-    procedure Init(AR, AG, AB, AA: Double); inline;
+    procedure Init(AR, AG, AB, AA: TReal); inline;
     procedure Assign(const AValue: TMapColor); inline;
     { True if color not transparent (Alpha = 1) }
     function IsSolid(): Boolean; inline;
-    { True if color transparent (Alpha = 0) }
+    { True if color visible (Alpha > 0) }
     function IsVisible(): Boolean; inline;
     procedure InitFromBytes(AR, AG, AB, AA: Byte); inline;
     procedure InitRandom();
+    { values as bytes }
+    procedure ToBytes(out AR, AG, AB, AA: Byte);
 
-    function Lighten(AFactor: Double): TMapColor;
-    function Darken(AFactor: Double): TMapColor;
+    function Lighten(AFactor: TReal): TMapColor;
+    function Darken(AFactor: TReal): TMapColor;
     function Decolor(): TMapColor;
 
     function ToHexString(): string;
@@ -148,8 +150,8 @@ type
     procedure SetStringValue(AAttrIndex: Integer; const AValue: string); virtual;
     procedure SetColorValue(AAttrIndex: Integer; const AValue: TColor); virtual;
     procedure SetMagnificationValue(AAttrIndex: Integer; const AValue: TMagnification); virtual;
-    procedure SetDoubleValue(AAttrIndex: Integer; AValue: Double);
-    procedure SetDoubleArrayValue(AAttrIndex: Integer; const AValue: array of Double); virtual;
+    procedure SetDoubleValue(AAttrIndex: Integer; AValue: TReal);
+    procedure SetDoubleArrayValue(AAttrIndex: Integer; const AValue: array of TReal); virtual;
     procedure SetSymbolValue(AAttrIndex: Integer; const AValue: TSymbol); virtual;
     procedure SetIntValue(AAttrIndex: Integer; AValue: Integer); virtual;
     procedure SetUIntValue(AAttrIndex: Integer; AValue: Cardinal); virtual;
@@ -254,13 +256,13 @@ type
     Slot: string;
     LineColor: TMapColor;
     GapColor: TMapColor;
-    DisplayWidth: Double;    // width in mm, added to Width
-    Width: Double;           // width in meters
-    DisplayOffset: Double;
-    Offset: Double;          // for parallel line
+    DisplayWidthMM: TReal;  // width in mm, added to Width
+    Width: TReal;           // width in meters
+    DisplayOffset: TReal;
+    Offset: TReal;          // for parallel line
     JoinCap: TLineCapStyle;  // capButt, capRound, capSquare
     EndCap: TLineCapStyle;   // capButt, capRound, capSquare
-    Dash: array of Double;   // pairs of line and gap widths (in pixels?)
+    Dash: array of TReal;   // pairs of line and gap widths (in pixels?)
     Priority: Integer;
     ZIndex: Integer;
     OffsetRel: TLineOffsetRel;  // lorBase, lorLeftOutline, lorRightOutline, lorLaneDivider
@@ -268,7 +270,7 @@ type
     function IsVisible(): Boolean;
     function HasDashes(): Boolean;
 
-    procedure AddDash(ALen, AGap: Double);
+    procedure AddDash(ALen, AGap: TReal);
   end;
 
   {$ifdef FPC}
@@ -304,10 +306,10 @@ type
     Slot: string;
     Color: TMapColor;
     GapColor: TMapColor;
-    Width: Double;          // border line width in mm
-    Dash: array of Double;
-    DisplayOffset: Double;
-    Offset: Double;
+    WidthMM: TReal;          // border line width in mm
+    Dash: array of TReal;
+    DisplayOffset: TReal;
+    Offset: TReal;
     Priority: Integer;
 
     function IsVisible(): Boolean;
@@ -324,7 +326,7 @@ type
   TLabelStyle = class(TStyle)
   public
     Priority: Integer;
-    Size: Double;          // font height in mm
+    SizeMM: TReal;          // font height in mm
   end;
 
   TTextStyleStyle = (tssNormal, tssEmphasize);
@@ -348,7 +350,7 @@ type
     TextColor: TMapColor;        // Color of text
     Style: TTextStyleStyle;      // Style of the text
     ScaleAndFadeMagLevel: Byte;  // Automatic pseudo-autoSize scaling for nodes
-    IsAutoSize: Boolean;         // Calculate the size of the label base don the height of the area
+    IsAutoSize: Boolean;         // Calculate the size of the label based on the height of the area
 
     // IsVisible() -> (FeatureType <> ftNone) and TextColor.IsVisible
     // GetAlpha() -> TextColor.A
@@ -394,7 +396,7 @@ type
   private
     FShieldStyle: TShieldStyle;
   public
-    ShieldSpace: Double;
+    ShieldSpace: TReal;
     procedure AfterConstruction; override;
     procedure BeforeDestruction; override;
 
@@ -415,10 +417,10 @@ type
   public
     //LabelRef: TLabelProvider; // The label - a reference to a feature and its label index
     FeatureType: TFeatureType;   // feature type, used for getting 'label' value
-    Size: Double;                // font height in mm
+    SizeMM: TReal;               // font height in mm
     TextColor: TMapColor;        // Color of text
-    DisplayOffset: Double;
-    Offset: Double;
+    DisplayOffset: TReal;
+    Offset: TReal;
     Priority: Integer;
   end;
 
@@ -431,7 +433,7 @@ type
   TIconStyle = class(TStyle)
   public
     Symbol: TMapSymbol; // The label - a reference to a feature and its label index
-    Size: Double;
+    Size: TReal;
     IconName: string;    // name of the icon as given in style
     IconId: Integer;     // Id for external resource binding
     Width: Integer;      // width of icon in pixels
@@ -453,7 +455,7 @@ type
        AFillStyle: TFillStyle;
        ABorderStyle: TBorderStyle);
 
-    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double); virtual; abstract;
+    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal); virtual; abstract;
 
     property ProjectionMode: TDrawPrimitiveProjectionMode read FProjectionMode;
     property FillStyle: TFillStyle read FFillStyle;
@@ -474,7 +476,7 @@ type
 
     procedure AddCoord(const ACoord: TVertex2D);
 
-    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double); override;
+    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal); override;
   end;
 
   { TRectanglePrimitive }
@@ -482,17 +484,17 @@ type
   TRectanglePrimitive = class(TDrawPrimitive)
   public
     TopLeft: TVertex2D;
-    Width: Double;
-    Height: Double;
+    Width: TReal;
+    Height: TReal;
 
     constructor Create(AProjectionMode: TDrawPrimitiveProjectionMode;
        const ATopLeft: TVertex2D;
-       AWidth: Double;
-       AHeight: Double;
+       AWidth: TReal;
+       AHeight: TReal;
        AFillStyle: TFillStyle;
        ABorderStyle: TBorderStyle);
 
-    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double); override;
+    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal); override;
   end;
 
   { TCirclePrimitive }
@@ -500,15 +502,15 @@ type
   TCirclePrimitive = class(TDrawPrimitive)
   public
     Center: TVertex2D;
-    Radius: Double;
+    Radius: TReal;
 
     constructor Create(AProjectionMode: TDrawPrimitiveProjectionMode;
        const ACenter: TVertex2D;
-       ARadius: Double;
+       ARadius: TReal;
        AFillStyle: TFillStyle;
        ABorderStyle: TBorderStyle);
 
-    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double); override;
+    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal); override;
   end;
 
   {  Definition of a symbol. A symbol consists of a list of DrawPrimitives
@@ -520,10 +522,10 @@ type
   private
     FPrimitives: TDrawPrimitiveList;
     FName: string;
-    FMinX: Double;
-    FMinY: Double;
-    FMaxX: Double;
-    FMaxY: Double;
+    FMinX: TReal;
+    FMinY: TReal;
+    FMaxX: TReal;
+    FMaxY: TReal;
   public
 
     constructor Create(AName: string);
@@ -531,15 +533,15 @@ type
 
     procedure AddPrimitive(APrimitive: TDrawPrimitive);
 
-    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double);
+    procedure GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal);
 
-    function GetWidth(): Double;
-    function GetHeight(): Double;
+    function GetWidth(): TReal;
+    function GetHeight(): TReal;
 
     property Primitives: TDrawPrimitiveList read FPrimitives;
     property Name: string read FName;
-    property Width: Double read GetWidth;
-    property Height: Double read GetHeight;
+    property Width: TReal read GetWidth;
+    property Height: TReal read GetHeight;
   end;
 
   {TPathSymbolStyleAttribute = (
@@ -552,15 +554,15 @@ type
   TPathSymbolStyle = class(TStyle)
   private
     FSymbol: TMapSymbol;
-    FSymbolSpace: Double;
-    FDisplayOffset: Double;
-    FOffset: Double;
+    FSymbolSpace: TReal;
+    FDisplayOffset: TReal;
+    FOffset: TReal;
 
   public
     property Symbol: TMapSymbol read FSymbol;
-    property SymbolSpace: Double read FSymbolSpace;
-    property DisplayOffset: Double read FDisplayOffset;
-    property Offset: Double read FOffset;
+    property SymbolSpace: TReal read FSymbolSpace;
+    property DisplayOffset: TReal read FDisplayOffset;
+    property Offset: TReal read FOffset;
 
     //procedure CopyAttributes(AOther: TPathSymbolStyle; AAttr: TPathSymbolStyleAttribute);
   end;
@@ -591,7 +593,7 @@ uses Math;
 const
   COLOR_CONV_CONST = 1.0 / 255;
 
-function fmod(a, b: Double): Double;
+function fmod(a, b: TReal): TReal;
 begin
   Result := a - b * Int(a / b);
 end;
@@ -696,7 +698,7 @@ end;
 
 { TMapColor }
 
-procedure TMapColor.Init(AR, AG, AB, AA: Double);
+procedure TMapColor.Init(AR, AG, AB, AA: TReal);
 begin
   R := AR;
   G := AG;
@@ -746,7 +748,17 @@ begin
   A := 1.0;
 end;
 
-function TMapColor.Lighten(AFactor: Double): TMapColor;
+procedure TMapColor.ToBytes(out AR, AG, AB, AA: Byte);
+begin
+  AR := Byte(Trunc(R * 255));
+  AG := Byte(Trunc(G * 255));
+  AB := Byte(Trunc(B * 255));
+  AA := Byte(Trunc(A * 255));
+  if AA > 250 then
+    AA := 255;
+end;
+
+function TMapColor.Lighten(AFactor: TReal): TMapColor;
 begin
   Result.R := R + (1-R) * AFactor;
   Result.G := G + (1-G) * AFactor;
@@ -754,7 +766,7 @@ begin
   Result.A := A;
 end;
 
-function TMapColor.Darken(AFactor: Double): TMapColor;
+function TMapColor.Darken(AFactor: TReal): TMapColor;
 begin
   Result.R := R - R * AFactor;
   Result.G := G - G * AFactor;
@@ -891,7 +903,7 @@ end;
 
 function TLineStyle.IsVisible(): Boolean;
 begin
-  Result := (DisplayWidth > 0.0) or (Width > 0.0);
+  Result := (DisplayWidthMM > 0.0) or (Width > 0.0);
   //Result := Result and IsColorVisible(LineColor);
 end;
 
@@ -900,7 +912,7 @@ begin
   Result := (Length(Dash) <> 0);
 end;
 
-procedure TLineStyle.AddDash(ALen, AGap: Double);
+procedure TLineStyle.AddDash(ALen, AGap: TReal);
 var
   n: Integer;
 begin
@@ -914,8 +926,8 @@ end;
 
 function TBorderStyle.IsVisible(): Boolean;
 begin
-  Result := (Width > 0);
-  //Result := (Width > 0) and IsColorVisible(Color);
+  Result := (WidthMM > 0);
+  //Result := (WidthMM > 0) and IsColorVisible(Color);
 end;
 
 { TDrawPrimitive }
@@ -940,7 +952,7 @@ begin
   Coords[n].Assign(ACoord);
 end;
 
-procedure TPolygonPrimitive.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double);
+procedure TPolygonPrimitive.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal);
 var
   i: Integer;
 begin
@@ -963,7 +975,7 @@ end;
 
 constructor TRectanglePrimitive.Create(
   AProjectionMode: TDrawPrimitiveProjectionMode; const ATopLeft: TVertex2D;
-  AWidth: Double; AHeight: Double; AFillStyle: TFillStyle;
+  AWidth: TReal; AHeight: TReal; AFillStyle: TFillStyle;
   ABorderStyle: TBorderStyle);
 begin
   inherited Create(AProjectionMode, AFillStyle, ABorderStyle);
@@ -973,7 +985,7 @@ begin
 end;
 
 procedure TRectanglePrimitive.GetBoundingBox(out AMinX, AMinY, AMaxX,
-  AMaxY: Double);
+  AMaxY: TReal);
 begin
   AMinX := TopLeft.X;
   AMinY := TopLeft.Y;
@@ -985,14 +997,14 @@ end;
 
 constructor TCirclePrimitive.Create(
   AProjectionMode: TDrawPrimitiveProjectionMode; const ACenter: TVertex2D;
-  ARadius: Double; AFillStyle: TFillStyle; ABorderStyle: TBorderStyle);
+  ARadius: TReal; AFillStyle: TFillStyle; ABorderStyle: TBorderStyle);
 begin
   inherited Create(AProjectionMode, AFillStyle, ABorderStyle);
   Center.Assign(ACenter);
   Radius := ARadius;
 end;
 
-procedure TCirclePrimitive.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double);
+procedure TCirclePrimitive.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal);
 begin
   AMinX := Center.X - Radius;
   AMinY := Center.Y - Radius;
@@ -1023,7 +1035,7 @@ end;
 
 procedure TMapSymbol.AddPrimitive(APrimitive: TDrawPrimitive);
 var
-  _MinX, _MinY, _MaxX, _MaxY: Double;
+  _MinX, _MinY, _MaxX, _MaxY: TReal;
 begin
   APrimitive.GetBoundingBox(_MinX, _MinY, _MaxX, _MaxY);
   FMinX := min(FMinX, _MinX);
@@ -1033,7 +1045,7 @@ begin
   Primitives.Add(APrimitive);
 end;
 
-procedure TMapSymbol.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: Double);
+procedure TMapSymbol.GetBoundingBox(out AMinX, AMinY, AMaxX, AMaxY: TReal);
 begin
   AMinX := FMinX;
   AMinY := FMinY;
@@ -1041,12 +1053,12 @@ begin
   AMaxY := FMaxY;
 end;
 
-function TMapSymbol.GetWidth(): Double;
+function TMapSymbol.GetWidth(): TReal;
 begin
   Result := FMaxX - FMinX;
 end;
 
-function TMapSymbol.GetHeight(): Double;
+function TMapSymbol.GetHeight(): TReal;
 begin
   Result := FMaxY - FMinY;
 end;

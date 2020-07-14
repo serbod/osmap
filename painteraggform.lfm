@@ -1,0 +1,29 @@
+object FormPainterAgg: TFormPainterAgg
+  Left = 506
+  Height = 399
+  Top = 234
+  Width = 499
+  Caption = 'FormPainterAgg'
+  ClientHeight = 399
+  ClientWidth = 499
+  OnCreate = FormCreate
+  LCLVersion = '2.0.8.0'
+  object Agg2DControl1: TAgg2DControl
+    Left = 0
+    Height = 399
+    Top = 0
+    Width = 499
+    Align = alClient
+    OnMouseDown = Agg2DControl1MouseDown
+    OnMouseMove = Agg2DControl1MouseMove
+    OnMouseWheel = Agg2DControl1MouseWheel
+  end
+  object PopupMenu1: TPopupMenu
+    left = 271
+    top = 124
+    object miTest1: TMenuItem
+      Caption = 'Test 1'
+      OnClick = miTest1Click
+    end
+  end
+end

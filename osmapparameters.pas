@@ -35,7 +35,7 @@ unit OsMapParameters;
 interface
 
 uses
-  Classes, SysUtils, OsMapGeometry, OsMapTransform, OsMapUtils;
+  Classes, SysUtils, OsMapTypes, OsMapGeometry, OsMapTransform, OsMapUtils;
 
 type
   TMapIconMode = (
@@ -57,17 +57,18 @@ type
   TMapParameter = class
   private
     FFontName: string;                  // Name of the font to use
-    FFontSize: Double;                  // Metric size of base font (aka font size 100%) in millimeter
+    FFontSize: TReal;                  // Metric size of base font (aka font size 100%) in millimeter
+    FFontSizeMax: TReal;
 
     FIconPaths: array of string;        // List of paths to search for images for icons
     FPatternPaths: array of string;     // List of paths to search for images for patterns
 
-    FLineMinWidthPixel: Double;         // Minimum width of an line to be drawn
-    FAreaMinDimensionMM: Double;        // Minimum dimension (either width or height) of an area in mm
+    FLineMinWidthPixel: TReal;         // Minimum width of an line to be drawn
+    FAreaMinDimensionMM: TReal;        // Minimum dimension (either width or height) of an area in mm
 
     FOptimizeWayNodes: TTransOptimizeMethod;  // Try to reduce the number of nodes for
     FOptimizeAreaNodes: TTransOptimizeMethod; // Try to reduce the number of nodes for
-    FOptimizeErrorToleranceMm: Double;  // The maximum error to allow when optimizing lines, in mm
+    FOptimizeErrorToleranceMm: TReal;  // The maximum error to allow when optimizing lines, in mm
     FDrawFadings: Boolean;              // Draw label fadings (default: true)
     FDrawWaysWithFixedWidth: Boolean;   // Draw ways using the size of the style sheet, if if the way has a width explicitly given
     FDrawWaysBorder: Boolean;           // Draw border for ways
@@ -76,28 +77,28 @@ type
     FLabelLineMinCharCount: Integer;    // Labels will be _never_ word wrapped if they are shorter then the given characters
     FLabelLineMaxCharCount: Integer;    // Labels will be word wrapped if they are longer then the given characters
     FLabelLineFitToArea: Boolean;       // Labels will be word wrapped to fit object area
-    FLabelLineFitToWidth: Double;       // Labels will be word wrapped to fit given width in pixels
+    FLabelLineFitToWidth: TReal;       // Labels will be word wrapped to fit given width in pixels
     FLabelIncludesAddress: Boolean;
 
-    FLabelPadding: Double;              // Space around point labels in mm (default 1).
-    FPlateLabelPadding: Double;         // Space around plates in mm (default 5).
-    FOverlayLabelPadding: Double;       // Space around overlay labels in mm (default 6).
+    FLabelPadding: TReal;              // Space around point labels in mm (default 1).
+    FPlateLabelPadding: TReal;         // Space around plates in mm (default 5).
+    FOverlayLabelPadding: TReal;       // Space around overlay labels in mm (default 6).
 
     FIconMode: TMapIconMode;            // Mode of icons, it controls what type of files would be loaded and how icon dimensions will be calculated
-    FIconSize: Double;                  // Size of icons in mm (default 3.7)
-    FIconPixelSize: Double;             // Size of icons in px (default 14)
-    FIconPadding: Double;               // Space around icons and symbols in mm (default 1).
+    FIconSize: TReal;                  // Size of icons in mm (default 3.7)
+    FIconPixelSize: TReal;             // Size of icons in px (default 14)
+    FIconPadding: TReal;               // Space around icons and symbols in mm (default 1).
 
     FPatternMode: TMapPatternMode;      // Mode of pattern, it controls what type of files would be loaded and how pattern geometry will be canculated
-    FPatternSize: Double;               // Size of pattern image in mm (default 3.7)
+    FPatternSize: TReal;               // Size of pattern image in mm (default 3.7)
 
     FDropNotVisiblePointLabels: Boolean; // Point labels that are not visible, are clipped during label positioning phase
 
   private
     // Contour labels
-    FContourLabelOffset: Double;        // Offset in mm for beginning and end of an contour label in relation to contour begin and end
-    FContourLabelSpace: Double;         // Space in mm between repetitive labels on the same contour
-    FContourLabelPadding: Double;       // Space around contour labels in mm (default 1).
+    FContourLabelOffset: TReal;        // Offset in mm for beginning and end of an contour label in relation to contour begin and end
+    FContourLabelSpace: TReal;         // Space in mm between repetitive labels on the same contour
+    FContourLabelPadding: TReal;       // Space around contour labels in mm (default 1).
 
     FRenderBackground: Boolean;         // Render any background features, else render like the background should be transparent
     FRenderSeaLand: Boolean;            // Rendering of sea/land tiles
@@ -128,19 +129,23 @@ type
     // Name of the font to use
     property FontName: string read FFontName write FFontName;
     // Metric size of base font (aka font size 100%) in millimeter
-    property FontSize: Double read FFontSize write FFontSize;
+    // 4 mm -> 18 px on 96 DPI
+    // 3 mm ->
+    property FontSize: TReal read FFontSize write FFontSize;
+    // Metric maximum size of font in millimeter
+    property FontSizeMax: TReal read FFontSizeMax write FFontSizeMax;
 
     // Minimum width of an line to be drawn, default 0.2
-    property LineMinWidthPixel: Double read FLineMinWidthPixel write FLineMinWidthPixel;
+    property LineMinWidthPixel: TReal read FLineMinWidthPixel write FLineMinWidthPixel;
     // Minimum dimension (either width or height) of an area in mm, default 2.0
-    property AreaMinDimensionMM: Double read FAreaMinDimensionMM write FAreaMinDimensionMM;
+    property AreaMinDimensionMM: TReal read FAreaMinDimensionMM write FAreaMinDimensionMM;
 
     // Try to reduce the number of nodes for nodes, default: tomNone
     property OptimizeWayNodes: TTransOptimizeMethod read FOptimizeWayNodes write FOptimizeWayNodes;
     // Try to reduce the number of nodes for areas, default: tomNone
     property OptimizeAreaNodes: TTransOptimizeMethod read FOptimizeAreaNodes write FOptimizeAreaNodes;
     // The maximum error to allow when optimizing lines, in mm
-    property IsOptimizeErrorToleranceMm: Double read FOptimizeErrorToleranceMm;
+    property IsOptimizeErrorToleranceMm: TReal read FOptimizeErrorToleranceMm;
     // Draw label fadings (default: true)
     property IsDrawFadings: Boolean read FDrawFadings;
     // Draw ways using the size of the style sheet, if if the way has a width explicitly given
@@ -157,41 +162,41 @@ type
     // Labels will be word wrapped to fit object area
     property LabelLineFitToArea: Boolean read FLabelLineFitToArea;
     // Labels will be word wrapped to fit given width in pixels
-    property LabelLineFitToWidth: Double read FLabelLineFitToWidth;
+    property LabelLineFitToWidth: TReal read FLabelLineFitToWidth;
     // Label includes address
     property LabelIncludesAddress: Boolean read FLabelIncludesAddress write FLabelIncludesAddress;
 
 
     // Space around point labels in mm (default 1).
-    property LabelPadding: Double read FLabelPadding;
+    property LabelPadding: TReal read FLabelPadding;
     // Space around plates in mm (default 5).
-    property PlateLabelPadding: Double read FPlateLabelPadding;
+    property PlateLabelPadding: TReal read FPlateLabelPadding;
     // Space around overlay labels in mm (default 6).
-    property OverlayLabelPadding: Double read FOverlayLabelPadding;
+    property OverlayLabelPadding: TReal read FOverlayLabelPadding;
 
     // Mode of icons, it controls what type of files would be loaded and how icon dimensions will be calculated
     property IconMode: TMapIconMode read FIconMode;
     // Size of icons in mm (default 3.7)
-    property IconSize: Double read FIconSize;
+    property IconSize: TReal read FIconSize;
     // Size of icons in px (default 14)
-    property IconPixelSize: Double read FIconPixelSize;
+    property IconPixelSize: TReal read FIconPixelSize;
     // Space around icons and symbols in mm (default 1).
-    property IconPadding: Double read FIconPadding;
+    property IconPadding: TReal read FIconPadding;
 
     // Mode of pattern, it controls what type of files would be loaded and how pattern geometry will be canculated
     property PatternMode: TMapPatternMode read FPatternMode;
     // Size of pattern image in mm (default 3.7)
-    property PatternSize: Double read FPatternSize;
+    property PatternSize: TReal read FPatternSize;
 
     // Point labels that are not visible, are clipped during label positioning phase
     property IsDropNotVisiblePointLabels: Boolean read FDropNotVisiblePointLabels;
 
     // Offset in mm for beginning and end of an contour label in relation to contour begin and end
-    property ContourLabelOffset: Double read FContourLabelOffset;
+    property ContourLabelOffset: TReal read FContourLabelOffset;
     // Space in mm between repetitive labels on the same contour
-    property ContourLabelSpace: Double read FContourLabelSpace;
+    property ContourLabelSpace: TReal read FContourLabelSpace;
     // Space around contour labels in mm (default 1).
-    property ContourLabelPadding: Double read FContourLabelPadding;
+    property ContourLabelPadding: TReal read FContourLabelPadding;
 
     // Render any background features, else render like the background should be transparent
     property IsRenderBackground: Boolean read FRenderBackground;
@@ -237,7 +242,8 @@ end;
 procedure TMapParameter.ResetToDefaults();
 begin
   FFontName := 'Tahoma';              // Name of the font to use
-  FFontSize := 8;                     // Metric size of base font (aka font size 100%) in millimeter
+  FFontSize := 3;                     // Metric size of base font (aka font size 100%) in millimeter
+  FFontSizeMax := 8;                  // Metric size of maximum font height in millimeter
 
   FLineMinWidthPixel := 0.2;          // Minimum width of an line to be drawn
   FAreaMinDimensionMM := 2.0;         // Minimum dimension (either width or height) of an area in mm

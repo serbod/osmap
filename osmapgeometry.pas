@@ -69,8 +69,8 @@ const
 
 type
   //TII = SmallInt
-  TLatitude  = type Double;  // Latitude, -90.0 ... 90.0
-  TLongitude = type Double;  // Longitude,  -180.0 ... 180.0
+  TLatitude  = type TReal;  // Latitude, -90.0 ... 90.0
+  TLongitude = type TReal;  // Longitude,  -180.0 ... 180.0
 
   TGeoCoordBuffer = array [0..COORD_BUF_SIZE-1] of Byte;
 
@@ -146,7 +146,7 @@ type
     { Get coordinate of position + course and distance.
       ABearing: Target course in degree
       ADistance: Target distance }
-    function Add(ABearing: Double; ADistance: TDistance): TGeoPoint;
+    function Add(ABearing: TReal; ADistance: TDistance): TGeoPoint;
   end;
 
   TGeoPointArray = array of TGeoPoint;
@@ -228,11 +228,11 @@ type
 
     function GetCenter(): TGeoPoint;
     { Returns the width of the bounding box (maxLon-minLon) }
-    function GetWidth(): Double; inline;
+    function GetWidth(): TReal; inline;
     { Returns the height of the bounding box (maxLat-minLat) }
-    function GetHeight(): Double; inline;
+    function GetHeight(): TReal; inline;
     { Returns the size of the bounding box (width*height) }
-    function GetSize(): Double; inline;
+    function GetSize(): TReal; inline;
 
     function GetBottomLeft(): TGeoPoint;
     function GetBottomRight(): TGeoPoint;
@@ -328,11 +328,11 @@ function GetSphericalDistance(const A, B: TGeoPoint): TDistance;
 
 { Calculating Vincenty's inverse for getting the ellipsoidal distance
   of two points on Earth. }
-function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance; overload;
+function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: TReal): TDistance; overload;
 
 function GetEllipsoidalDistance(const A, B: TGeoPoint): TDistance; overload;
 
-function GetEllipsoidalDistanceCoord(const APosition: TGeoPoint; ABearing: Double;
+function GetEllipsoidalDistanceCoord(const APosition: TGeoPoint; ABearing: TReal;
                                   const ADistance: TDistance): TGeoPoint;
 
 
@@ -345,15 +345,15 @@ function GetEllipsoidalDistanceCoord(const APosition: TGeoPoint; ABearing: Doubl
 { Returns true, if the lines defined by the given coordinates intersect. Returns the intersection coordinate. }
 function GetLineIntersection(const A1, A2, B1, B2: TGeoPoint; out AIntersection: TGeoPoint): Boolean;
 
-procedure Normalize(X, Y: Double; out NX, NY: Double); inline;
+procedure Normalize(X, Y: TReal; out NX, NY: TReal); inline;
 
 { Calculates the determinant of the line between the given points. }
-function Det(X1, Y1, X2, Y2: Double): Double; inline;
+function Det(X1, Y1, X2, Y2: TReal): TReal; inline;
 
 { compute difference of two angles
   A - angle in radians in range -M_PI .. +M_PI
   B - angle in radians in range -M_PI .. +M_PI }
-function AngleDiff(A, B: Double): Double;
+function AngleDiff(A, B: TReal): TReal;
 
 
 var
@@ -361,8 +361,8 @@ var
     For the conversion the float value is shifted to positive
     value and afterwards multiplied by conversion factor
     to get long values without significant values after colon. }
-  GlobalLonConversionFactor: Double;
-  GlobalLatConversionFactor: Double;
+  GlobalLonConversionFactor: TReal;
+  GlobalLatConversionFactor: TReal;
 
 implementation
 
@@ -373,7 +373,7 @@ uses OsMapUtils;
   http://en.wikipedia.org/wiki/Web_Mercator
   http://wiki.openstreetmap.org/wiki/Slippy_map_tilenames }
 
-function fmod(a, b: Double): Double; inline;
+function fmod(a, b: TReal): TReal; inline;
 begin
   Result := a - b * Int(a / b);
 end;
@@ -426,7 +426,7 @@ end;
 
 function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileId;
 var
-  LatRad: Double;
+  LatRad: TReal;
 begin
   LatRad := ACoord.Lat * M_PI / 180.0;
 
@@ -437,8 +437,8 @@ end;
 function GetSphericalDistance(const A, B: TGeoPoint): TDistance;
 var
   r: TDistance;
-  aLatRad, bLatRad, dLat, dLon: Double;
-  sindLonDiv2, aa, c: Double;
+  aLatRad, bLatRad, dLat, dLon: TReal;
+  sindLonDiv2, aa, c: TReal;
 begin
   r := 6371010.0; // Average radius of Earth
   aLatRad := DegToRad(a.Lat);
@@ -456,15 +456,15 @@ begin
   Result := r * c;
 end;
 
-function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: Double): TDistance;
+function GetEllipsoidalDistance(aLon, aLat, bLon, bLat: TReal): TDistance;
 var
-  a, b, f, phi1, phi2, lambda1, lambda2, a2b2b2: Double;
-  U1, sinU1, cosU1, U2, sinU2, cosU2: Double;
-  sinU1sinU2, cosU1sinU2, sinU1cosU2, cosU1cosU2: Double;
-  omega, lambda, sigma, deltasigma, lambda0: Double;
-  sinlambda, coslambda, sin2sigma, sinsigma, cossigma: Double;
-  sinalpha, alpha, cosalpha, cos2alpha, cos2sigmam: Double;
-  ul2, cos2sigmam2, A1, B1, C1: Double;
+  a, b, f, phi1, phi2, lambda1, lambda2, a2b2b2: TReal;
+  U1, sinU1, cosU1, U2, sinU2, cosU2: TReal;
+  sinU1sinU2, cosU1sinU2, sinU1cosU2, cosU1cosU2: TReal;
+  omega, lambda, sigma, deltasigma, lambda0: TReal;
+  sinlambda, coslambda, sin2sigma, sinsigma, cossigma: TReal;
+  sinalpha, alpha, cosalpha, cos2alpha, cos2sigmam: TReal;
+  ul2, cos2sigmam2, A1, B1, C1: TReal;
   i: Integer;
 begin
   a := EarthRadiusMeter;   // length of semi-major axis of the ellipsoid (radius at equator)
@@ -554,17 +554,17 @@ begin
   Result := b * A1 * (sigma - deltasigma);
 end;
 
-procedure CalcEllipsoidalDistance(Lat1: TLatitude; Lon1: TLongitude; ABearing: Double;
+procedure CalcEllipsoidalDistance(Lat1: TLatitude; Lon1: TLongitude; ABearing: TReal;
                             const ADistance: TDistance;
                             out lat2: TLatitude; out lon2: TLongitude);
 var
-  a, b, f, A1, B1, C, L: Double;
-  distanceAsMeter: Double;
-  alpha1, cosAlpha1, sinAlpha1: Double;
-  tanU1, cosU1, sinU1: Double;
-  sigma1, sinAlpha, cosSqAlpha, uSq: Double;
-  sigma, sinSigma, cosSigma, cos2SigmaM, sigmaP: Double;
-  deltaSigma, tmp, lambda: Double;
+  a, b, f, A1, B1, C, L: TReal;
+  distanceAsMeter: TReal;
+  alpha1, cosAlpha1, sinAlpha1: TReal;
+  tanU1, cosU1, sinU1: TReal;
+  sigma1, sinAlpha, cosSqAlpha, uSq: TReal;
+  sigma, sinSigma, cosSigma, cos2SigmaM, sigmaP: TReal;
+  deltaSigma, tmp, lambda: TReal;
 begin
   { See https://en.wikipedia.org/wiki/Vincenty%27s_formulae }
 
@@ -634,7 +634,7 @@ begin
   Result := GetEllipsoidalDistance(A.Lon, A.Lat, B.Lon, B.Lat);
 end;
 
-function GetEllipsoidalDistanceCoord(const APosition: TGeoPoint; ABearing: Double;
+function GetEllipsoidalDistanceCoord(const APosition: TGeoPoint; ABearing: TReal;
                                 const ADistance: TDistance): TGeoPoint;
 begin
   CalcEllipsoidalDistance(APosition.Lat,
@@ -647,7 +647,7 @@ end;
 
 function GetLineIntersection(const A1, A2, B1, B2: TGeoPoint; out AIntersection: TGeoPoint): Boolean;
 var
-  denr, ua_numr, ub_numr, ua, ub: Double;
+  denr, ua_numr, ub_numr, ua, ub: TReal;
   aBox, bBox: TGeoBox;
 begin
   if A1.IsEqual(B1) or A1.IsEqual(B2) then
@@ -734,21 +734,21 @@ begin
   Result := False;
 end;
 
-procedure Normalize(X, Y: Double; out NX, NY: Double);
+procedure Normalize(X, Y: TReal; out NX, NY: TReal);
 var
-  Len: Double;
+  Len: TReal;
 begin
   Len := sqrt((X * X) + (Y * Y));
   NX := X / Len;
   NY := Y / Len;
 end;
 
-function Det(X1, Y1, X2, Y2: Double): Double;
+function Det(X1, Y1, X2, Y2: TReal): TReal;
 begin
   Result := (X1 * Y2) - (Y1 * X2);
 end;
 
-function AngleDiff(A, B: Double): Double;
+function AngleDiff(A, B: TReal): TReal;
 begin
   Result := abs(a - b);
   if Result > M_PI then
@@ -922,10 +922,10 @@ begin
 end;
 
 { for TGeoPoint.Parse(), ScanCoordinate() }
-function ScanNumber(const AText: string; var APos: Integer; var AValue: Double; AMaxDigits: Integer): Boolean;
+function ScanNumber(const AText: string; var APos: Integer; var AValue: TReal; AMaxDigits: Integer): Boolean;
 var
   n, DigitsCount: Integer;
-  Factor: Double;
+  Factor: TReal;
 begin
   // using TStringHelper with 0-based char index
   Result := False;
@@ -977,10 +977,10 @@ begin
 end;
 
 { for TGeoPoint.Parse() }
-function ScanCoordinate(const AText: string; var APos: Integer; var AValue: Double; AMaxDigits: Integer): Boolean;
+function ScanCoordinate(const AText: string; var APos: Integer; var AValue: TReal; AMaxDigits: Integer): Boolean;
 var
   n, TextLen: Integer;
-  Minutes, Seconds: Double;
+  Minutes, Seconds: TReal;
 begin
   // using TStringHelper with 0-based char index
   Result := ScanNumber(AText, APos, AValue, AMaxDigits);
@@ -1055,7 +1055,7 @@ end;
 function TGeoPoint.Parse(AText: string): Boolean;
 var
   CurPos, TextLen: Integer;
-  TmpLat, TmpLon: Double;
+  TmpLat, TmpLon: TReal;
   IsLatPos, IsLatDirectionGiven: Boolean;
   IsLonPos, IsLonDirectionGiven: Boolean;
 
@@ -1208,7 +1208,7 @@ begin
   Result := GetEllipsoidalDistance(Self, ATarget);
 end;
 
-function TGeoPoint.Add(ABearing: Double; ADistance: TDistance): TGeoPoint;
+function TGeoPoint.Add(ABearing: TReal; ADistance: TDistance): TGeoPoint;
 begin
   if ADistance = 0.0 then
     Result := Self
@@ -1408,17 +1408,17 @@ begin
   Result.Lon := (MinCoord.Lon + MaxCoord.Lon) / 2;
 end;
 
-function TGeoBox.GetWidth(): Double;
+function TGeoBox.GetWidth(): TReal;
 begin
   Result := MaxCoord.Lon - MinCoord.Lon;
 end;
 
-function TGeoBox.GetHeight(): Double;
+function TGeoBox.GetHeight(): TReal;
 begin
   Result := MaxCoord.Lat - MinCoord.Lat;
 end;
 
-function TGeoBox.GetSize(): Double;
+function TGeoBox.GetSize(): TReal;
 begin
   Result := GetWidth() * GetHeight();
 end;
@@ -1489,7 +1489,7 @@ end;
 
 function TOSMTileId.GetTopLeftCoord(const AMagnification: TMagnification): TGeoPoint;
 var
-  n: Double;
+  n: TReal;
 begin
   n := M_PI - 2.0 * M_PI * Y / AMagnification.Magnification;
 

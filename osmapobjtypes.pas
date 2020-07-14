@@ -389,7 +389,7 @@ type
     FIsIgnore: Boolean;                // Ignore objects of this type
     FLanes: Byte;                      // Number of expected lanes (default: 1)
     FOnewayLanes: Byte;                // Number of expected lanes (default: 1)
-
+    FZOrder: Byte;                     // In what order will objects drawn on map (for sorting)
 
     function GetCanRoute(): Boolean;
     function GetCondition(AIndex: Integer): TTypeCondition;
@@ -531,7 +531,8 @@ type
     property Lanes: Byte read FLanes write FLanes;
     { Number of expected one-way lanes (default: 1) }
     property OnewayLanes: Byte read FOnewayLanes write FOnewayLanes;
-
+    { In what order will objects drawn on map (for sorting) }
+    property ZOrder: Byte read FZOrder write FZOrder;
     { Set of idents that server as categorizing groups }
     property Groups: TStringList read FGroups;
     { Map of descriptions for given language codes }
@@ -1038,13 +1039,14 @@ end;
 procedure TFeatureValueBuffer.Read(AScanner: TFileScanner;
   out ASpecialFlag1: Boolean; out ASpecialFlag2: Boolean; AFlagsCount: Integer);
 var
-  i: Integer;
+  i, n: Integer;
   TmpValue: TFeatureValue;
   TmpByte: Byte;
 begin
   //AScanner.Read(FFeatureMask[0], TypeInfo.FeatureMaskBytes);
+  n := TypeInfo.FeatureMaskBytes;
   FFeatureMask := 0;
-  for i := 0 to TypeInfo.FeatureMaskBytes-1 do
+  for i := 0 to n-1 do
   begin
     AScanner.Read(TmpByte);
     FFeatureMask := FFeatureMask or (TmpByte shl (8 * i));
@@ -1910,7 +1912,7 @@ procedure TTypeConfig.BeforeDestruction();
 begin
   { TODO : cleanup }
   //FreeAndNil(FNameToFeatureMap);
-  FreeAndNil(FNameToTypeMap);
+  //FreeAndNil(FNameToTypeMap);
 
   FreeAndNil(FAreaTypes);
   FreeAndNil(FWayTypes);

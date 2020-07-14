@@ -204,6 +204,7 @@ type
     procedure WriteNumber(AValue: SmallInt); overload;
     procedure WriteNumber(AValue: LongInt); overload;
     procedure WriteNumber(AValue: Int64); overload;
+    procedure WriteNumber(AValue: UInt64); overload;
 
     { Write TypeId value. AMaxBytes: 1..2 }
     procedure WriteTypeId(ATypeId: TTypeId; AMaxBytes: Byte);
@@ -360,6 +361,11 @@ end;
 procedure TFileWriter.WriteNumber(AValue: Int64);
 begin
   WriteEncodedSignedNumber(AValue);
+end;
+
+procedure TFileWriter.WriteNumber(AValue: UInt64);
+begin
+  WriteEncodedUnsignedNumber(AValue);
 end;
 
 procedure TFileWriter.WriteTypeId(ATypeId: TTypeId; AMaxBytes: Byte);
@@ -563,7 +569,7 @@ begin
     ByteBufferPos := 0;
     for i := 0 to Length(DeltaBuffer)-1 do
     begin
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i];
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i]);
       Inc(ByteBufferPos);
     end;
   end
@@ -572,10 +578,10 @@ begin
     ByteBufferPos := 0;
     for i := 0 to Length(DeltaBuffer)-1 do
     begin
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i] and $FF;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i] and $FF);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := (DeltaBuffer[i] shr 8);
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i] shr 8);
       Inc(ByteBufferPos);
     end;
   end
@@ -585,22 +591,22 @@ begin
     i := 0;
     while i < Length(DeltaBuffer)-1 do
     begin
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i] and $FF;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i] and $FF);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := (DeltaBuffer[i] shr 8) and $FF;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i] shr 8);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i] shr 16;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i] shr 16);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i+1] and $FF;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i+1] and $FF);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := (DeltaBuffer[i+1] shr 8) and $FF;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i+1] shr 8);
       Inc(ByteBufferPos);
 
-      ByteBuffer[ByteBufferPos] := DeltaBuffer[i+1] shr 16;
+      ByteBuffer[ByteBufferPos] := Byte(DeltaBuffer[i+1] shr 16);
       Inc(ByteBufferPos);
 
       Inc(i, 2);
@@ -892,7 +898,7 @@ begin
     SetLength(TmpBuffer, nSize);
     while not IsFinished do
     begin
-      nRead := FFile.Read(TmpBuffer[1], nSize);
+      nRead := FFile.Read(TmpBuffer[0], nSize);
       //n := Pos(#0, TmpBuffer)-1;
       n := -1;
       for i := 0 to nSize-1 do
@@ -913,12 +919,13 @@ begin
       if n > 0 then
       begin
         //AValue := AValue + Copy(TmpBuffer, 1, n);
-        for i := 1 to n do
+        // todo: copy buffer
+        for i := 0 to n do
           AValue := AValue + Chr(TmpBuffer[i]);
       end
     end;
 
-    TmpPos := TmpPos + Length(AValue) + 1;
+    TmpPos := TmpPos + Length(AValue);
     if TmpPos <= FFile.Size then
       FFile.Position := TmpPos
     else
@@ -1056,8 +1063,10 @@ var
   i, n: Integer;
   pSegment: ^TSegmentGeoBox;
   Bitmask: LongWord;
+  DebugPos: Int64;
 begin
   Result := False;
+  DebugPos := Position;
   //SizeByte := Stream.ReadByte();
   Read(SizeByte);
 

@@ -123,7 +123,7 @@ type
 
     function Matches(const AContext: TStyleResolveContext;
                  const ABuffer: TFeatureValueBuffer;
-                 AMeterInPixel, AMeterInMM: Double): Boolean;
+                 AMeterInPixel, AMeterInMM: TReal): Boolean;
   end;
 
   //TNamedSymbolMap = specialize TFPGMap<string, TMapSymbol>;
@@ -532,7 +532,7 @@ begin
     TmpStyle.Name := s;
     (TmpStyle as TLineStyle).LineColor.InitRandom();
     (TmpStyle as TLineStyle).Width := DEF_LINE_WIDTH;
-    (TmpStyle as TLineStyle).DisplayWidth := DEF_LINE_DISPLAY_WIDTH;
+    (TmpStyle as TLineStyle).DisplayWidthMM := DEF_LINE_DISPLAY_WIDTH;
     AddStyleByName(s, TmpStyle);
     ALineStyles.Add(TmpStyle as TLineStyle);
   end;
@@ -966,7 +966,7 @@ begin
 end;
 
 function TStyleCriteria.Matches(const AContext: TStyleResolveContext;
-  const ABuffer: TFeatureValueBuffer; AMeterInPixel, AMeterInMM: Double
+  const ABuffer: TFeatureValueBuffer; AMeterInPixel, AMeterInMM: TReal
   ): Boolean;
 begin
 
