@@ -725,7 +725,6 @@ var
   RingTypeInfo: TTypeInfo; // type
   IsMultipleRings, HasMaster, IsReadIds: Boolean;
   RingCount: Integer;
-  fvb: TFeatureValueBuffer;
   i: Integer;
   pRing: ^TMapAreaRing;
 begin
@@ -735,16 +734,16 @@ begin
   AScanner.ReadTypeId(RingType, ATypeConfig.AreaTypeIdBytes);
   RingTypeInfo := ATypeConfig.GetAreaTypeInfo(RingType);
 
-  fvb.SetType(RingTypeInfo);
-  fvb.Read(AScanner, IsMultipleRings, HasMaster);
+  SetLength(Rings, RingCount);
+  Rings[0].FeatureValueBuffer.SetType(RingTypeInfo);
+  Rings[0].FeatureValueBuffer.Read(AScanner, IsMultipleRings, HasMaster);
+
   if IsMultipleRings then
   begin
     AScanner.ReadNumber(RingCount);
     Inc(RingCount);
+    SetLength(Rings, RingCount);
   end;
-
-  SetLength(Rings, RingCount);
-  Rings[0].FeatureValueBuffer.Assign(fvb);
 
   if HasMaster then
     Rings[0].Ring := MASTER_RING_ID
@@ -828,6 +827,7 @@ begin
   // Master/Outer ring
   pRing := @Rings[0];
   DebugPos := AWriter.Stream.Position;
+
   AWriter.WriteTypeId(pRing^.GetType().AreaId,
                       ATypeConfig.AreaTypeIdBytes);
 

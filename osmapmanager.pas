@@ -29,9 +29,9 @@ interface
 
 uses
   {$ifdef MSWINDOWS}Windows, {$else}Types, {$endif}
-  Classes, SysUtils, SyncObjs,
+  Classes, SysUtils, SyncObjs, IniFiles,
   OsMapPainter, OsMapProjection, OsMapStyleConfig, OsMapTypes, OsMapObjTypes,
-  OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder, IniFiles;
+  OsMapParameters, OsMapStyles, OsMapObjects, OsMapGeocoder;
 
 type
   TMapManager = class;
@@ -367,20 +367,29 @@ end;
 
 procedure TMapManager.SaveAreasToFile(AFileName: string);
 var
+  swf: TSimpleFileWriter;
   Writer: TFileWriter;
   TmpArea: TMapArea;
   n: UInt64;
+  i: Integer;
 begin
+  swf.Init();
+  swf.FileName := AFileName+'_w';
   Writer := TFileWriter.Create();
   try
     Writer.Open(AFileName);
     n := MapData.AreaList.Count;
     Writer.WriteNumber(n);
+    n := 0;
     for TmpArea in MapData.AreaList do
     begin
+      //swf.Write(Format('%d:%d:%d' + sLineBreak, [n, Writer.Stream.Position, Length(TmpArea.Rings)]));
+
       TmpArea.Write(MapTypeConfig, Writer);
+      Inc(n);
     end;
     Writer.Close();
+    swf.Term();
   finally
     Writer.Free();
   end;
@@ -391,17 +400,21 @@ var
   Reader: TFileScanner;
   TmpWay: TMapWay;
   n: UInt64;
+  i: Integer;
 begin
   Reader := TFileScanner.Create();
   try
     Reader.Open(AFileName, fsmNormal, False);
     Reader.ReadNumber(n);
 
-    while n > 0 do
+    i := 0;
+    while i < n do
     begin
       TmpWay := TMapWay.Create();
       TmpWay.Read(MapTypeConfig, Reader);
       MapData.WayList.Add(TmpWay);
+
+      Inc(i);
     end;
     Reader.Close();
   finally
@@ -411,22 +424,31 @@ end;
 
 procedure TMapManager.LoadAreasFromFile(AFileName: string);
 var
+  swf: TSimpleFileWriter;
   Reader: TFileScanner;
   TmpArea: TMapArea;
   n: UInt64;
+  i: Integer;
 begin
+  swf.Init();
+  swf.FileName := AFileName+'_r';
   Reader := TFileScanner.Create();
   try
     Reader.Open(AFileName, fsmNormal, False);
     Reader.ReadNumber(n);
 
-    while n > 0 do
+    i := 0;
+    while i < n do
     begin
+      //swf.Write(Format('%d:%d' + sLineBreak, [i, Reader.Position]));
+
       TmpArea := TMapArea.Create();
       TmpArea.Read(MapTypeConfig, Reader);
       MapData.AreaList.Add(TmpArea);
+      Inc(i);
     end;
     Reader.Close();
+    swf.Term();
   finally
     Reader.Free();
   end;

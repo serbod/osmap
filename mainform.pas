@@ -9,9 +9,16 @@ interface
 
 uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, ExtCtrls, StdCtrls,
-  Spin, Menus, OsMapPainter, OsMapPainterAgg, OsMapPainterBGRA, OsMapProjection,
+  Spin, Menus, Types, OsMapPainter, OsMapProjection,
   OsMapStyleConfig, OsMapObjTypes, OsMapManager, OsMapFormatMp, OsMapTypes,
-  OsMapGeometry, Types, PainterAggForm, PainterBgraForm;
+  OsMapGeometry
+  {$ifdef AggPainter}
+  , OsMapPainterAgg, PainterAggForm
+  {$endif}
+  {$ifdef BGRAPainter}
+  , OsMapPainterBGRA, PainterBgraForm
+  {$endif}
+  ;
 
 type
 
@@ -157,14 +164,16 @@ end;
 procedure TForm1.miLoadMapFilesClick(Sender: TObject);
 begin
   MapManager.LoadWaysFromFile(MapManager.WaysFileName);
-  //MapManager.LoadAreasFromFile(MapManager.AreasFileName);
-  ShowMessage('Loaded!');
+  MapManager.LoadAreasFromFile(MapManager.AreasFileName);
+  btnStart.Enabled := False;
+  btnShow.Enabled := True;
+  //ShowMessage('Loaded!');
 end;
 
 procedure TForm1.miSaveMapFilesClick(Sender: TObject);
 begin
   MapManager.SaveWaysToFile(MapManager.WaysFileName);
-  //MapManager.SaveAreasToFile(MapManager.AreasFileName);
+  MapManager.SaveAreasToFile(MapManager.AreasFileName);
   ShowMessage('Saved!');
 end;
 

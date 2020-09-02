@@ -206,7 +206,7 @@ begin
     pBuf^ := pBuf^ or $80;
     Inc(pBuf);
 
-    pBuf^ := pBuf^ or Byte(ANum and $7F);
+    pBuf^ := Byte(ANum and $7F);
     ANum := ANum shr 7;
     Inc(Result);
   end;
@@ -259,11 +259,11 @@ begin
   Val := (pBuf^ and $7E) shr 1;
   NextShift := 6;
 
-  while (pBuf^ or $80) <> 0 do
+  while (pBuf^ and $80) <> 0 do
   begin
     ANum := ANum or (Val shl Shift);
-    Val := (pBuf^ and $7F);
     Inc(pBuf);
+    Val := (pBuf^ and $7F);
     Shift := NextShift;
     Inc(NextShift, 7);
     Inc(Result);
@@ -431,6 +431,7 @@ function TSimpleStringHash.Find(const Key: string): PHashItem;
 var
   Hash: Cardinal;
 begin
+  Assert(Length(Buckets) > 0);
   Hash := HashOf(Key) mod Cardinal(Length(Buckets));
   Result := Buckets[Hash];
   while Result <> nil do
@@ -463,6 +464,7 @@ var
   Hash: Cardinal;
   Bucket: PHashItem;
 begin
+  Assert(Length(Buckets) > 0);
   Hash := HashOf(Key) mod Cardinal(Length(Buckets));
   New(Bucket);
   Bucket^.Key := Key;

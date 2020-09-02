@@ -1120,10 +1120,10 @@ begin
     else
     begin
       if ASpecialFlag1 then
-        TmpByte := TmpByte and $80;
+        TmpByte := TmpByte or $80;
 
       if (AFlagsCount >= 2) and (ASpecialFlag2) then
-        TmpByte := TmpByte and $40;
+        TmpByte := TmpByte or $40;
 
       IsAddTmpByte := True;
     end;
@@ -2063,7 +2063,7 @@ end;
 
 function TTypeConfig.GetNodeTypeInfo(AId: TTypeId): TTypeInfo;
 begin
-  Assert(AId < FNodeTypes.Count);
+  Assert(AId <= FNodeTypes.Count);
   if (AId = ObjTypeIgnore) then
     Result := FTypeInfoIgnore
   else
@@ -2072,7 +2072,7 @@ end;
 
 function TTypeConfig.GetWayTypeInfo(AId: TTypeId): TTypeInfo;
 begin
-  Assert(AId < FWayTypes.Count);
+  Assert(AId <= FWayTypes.Count);
   if (AId = ObjTypeIgnore) then
     Result := FTypeInfoIgnore
   else
@@ -2081,7 +2081,7 @@ end;
 
 function TTypeConfig.GetAreaTypeInfo(AId: TTypeId): TTypeInfo;
 begin
-  Assert(AId < FAreaTypes.Count);
+  Assert(AId <= FAreaTypes.Count);
   if (AId = ObjTypeIgnore) then
     Result := FTypeInfoIgnore
   else

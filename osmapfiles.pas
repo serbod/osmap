@@ -217,6 +217,20 @@ type
     //property Pos: TFileOffset read GetPos write SetPos;
   end;
 
+  { Simple thread-safe file writer for log files }
+  TSimpleFileWriter = object
+  private
+    fh: THandle;
+    FUnflushedCount: Integer;
+    //FLock: TSimpleLock;
+  public
+    FileName: string;
+    procedure Init();
+    procedure Term();
+    { Append data to file. Note! Line ending chars not auto-added! }
+    procedure Write(const AStr: AnsiString = '');
+  end;
+
 implementation
 
 uses Math; // eliminate "end of source not found"
@@ -455,7 +469,7 @@ begin
     LastLon := CurrentLon;
   end;
 
-  BytesNeeded := (NodesCount-1) * CoordBitSize div 8; // all coordinates in the same encoding
+  BytesNeeded := (NodesCount-1) * (CoordBitSize div 8); // all coordinates in the same encoding
 
   // do we need to store node ids?
   HasNodes := False;
@@ -885,12 +899,13 @@ procedure TFileScanner.Read(out AValue: string);
 var
   TmpPos: Int64;
   TmpBuffer: TBytes;  // AnsiString
-  nSize, nRead, n, i: Integer;
+  nSize, nRead, n, i, nTotal: Integer;
   IsFinished: Boolean;
 begin
   Assert(Assigned(FFile));
   AValue := '';
   IsFinished := False;
+  nTotal := 0;
   if Assigned(FFile) then
   begin
     TmpPos := FFile.Position;
@@ -900,32 +915,36 @@ begin
     begin
       nRead := FFile.Read(TmpBuffer[0], nSize);
       //n := Pos(#0, TmpBuffer)-1;
-      n := -1;
-      for i := 0 to nSize-1 do
+      n := 0;
+      for i := 0 to nRead-1 do
       begin
         if TmpBuffer[i] = 0 then
         begin
-          n := i;
+          n := i; // pos of zero = length
+          nTotal := nTotal + 1; // zero byte
+          IsFinished := True;
           Break;
         end;
       end;
 
-      IsFinished := (nRead < nSize) or (n >= 0) or (n > nRead);
-      if (n > nRead) then
-        n := nRead
-      else if (n < 0) then
-        n := nRead;
+      if not IsFinished then
+      begin
+        IsFinished := (nRead < nSize);
+        if (n <= 0) then
+          n := nRead;
+      end;
 
       if n > 0 then
       begin
+        nTotal := nTotal + n;
         //AValue := AValue + Copy(TmpBuffer, 1, n);
         // todo: copy buffer
-        for i := 0 to n do
+        for i := 0 to n-1 do
           AValue := AValue + Chr(TmpBuffer[i]);
       end
     end;
 
-    TmpPos := TmpPos + Length(AValue);
+    TmpPos := TmpPos + nTotal;
     if TmpPos <= FFile.Size then
       FFile.Position := TmpPos
     else
@@ -1100,6 +1119,10 @@ begin
     Inc(ShiftCount, 7);
   end;
 
+  // !!debug
+  if NodeCount > 5000 then
+    ByteBufferSize := 0;
+
   SetLength(ANodes, NodeCount);
 
   if NodeCount = 0 then
@@ -1127,10 +1150,19 @@ begin
     n := 0;
     while n < (ByteBufferSize-1) do
     begin
-      LatDelta := TmpBuffer[n+0];
-      LonDelta := TmpBuffer[n+1];
+      LatUDelta := TmpBuffer[n+0];
+      LonUDelta := TmpBuffer[n+1];
 
+      if (LatUDelta and $80) <> 0 then
+        LatDelta := LongInt(LatUDelta or $FFFFFF00)
+      else
+        LatDelta := LongInt(LatUDelta);
       Inc(LatValue, LatDelta);
+
+      if (LonUDelta and $80) <> 0 then
+        LonDelta := LongInt(LonUDelta or $FFFFFF00)
+      else
+        LonDelta := LongInt(LonUDelta);
       Inc(LonValue, LonDelta);
 
       ANodes[CurrentCoordPos].Init(LatValue / GlobalLatConversionFactor - 90.0,
@@ -1152,13 +1184,13 @@ begin
         LatDelta := LongInt(LatUDelta or $FFFF0000)
       else
         LatDelta := LongInt(LatUDelta);
-      Inc(LatValue, LatDelta);
+      LatValue := LatValue + LatDelta;
 
       if (LonUDelta and $8000) <> 0 then
         LonDelta := LongInt(LonUDelta or $FFFF0000)
       else
         LonDelta := LongInt(LonUDelta);
-      Inc(LonValue, LonDelta);
+      LonValue := LonValue + LonDelta;
 
       ANodes[CurrentCoordPos].Init(LatValue / GlobalLatConversionFactor - 90.0,
                                    LonValue / GlobalLonConversionFactor - 180.0);
@@ -1289,6 +1321,87 @@ begin
   AValue.Offset := TmpOffset + FLastFileOffset;
 
   FLastFileOffset := AValue.Offset;
+end;
+
+{ TSimpleFileWriter }
+
+procedure TSimpleFileWriter.Init();
+begin
+  FUnflushedCount := 0;
+  fh := 0;
+  //FLock.Init();
+end;
+
+procedure TSimpleFileWriter.Write(const AStr: AnsiString);
+var
+  {$IFDEF FPC}
+  Res: THandle;
+  {$ELSE}
+  Res: Integer;
+  {$ENDIF}
+begin
+  //if not FLock.Acquire then Exit;
+  if FUnflushedCount = 0 then
+  begin
+    Res := FileOpen(FileName, (fmOpenReadWrite or fmShareDenyNone));
+    {$IFDEF FPC}
+    if Res <> feInvalidHandle then
+    {$ELSE}
+    if Res > 0 then
+    {$ENDIF}
+    begin
+      fh := Res;
+      FileSeek(fh, 0, fsFromEnd);
+    end
+    else
+    begin
+      // file not exists? try to create new
+      // Just created file not shared, despite to access flags
+      Res := FileCreate(FileName, 438);
+      {$IFDEF FPC}
+      if Res <> feInvalidHandle then
+      {$ELSE}
+      if Res > 0 then
+      {$ENDIF}
+      begin
+        FileClose(Res);
+        Res := FileOpen(FileName, (fmOpenReadWrite or fmShareDenyNone));
+        {$IFDEF FPC}
+        if Res <> feInvalidHandle then
+        {$ELSE}
+        if Res > 0 then
+        {$ENDIF}
+          fh := Res;
+      end;
+    end;
+  end;
+
+  if fh <> 0 then
+  begin
+    if AStr <> '' then
+      FileWrite(fh, AStr[1], Length(AStr));
+    //Flush(f); // forced flush data from buffer to file
+    Inc(FUnflushedCount);
+    if FUnflushedCount > 10 then
+    begin
+      // another forced flush
+      FUnflushedCount := 0;
+      //CloseFile(f);
+      FileClose(fh);
+      fh := 0;
+    end;
+  end;
+  //FLock.Release();
+end;
+
+procedure TSimpleFileWriter.Term();
+begin
+  if FUnflushedCount > 0 then
+  begin
+    FUnflushedCount := 0;
+    FileClose(fh);
+    fh := 0;
+  end;
 end;
 
 end.
