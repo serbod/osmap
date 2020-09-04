@@ -91,6 +91,8 @@ type
     procedure LoadWaysFromFile(AFileName: string);
     procedure LoadAreasFromFile(AFileName: string);
 
+    procedure SortAreas();
+
     // shared
     property MapData: TMapData read FMapData;
     property MapParameter: TMapParameter read FMapParameter;
@@ -452,6 +454,11 @@ begin
   finally
     Reader.Free();
   end;
+end;
+
+procedure TMapManager.SortAreas();
+begin
+  MapData.AreaList.Sort(@CompareAreas);
 end;
 
 { TMapRenderThread }

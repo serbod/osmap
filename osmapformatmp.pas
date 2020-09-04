@@ -105,6 +105,7 @@ begin
         IsWay := False;
         if Assigned(TmpWay) then
         begin
+          TmpWay.FileOffset := LineNo;
           FManager.MapData.WayList.Add(TmpWay);
           TmpWay := nil;
         end;
@@ -116,6 +117,7 @@ begin
         IsArea := False;
         if Assigned(TmpArea) then
         begin
+          TmpArea.FileOffset := LineNo;
           if Length(TmpArea.Rings[0].Nodes) > 2 then
             FManager.MapData.AreaList.Add(TmpArea)
           else
@@ -184,6 +186,15 @@ begin
     begin
       // улица
       TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftAddress, AValue);
+    end
+  end
+  else
+  if AKey = 'EndLevel' then
+  begin
+    if IsArea and Assigned(TmpArea) then
+    begin
+      // уровень, ZOrder
+      TmpArea.Rings[0].FeatureValueBuffer.SetFeatureValue(ftLayer, AValue);
     end
   end;
 end;

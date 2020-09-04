@@ -68,6 +68,7 @@ type
     Actual for same zoom level. If zoom level changed, must be recalculated }
   TMapItemDrawOptions = packed record
     ZoomLevel: Byte;
+    ZOrder: Byte;
     IsStyleVisible: Boolean;
     IsTextLabelVisible: Boolean;
     IsBorderLabelVisible: Boolean;
@@ -161,6 +162,7 @@ type
 
     function HasAnyFeaturesSet(): Boolean;
 
+    { The master ring does not have any nodes }
     function IsMasterRing(): Boolean;
     function IsOuterRing(): Boolean;
 
@@ -174,6 +176,7 @@ type
     { Return True if given point inside this Ring polygon }
     function IsPointInside(const APoint: TGeoPoint): Boolean;
   end;
+  PMapAreaRing = ^TMapAreaRing;
 
   { Node data read/write mode for TArea.Read() and TArea.Write()
     ndmAuto - Node ids will only be used if not thought to be required for this area.
@@ -226,6 +229,7 @@ type
       index, dropping all ids }
     procedure WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
 
+    property TypeInfo: TTypeInfo read GetType;
   end;
 
   {$ifdef FPC}
@@ -409,6 +413,7 @@ uses Math; // eliminate "end of source not found"
 procedure ResetMapItemDrawOptions(var AValue: TMapItemDrawOptions);
 begin
   AValue.ZoomLevel := 0;
+  AValue.ZOrder := 0;
   AValue.IsStyleVisible := True;
   AValue.IsTextLabelVisible := True;
   AValue.IsBorderLabelVisible := True;

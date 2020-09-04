@@ -1119,10 +1119,6 @@ begin
     Inc(ShiftCount, 7);
   end;
 
-  // !!debug
-  if NodeCount > 5000 then
-    ByteBufferSize := 0;
-
   SetLength(ANodes, NodeCount);
 
   if NodeCount = 0 then

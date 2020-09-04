@@ -95,6 +95,8 @@ begin
   ImportFromMpFile(FMapManager, 'mogilev.mp');
   ImportFromMpFile(FMapManager, 'vitebsk.mp');
 
+  MapManager.SortAreas();
+
   {Bitmap := Image1.Picture.Bitmap;
   Bitmap.PixelFormat := TPixelFormat.pf32bit;
 
@@ -165,6 +167,7 @@ procedure TForm1.miLoadMapFilesClick(Sender: TObject);
 begin
   MapManager.LoadWaysFromFile(MapManager.WaysFileName);
   MapManager.LoadAreasFromFile(MapManager.AreasFileName);
+  MapManager.SortAreas();
   btnStart.Enabled := False;
   btnShow.Enabled := True;
   //ShowMessage('Loaded!');
@@ -189,9 +192,10 @@ end;
 
 procedure TForm1.ShowObjectsAt(ALon, ALat: Real);
 var
-  i: Integer;
+  i, ii: Integer;
   mpt: TGeoPoint;
-  s: string;
+  s, ss: string;
+  pDrawOptions: Pointer;
 begin
   FSl.Clear();
   mpt.Init(ALat, ALon);
@@ -199,12 +203,30 @@ begin
   begin
     if FMapManager.MapData.AreaList.Items[i].Rings[0].IsPointInside(mpt) then
     begin
-      Fsl.Add(FMapManager.MapData.AreaList.Items[i].GetType().TypeName);
+      s := '';
+      pDrawOptions := Addr(FMapManager.MapData.AreaList.Items[i].Rings[0].DrawOptions);
+
+      for ii := 0 to FMapManager.MapPainter.AreaDataList.Count-1 do
+      begin
+        if FMapManager.MapPainter.AreaDataList.PItems[ii]^.pDrawOptions = pDrawOptions then
+        begin
+          s := Format('(%d:%d)', [ii, FMapManager.MapData.AreaList.Items[i].FileOffset]);
+        end;
+      end;
+
+      Fsl.Add(Format('%s ZOrder=%d (%s) %s [Layer=%s; Name=%s]',
+        [FMapManager.MapData.AreaList.Items[i].TypeInfo.TypeName,
+        FMapManager.MapData.AreaList.Items[i].TypeInfo.ZOrder,
+        BoolToStr(FMapManager.MapData.AreaList.Items[i].Rings[0].DrawOptions.IsStyleVisible),
+        s,
+        FMapManager.MapData.AreaList.Items[i].Rings[0].FeatureValueBuffer.GetFeatureValue(ftLayer),
+        FMapManager.MapData.AreaList.Items[i].Rings[0].FeatureValueBuffer.GetFeatureValue(ftName)
+        ]));
     end;
   end;
 
-  s := FSl.Text;
-  ShowMessage(s);
+  ss := FSl.Text;
+  ShowMessage(ss);
 end;
 
 procedure TForm1.btnShowClick(Sender: TObject);

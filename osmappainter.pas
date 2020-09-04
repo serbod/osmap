@@ -599,6 +599,9 @@ type
     property IsBusy: Boolean read FIsBusy;
     property CurrentStep: TRenderSteps read FCurStep;
     property OnLog: TGetStrProc read FOnLog write FOnLog;
+
+    // debug
+    property AreaDataList: TAreaDataList read FAreaDataList;
   end;
 
   {$ifdef FPC}
@@ -678,6 +681,9 @@ type
     function DrawMap(AProjection: TProjection; AParameter: TMapParameter; AData: TMapData): Boolean; override;
   end;
 
+  function CompareAreas(const A, B: TMapArea): Integer;
+
+
 implementation
 
 uses Math, OsMapUtils;
@@ -733,10 +739,24 @@ begin
 end;
 
 function CompareAreaData(const A, B: TAreaData): Integer;
+var
+  n1, n2: Integer;
 begin
-  if A.TypeInfo.ZOrder > B.TypeInfo.ZOrder then
+  {if A.TypeInfo.ZOrder > B.TypeInfo.ZOrder then
     Exit(1)
   else if A.TypeInfo.ZOrder < B.TypeInfo.ZOrder then
+    Exit(-1); }
+
+  if A.pDrawOptions^.ZOrder > B.pDrawOptions^.ZOrder then
+    Exit(1)
+  else if A.pDrawOptions^.ZOrder < B.pDrawOptions^.ZOrder then
+    Exit(-1);
+
+  n1 := StrToIntDef(A.pBuffer^.GetFeatureValue(ftLayer), 1);
+  n2 := StrToIntDef(B.pBuffer^.GetFeatureValue(ftLayer), 1);
+  if n1 > n2 then
+    Exit(1)
+  else if (n1 < n2) then
     Exit(-1);
 
   if Assigned(A.FillStyle) and Assigned(B.FillStyle) then
@@ -751,7 +771,21 @@ begin
   else if Assigned(B.FillStyle) then
     Exit(-1);
 
-  if (A.BoundingBox.MinCoord.Lon = B.BoundingBox.MinCoord.Lon) then
+
+  if (A.BoundingBox.MinCoord.Lon > B.BoundingBox.MinCoord.Lon)
+  and (A.BoundingBox.MaxCoord.Lon < B.BoundingBox.MaxCoord.Lon)
+  then
+    Exit(1)
+  else
+  if (A.BoundingBox.MinCoord.Lat > B.BoundingBox.MinCoord.Lat)
+  and (A.BoundingBox.MaxCoord.Lat < B.BoundingBox.MaxCoord.Lat)
+  then
+    Exit(1)
+  else
+    Exit(0);
+
+
+  {if (A.BoundingBox.MinCoord.Lon = B.BoundingBox.MinCoord.Lon) then
   begin
     if (A.BoundingBox.MaxCoord.Lon = B.BoundingBox.MaxCoord.Lon) then
     begin
@@ -779,8 +813,42 @@ begin
       Result := Trunc(A.BoundingBox.MaxCoord.Lon - B.BoundingBox.MaxCoord.Lon);
   end
   else
-    Result := Trunc(A.BoundingBox.MinCoord.Lon - B.BoundingBox.MinCoord.Lon);
+    Result := Trunc(A.BoundingBox.MinCoord.Lon - B.BoundingBox.MinCoord.Lon);  }
 
+end;
+
+function CompareAreas(const A, B: TMapArea): Integer;
+var
+  n1, n2: Integer;
+begin
+  if A.TypeInfo.ZOrder > B.TypeInfo.ZOrder then
+    Exit(1)
+  else if A.TypeInfo.ZOrder < B.TypeInfo.ZOrder then
+    Exit(-1);
+
+  n1 := StrToIntDef(A.Rings[0].FeatureValueBuffer.GetFeatureValue(ftLayer), 1);
+  n2 := StrToIntDef(B.Rings[0].FeatureValueBuffer.GetFeatureValue(ftLayer), 1);
+  if n1 > n2 then
+    Exit(1)
+  else if (n1 < n2) then
+    Exit(-1);
+
+  if (A.Rings[0].BBox.MinCoord.Lon > B.Rings[0].BBox.MinCoord.Lon)
+  and (A.Rings[0].BBox.MaxCoord.Lon < B.Rings[0].BBox.MaxCoord.Lon)
+  then
+    Exit(1)
+  else
+  if (A.Rings[0].BBox.MinCoord.Lat > B.Rings[0].BBox.MinCoord.Lat)
+  and (A.Rings[0].BBox.MaxCoord.Lat < B.Rings[0].BBox.MaxCoord.Lat)
+  then
+    Exit(1);
+
+  if A.FileOffset > B.FileOffset then
+    Result := 1
+  else if A.FileOffset < B.FileOffset then
+    Result := -1
+  else
+    Result := 0;
 end;
 
 function FMod(a, b: TReal): TReal;
@@ -1249,8 +1317,6 @@ procedure TMapPainter.PrepareArea(const AStyleConfig: TStyleConfig;
   const AArea: TMapArea);
 var
   td: array of TPolyData;
-  i, ii, j, idx: Integer;
-  pRing: ^TMapAreaRing;
   nodes: TGeoPointArray;
   RingId, BorderStyleIndex: Integer;
   IsFoundRing: Boolean;
@@ -1264,35 +1330,35 @@ var
   TransStart, TransEnd: Integer;
   ZoomLevel: Byte;
 
-  procedure _TransformAreaRing();
+  procedure _TransformAreaRing(var ARing: TMapAreaRing; i: Integer);
   var
     Segment: TSegmentGeoBox;
     ii: Integer;
   begin
-    if (Length(pRing^.Segments) <= 1) then
+    if (Length(ARing.Segments) <= 1) then
     begin
       FTransBuffer.TransformArea(AProjection,
                                 AParameter.OptimizeAreaNodes,
-                                pRing^.Nodes,
+                                ARing.Nodes,
                                 td[i].TransStart, td[i].TransEnd,
                                 FErrorTolerancePixel);
     end
     else
     begin
-      for Segment in pRing^.Segments do
+      for Segment in ARing.Segments do
       begin
         if (AProjection.GetDimensions().IsIntersects(Segment.BBox, False)) then
         begin
           // TODO: add TransBuffer::Transform* methods with vector subrange (begin/end)
           for ii := Segment.FromIndex to Segment.ToIndex do
           begin
-            AppendGeoPointToArray(nodes, pRing^.Nodes[ii]);
+            AppendGeoPointToArray(nodes, ARing.Nodes[ii]);
           end;
         end
         else
         begin
-          AppendGeoPointToArray(nodes, pRing^.Nodes[Segment.FromIndex]);
-          AppendGeoPointToArray(nodes, pRing^.Nodes[Segment.ToIndex-1]);
+          AppendGeoPointToArray(nodes, ARing.Nodes[Segment.FromIndex]);
+          AppendGeoPointToArray(nodes, ARing.Nodes[Segment.ToIndex-1]);
         end;
       end;
       FTransBuffer.TransformArea(AProjection,
@@ -1302,6 +1368,10 @@ var
                                 FErrorTolerancePixel);
     end;
   end;
+
+var
+  i, ii, j, idx: Integer;
+  pRing: ^TMapAreaRing;
 
 begin
   SetLength(td, Length(AArea.Rings));
@@ -1321,11 +1391,14 @@ begin
   IsFoundRing := True;
   ZoomLevel := Byte(AProjection.Magnification.Level);
 
+  i := 0;
   while (IsFoundRing) do
   begin
     IsFoundRing := False;
 
-    for i := 0 to Length(AArea.Rings)-1 do
+    if i >= Length(AArea.Rings) then
+      Continue;
+    //for i := 0 to Length(AArea.Rings)-1 do
     begin
       pRing := Addr(AArea.Rings[i]);
 
@@ -1342,7 +1415,7 @@ begin
         Continue;
 
       AreaData.IsOuter := pRing^.IsOuterRing();
-      if (not AreaData.IsOuter) and pRing^.GetType().IsIgnore then
+      if (not AreaData.IsOuter) or pRing^.GetType().IsIgnore then
         Continue;
 
       // The master ring does not have any nodes, so we skip it
@@ -1377,7 +1450,7 @@ begin
         Continue;
       end;
 
-      _TransformAreaRing();
+      _TransformAreaRing(pRing^, i);
 
       borderStyleIndex := 0;
 
@@ -1408,13 +1481,14 @@ begin
       // Since we know that rings are created deep first, we only take into account direct followers
       // in the list with pRing^+1.
       j := i+1;
-      SetLength(AreaData.Clippings, Length(AArea.rings) - j + 1);
+      SetLength(AreaData.Clippings, Length(AArea.Rings) - j + 1);
       ClipCount := 0;
-      while (j < Length(AArea.rings))
-        and (AArea.rings[j].Ring = RingId + 1)
-        and (AArea.rings[j].GetType().IsIgnore)
+      while (j < Length(AArea.Rings))
+        and (AArea.Rings[j].Ring = RingId + 1)
+        and (not AArea.Rings[j].GetType().IsIgnore)
       do
       begin
+        _TransformAreaRing(AArea.Rings[j], j);
         AreaData.Clippings[ClipCount] := td[j];
         Inc(ClipCount);
         Inc(j);
@@ -1463,6 +1537,7 @@ begin
 
         FAreaDataList.Append(AreaData);
       end;
+      Inc(i);
     end;
 
     Inc(RingId);
@@ -1525,7 +1600,7 @@ begin
       PrepareArea(AStyleConfig, AProjection, AParameter, AData.AreaList[i]);
   end;
 
-  FAreaDataList.Sort(@CompareAreaData);
+  //FAreaDataList.Sort(@CompareAreaData);
 
   // POI Areas
   FCurItemDesc := 'PoiArea';
@@ -3024,10 +3099,10 @@ begin
   Inc(FCount);
 end;
 
-function CompareAreas(const Area1, Area2): Integer;
+{function CompareAreas(const Area1, Area2): Integer;
 begin
   Result := CompareAreaData(PAreaData(Area1)^, PAreaData(Area2)^);
-end;
+end; }
 
 procedure TAreaDataList.QSort(L, R: Integer);
 var

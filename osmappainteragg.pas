@@ -671,7 +671,7 @@ end;
 procedure TMapPainterAgg.DrawArea(const AProjection: TProjection;
   const AParameter: TMapParameter; const AAreaData: TAreaData);
 var
-  i: Integer;
+  i, n: Integer;
   data: TPolyData;
   Pixel: TVertex2D;
 begin
@@ -697,12 +697,18 @@ begin
   begin
     for data in AAreaData.Clippings do
     begin
-      FAgg2D.MoveTo(FTransBuffer.Buffer[data.TransStart].X,
-                     FTransBuffer.Buffer[data.TransStart].Y);
-      for i := data.TransStart+1 to data.TransEnd do
+      // to draw hole in polygon, inner path must be reverse-ordered
+      //n := data.TransEnd;
+      n := data.TransStart;
+      FAgg2D.MoveTo(FTransBuffer.Buffer[n].X,
+                     FTransBuffer.Buffer[n].Y);
+      //while n >= data.TransStart do
+      while n <= data.TransEnd do
       begin
-        FAgg2D.LineTo(FTransBuffer.Buffer[i].X,
-                      FTransBuffer.Buffer[i].Y);
+        FAgg2D.LineTo(FTransBuffer.Buffer[n].X,
+                      FTransBuffer.Buffer[n].Y);
+        //Dec(n);
+        Inc(n);
       end;
       FAgg2D.ClosePolygon();
     end;
