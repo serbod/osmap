@@ -1,0 +1,31 @@
+object FormMain: TFormMain
+  Left = 311
+  Height = 272
+  Top = 250
+  Width = 270
+  Caption = 'FormMain'
+  ClientHeight = 272
+  ClientWidth = 270
+  OnCreate = FormCreate
+  OnDestroy = FormDestroy
+  LCLVersion = '2.0.10.0'
+  object Image1: TImage
+    Left = 8
+    Height = 256
+    Top = 8
+    Width = 256
+  end
+  object FPHttpServer1: TFPHttpServer
+    ServerBanner = 'FreePascal'
+    LookupHostNames = False
+    HostName = 'localhost'
+    CertificateData.CipherList = 'DEFAULT'
+    CertificateData.HostName = 'localhost'
+    UseSSL = False
+    Threaded = False
+    OnRequest = FPHttpServer1Request
+    AcceptIdleTimeout = 0
+    Left = 72
+    Top = 109
+  end
+end

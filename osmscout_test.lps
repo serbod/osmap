@@ -19,7 +19,9 @@
         <HasResources Value="True"/>
         <ResourceBaseClass Value="Form"/>
         <UnitName Value="MainForm"/>
-        <CursorPos X="96" Y="210"/>
+        <IsVisibleTab Value="True"/>
+        <TopLine Value="171"/>
+        <CursorPos X="66" Y="192"/>
         <UsageCount Value="216"/>
         <Loaded Value="True"/>
         <LoadedDesigner Value="True"/>
@@ -28,10 +30,9 @@
         <Filename Value="osmappainter.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapPainter"/>
-        <IsVisibleTab Value="True"/>
-        <EditorIndex Value="11"/>
-        <TopLine Value="1344"/>
-        <CursorPos X="24" Y="1359"/>
+        <EditorIndex Value="10"/>
+        <TopLine Value="1382"/>
+        <CursorPos Y="1395"/>
         <UsageCount Value="216"/>
         <Bookmarks Count="2">
           <Item0 Y="1003"/>
@@ -43,9 +44,9 @@
         <Filename Value="osmaptypes.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapTypes"/>
-        <EditorIndex Value="10"/>
-        <TopLine Value="92"/>
-        <CursorPos X="12" Y="102"/>
+        <EditorIndex Value="9"/>
+        <TopLine Value="134"/>
+        <CursorPos X="14" Y="148"/>
         <UsageCount Value="216"/>
         <Loaded Value="True"/>
       </Unit3>
@@ -63,9 +64,9 @@
         <Filename Value="osmapgeometry.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapGeometry"/>
-        <EditorIndex Value="3"/>
-        <TopLine Value="1509"/>
-        <CursorPos X="41" Y="1537"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="1489"/>
+        <CursorPos X="46" Y="1504"/>
         <UsageCount Value="216"/>
         <Loaded Value="True"/>
       </Unit5>
@@ -73,9 +74,9 @@
         <Filename Value="osmapobjects.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapObjects"/>
-        <EditorIndex Value="7"/>
-        <TopLine Value="509"/>
-        <CursorPos X="19" Y="524"/>
+        <EditorIndex Value="6"/>
+        <TopLine Value="696"/>
+        <CursorPos Y="719"/>
         <UsageCount Value="215"/>
         <Loaded Value="True"/>
       </Unit6>
@@ -84,8 +85,8 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapParameters"/>
         <EditorIndex Value="12"/>
-        <TopLine Value="267"/>
-        <CursorPos X="47" Y="136"/>
+        <TopLine Value="216"/>
+        <CursorPos Y="234"/>
         <UsageCount Value="201"/>
         <Loaded Value="True"/>
       </Unit7>
@@ -93,8 +94,8 @@
         <Filename Value="osmapobjtypes.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapObjTypes"/>
-        <EditorIndex Value="9"/>
-        <TopLine Value="128"/>
+        <EditorIndex Value="8"/>
+        <TopLine Value="127"/>
         <CursorPos X="55" Y="179"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
@@ -112,7 +113,7 @@
         <Filename Value="osmapfiles.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapFiles"/>
-        <EditorIndex Value="8"/>
+        <EditorIndex Value="7"/>
         <TopLine Value="297"/>
         <CursorPos X="44" Y="1124"/>
         <UsageCount Value="203"/>
@@ -123,8 +124,8 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapUtils"/>
         <EditorIndex Value="15"/>
-        <TopLine Value="233"/>
-        <CursorPos Y="272"/>
+        <TopLine Value="395"/>
+        <CursorPos Y="411"/>
         <UsageCount Value="203"/>
         <Loaded Value="True"/>
       </Unit11>
@@ -171,8 +172,8 @@
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapPainterAgg"/>
         <EditorIndex Value="1"/>
-        <TopLine Value="693"/>
-        <CursorPos X="17" Y="704"/>
+        <TopLine Value="829"/>
+        <CursorPos Y="849"/>
         <UsageCount Value="204"/>
         <Loaded Value="True"/>
       </Unit16>
@@ -180,9 +181,9 @@
         <Filename Value="osmapprojection.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapProjection"/>
-        <EditorIndex Value="5"/>
-        <TopLine Value="369"/>
-        <CursorPos X="59" Y="369"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="764"/>
+        <CursorPos X="32" Y="785"/>
         <UsageCount Value="200"/>
         <Loaded Value="True"/>
       </Unit17>
@@ -190,9 +191,9 @@
         <Filename Value="osmapmanager.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapManager"/>
-        <EditorIndex Value="4"/>
-        <TopLine Value="447"/>
-        <CursorPos X="22" Y="461"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="325"/>
+        <CursorPos Y="347"/>
         <UsageCount Value="203"/>
         <Loaded Value="True"/>
       </Unit18>
@@ -200,7 +201,7 @@
         <Filename Value="osmapformatmp.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="OsMapFormatMp"/>
-        <EditorIndex Value="6"/>
+        <EditorIndex Value="5"/>
         <TopLine Value="454"/>
         <CursorPos Y="462"/>
         <UsageCount Value="202"/>
@@ -225,7 +226,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="61"/>
         <CursorPos Y="75"/>
-        <UsageCount Value="90"/>
+        <UsageCount Value="95"/>
       </Unit21>
       <Unit22>
         <Filename Value="painterbgraform.pas"/>
@@ -237,7 +238,7 @@
         <EditorIndex Value="-1"/>
         <TopLine Value="130"/>
         <CursorPos X="17" Y="142"/>
-        <UsageCount Value="89"/>
+        <UsageCount Value="94"/>
       </Unit22>
       <Unit23>
         <Filename Value="osmaprouting.pas"/>
@@ -337,11 +338,10 @@
       </Unit35>
       <Unit36>
         <Filename Value="..\..\pas-components\AggPasMod\Source\Agg2D.pas"/>
-        <EditorIndex Value="2"/>
+        <EditorIndex Value="-1"/>
         <TopLine Value="152"/>
         <CursorPos X="51" Y="97"/>
-        <UsageCount Value="12"/>
-        <Loaded Value="True"/>
+        <UsageCount Value="13"/>
         <DefaultSyntaxHighlighter Value="Delphi"/>
       </Unit36>
       <Unit37>
@@ -522,10 +522,11 @@
       </Unit60>
       <Unit61>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
-        <EditorIndex Value="-1"/>
-        <TopLine Value="830"/>
-        <CursorPos X="17" Y="828"/>
-        <UsageCount Value="11"/>
+        <EditorIndex Value="11"/>
+        <TopLine Value="915"/>
+        <CursorPos Y="930"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
       </Unit61>
       <Unit62>
         <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\sysutils\sysutilh.inc"/>
@@ -537,124 +538,124 @@
     </Units>
     <JumpHistory Count="30" HistoryIndex="29">
       <Position1>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1408" TopLine="1393"/>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
+        <Caret Line="929" TopLine="915"/>
       </Position1>
       <Position2>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1411" TopLine="1393"/>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
+        <Caret Line="930" TopLine="915"/>
       </Position2>
       <Position3>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1412" TopLine="1402"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="710" TopLine="696"/>
       </Position3>
       <Position4>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1398" TopLine="1384"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="711" TopLine="696"/>
       </Position4>
       <Position5>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1400" TopLine="1384"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="712" TopLine="696"/>
       </Position5>
       <Position6>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1402" TopLine="1384"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="714" TopLine="696"/>
       </Position6>
       <Position7>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1408" TopLine="1385"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="716" TopLine="696"/>
       </Position7>
       <Position8>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1411" TopLine="1388"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="712" TopLine="696"/>
       </Position8>
       <Position9>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1412" TopLine="1389"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="719" TopLine="696"/>
       </Position9>
       <Position10>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1398" TopLine="1389"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="357" TopLine="343"/>
       </Position10>
       <Position11>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1400" TopLine="1389"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="358" TopLine="343"/>
       </Position11>
       <Position12>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1402" TopLine="1389"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="361" TopLine="343"/>
       </Position12>
       <Position13>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1408" TopLine="1389"/>
+        <Caret Line="1595" TopLine="1584"/>
       </Position13>
       <Position14>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1411" TopLine="1389"/>
+        <Caret Line="1597" TopLine="1584"/>
       </Position14>
       <Position15>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1398" TopLine="1389"/>
+        <Caret Line="1599" TopLine="1584"/>
       </Position15>
       <Position16>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1539" TopLine="1525"/>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
+        <Caret Line="929" TopLine="915"/>
       </Position16>
       <Position17>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1394" TopLine="1380"/>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
+        <Caret Line="930" TopLine="915"/>
       </Position17>
       <Position18>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1376" TopLine="1362"/>
+        <Filename Value="osmapobjects.pas"/>
+        <Caret Line="719" TopLine="696"/>
       </Position18>
       <Position19>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1539" TopLine="1527"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="357" TopLine="343"/>
       </Position19>
       <Position20>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1398" TopLine="1384"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="358" TopLine="343"/>
       </Position20>
       <Position21>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1390" Column="5" TopLine="1401"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="361" TopLine="343"/>
       </Position21>
       <Position22>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1400" Column="16" TopLine="1391"/>
+        <Caret Line="1599" Column="91" TopLine="1584"/>
       </Position22>
       <Position23>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1403" TopLine="1394"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="265" Column="18" TopLine="249"/>
       </Position23>
       <Position24>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1405" TopLine="1394"/>
+        <Caret Line="1599" Column="91" TopLine="1584"/>
       </Position24>
       <Position25>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1411" TopLine="1394"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="104" Column="19" TopLine="92"/>
       </Position25>
       <Position26>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1414" TopLine="1400"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="357" Column="44" TopLine="353"/>
       </Position26>
       <Position27>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1417" TopLine="1403"/>
+        <Filename Value="osmapprojection.pas"/>
+        <Caret Line="785" Column="32" TopLine="764"/>
       </Position27>
       <Position28>
-        <Filename Value="osmappainter.pas"/>
-        <Caret Line="1418" TopLine="1403"/>
+        <Filename Value="mainform.pas"/>
+        <Caret Line="193" TopLine="171"/>
       </Position28>
       <Position29>
         <Filename Value="osmappainter.pas"/>
-        <Caret Line="1403" TopLine="1400"/>
+        <Caret Line="1591" TopLine="1584"/>
       </Position29>
       <Position30>
-        <Filename Value="osmappainteragg.pas"/>
-        <Caret Line="711" Column="16" TopLine="697"/>
+        <Filename Value="osmappainter.pas"/>
+        <Caret Line="1600" TopLine="1584"/>
       </Position30>
     </JumpHistory>
     <RunParams>

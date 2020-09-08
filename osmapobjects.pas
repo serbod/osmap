@@ -711,7 +711,7 @@ begin
   Assert(Length(Rings) > 0);
   for i := 0 to Length(Rings)-1 do
   begin
-    if Rings[i].IsOuterRing() then
+    if Rings[i].IsOuterRing() and (Length(Rings[i].Nodes) > 2) then
     begin
       Result.Include(Rings[i].GetBoundingBox());
     end;

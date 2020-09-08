@@ -65,7 +65,7 @@ type
     FMapRenderThread: TMapRenderThread;
     FMapGeocoder: TMapGeocoder;
     // assigned
-    FMapProjection: TMercatorProjection;
+    FMapProjection: TProjection;
     FMapPainter: TMapPainter;
 
 
@@ -100,7 +100,7 @@ type
     property MapStyleConfig: TStyleConfig read FMapStyleConfig;
     property MapGeocoder: TMapGeocoder read FMapGeocoder;
 
-    property MapProjection: TMercatorProjection read FMapProjection write FMapProjection;
+    property MapProjection: TProjection read FMapProjection write FMapProjection;
     property MapPainter: TMapPainter read FMapPainter write FMapPainter;
 
     property OnAfterRender: TNotifyEvent read FOnAfterRender write FOnAfterRender;
@@ -340,6 +340,7 @@ begin
 
   if Assigned(MapProjection) and Assigned(MapPainter) then
   begin
+    MapPainter.CheckDebug(MapData);
     MapPainter.DrawMap(MapProjection, MapParameter, MapData);
   end;
   if Assigned(OnAfterRender) then

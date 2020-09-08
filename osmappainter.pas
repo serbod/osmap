@@ -585,6 +585,8 @@ type
     { Get current renderer state description, for debugging }
     function GetStateStr(): string;
 
+    procedure CheckDebug(AMapData: TMapData);
+
     {  }
     function Draw(AProjection: TProjection;
                   AParameter: TMapParameter;
@@ -1484,7 +1486,7 @@ begin
       SetLength(AreaData.Clippings, Length(AArea.Rings) - j + 1);
       ClipCount := 0;
       while (j < Length(AArea.Rings))
-        and (AArea.Rings[j].Ring = RingId + 1)
+        and (AArea.Rings[j].Ring = RingId + 1) // inner rings
         and (not AArea.Rings[j].GetType().IsIgnore)
       do
       begin
@@ -1537,7 +1539,7 @@ begin
 
         FAreaDataList.Append(AreaData);
       end;
-      Inc(i);
+      Inc(i, 1 + ClipCount);
     end;
 
     Inc(RingId);
@@ -1587,6 +1589,7 @@ procedure TMapPainter.PrepareAreas(const AStyleConfig: TStyleConfig;
   const AData: TMapData);
 var
   i: Integer;
+  TmpArea: TMapArea;
 begin
   FAreaDataList.Clear();
 
@@ -2061,7 +2064,7 @@ procedure TMapPainter.DrawOSMTileGrid(const AProjection: TProjection;
   const AOsmTileLine: TLineStyle);
 var
   BoundingBox: TGeoBox;
-  TileA, TileB: TOSMTileId;
+  TileA, TileB: TOSMTileXY;
   StartTileX, EndTileX: LongWord;
   StartTileY, EndTileY: LongWord;
   Points: TGeoPointArray;
@@ -2092,7 +2095,7 @@ begin
 
     for x := StartTileX to EndTileX do
     begin
-      Points[x-StartTileX].Assign(OSMTileId(x, y).GetTopLeftCoord(AMagnification));
+      Points[x-StartTileX].Assign(OSMTileXY(x, y).GetTopLeftCoord(AMagnification));
     end;
 
     FTransBuffer.TransformWay(AProjection,
@@ -2125,7 +2128,7 @@ begin
 
     for y := StartTileY to EndTileY do
     begin
-      Points[y-StartTileY] := OSMTileId(x, y).GetTopLeftCoord(AMagnification);
+      Points[y-StartTileY] := OSMTileXY(x, y).GetTopLeftCoord(AMagnification);
     end;
 
     FTransBuffer.TransformWay(AProjection,
@@ -2190,6 +2193,7 @@ procedure TMapPainter.PreprocessData(const AProjection: TProjection;
 var
   prepareWaysTimer, prepareAreasTimer: TStopClock;
 begin
+  CheckDebug(AData);
   prepareWaysTimer.Init();
   PrepareWays(FStyleConfig, AProjection, AParameter, AData);
   prepareWaysTimer.Stop();
@@ -2197,6 +2201,7 @@ begin
   if AParameter.IsAborted then
     Exit;
 
+  CheckDebug(AData);
   prepareAreasTimer.Init();
   PrepareAreas(FStyleConfig, AProjection, AParameter, AData);
   prepareAreasTimer.Stop();
@@ -2990,6 +2995,22 @@ begin
     Result := '';
 end;
 
+procedure TMapPainter.CheckDebug(AMapData: TMapData);
+var
+  TmpArea: TMapArea;
+  i: Integer;
+begin
+  // debug
+  for i := 0 to AMapData.AreaList.Count-1 do
+  begin
+    TmpArea := AMapData.AreaList[i];
+    if Length(TmpArea.Rings) = 0 then
+    begin
+      Sleep(1);
+    end;
+  end;
+end;
+
 function TMapPainter.Draw(AProjection: TProjection;
   AParameter: TMapParameter; AData: TMapData;
   AStartStep: TRenderSteps; AEndStep: TRenderSteps): Boolean;
@@ -3000,6 +3021,8 @@ begin
   Assert(AStartStep >= Low(TRenderSteps));
   Assert(AStartStep <= High(TRenderSteps));
   FIsBusy := True;
+
+  CheckDebug(AData);
 
   for Step := AStartStep to AEndStep do
   begin

@@ -34,8 +34,8 @@ util\GeoBox
   GeoBox
 
 util\Tiling
-  OSMTileId
-  OSMTileIdBox
+  OSMTileId -> TOSMTileXY
+  OSMTileIdBox -> TOSMTileBox
 
 util\Geometry (...)
 *)
@@ -277,9 +277,9 @@ type
     redundant we have defined OSMTile without the zoom level to save in memory
     space. }
 
-  { TOSMTileId }
+  { TOSMTileXY }
 
-  TOSMTileId = object
+  TOSMTileXY = object
   public
     X: LongWord;
     Y: LongWord;
@@ -297,9 +297,9 @@ type
 
   { A bounding box defined by two tile ids that span a rectangular region (in
     tile coordinate system) }
-  TOSMTileIdBox = object
-    MinTile: TOSMTileId ;
-    MaxTile: TOSMTileId;
+  TOSMTileBox = object
+    MinTile: TOSMTileXY ;
+    MaxTile: TOSMTileXY;
 
     function GetWidth(): LongWord;
     function GetHeight(): LongWord;
@@ -318,9 +318,9 @@ function GeoCoord(ALat: TLatitude; ALon: TLongitude): TGeoPoint;
 function GeoBox(const AMinCoord, AMaxCoord: TGeoPoint): TGeoBox;
 
 { Return TOSMTileId for given X and Y }
-function OSMTileId(AX, AY: LongWord): TOSMTileId;
+function OSMTileXY(AX, AY: LongWord): TOSMTileXY;
 
-function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileId;
+function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileXY;
 
 { Calculating basic cost for the A* algorithm based on the
   spherical distance of two points on Earth. }
@@ -418,13 +418,13 @@ begin
   Result.SetValue(AMinCoord, AMaxCoord);
 end;
 
-function OSMTileId(AX, AY: LongWord): TOSMTileId;
+function OSMTileXY(AX, AY: LongWord): TOSMTileXY;
 begin
   Result.X := AX;
   Result.Y := AY;
 end;
 
-function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileId;
+function GetOSMTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TOSMTileXY;
 var
   LatRad: TReal;
 begin
@@ -1479,60 +1479,62 @@ begin
                   GeoCoord(botLat, rightLon));
 end;
 
-{ TOSMTileId }
+{ TOSMTileXY }
 
-procedure TOSMTileId.Init(AX, AY: LongWord);
+procedure TOSMTileXY.Init(AX, AY: LongWord);
 begin
   X := AX;
   Y := AY;
 end;
 
-function TOSMTileId.GetTopLeftCoord(const AMagnification: TMagnification): TGeoPoint;
+function TOSMTileXY.GetTopLeftCoord(const AMagnification: TMagnification): TGeoPoint;
 var
   n: TReal;
 begin
-  n := M_PI - 2.0 * M_PI * Y / AMagnification.Magnification;
+  {n := M_PI - 2.0 * M_PI * Y / AMagnification.Magnification;
+  Result.Lat := 180.0 / M_PI * arctan(0.5 * (exp(n) - exp(-n))); }
 
-  Result.Lat := 180.0 / M_PI * arctan(0.5 * (exp(n) - exp(-n)));
-  Result.Lon := Y / AMagnification.Magnification * 360.0 - 180.0;
+  n := ArcTan(SinH(M_PI * (1 - 2 * (Y+1) / AMagnification.Magnification)));
+  Result.Lat := RadToDeg(n);
+  Result.Lon := X / AMagnification.Magnification * 360.0 - 180.0;
 end;
 
-function TOSMTileId.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
+function TOSMTileXY.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
 begin
   Assert( (X < High(LongWord)) and (Y < High(LongWord)) );
   Result.MinCoord := GetTopLeftCoord(AMagnification);
-  Result.MaxCoord := OSMTileId(X+1, Y+1).GetTopLeftCoord(AMagnification);
+  Result.MaxCoord := OSMTileXY(X+1, Y-1).GetTopLeftCoord(AMagnification);
 end;
 
-function TOSMTileId.GetDisplayText(): string;
+function TOSMTileXY.GetDisplayText(): string;
 begin
   Result := IntToStr(X) + ',' + IntToStr(Y);
 end;
 
-{ TOSMTileIdBox }
+{ TOSMTileBox }
 
-function TOSMTileIdBox.GetWidth(): LongWord;
+function TOSMTileBox.GetWidth(): LongWord;
 begin
   Result := MaxTile.X - MinTile.X + 1;
 end;
 
-function TOSMTileIdBox.GetHeight(): LongWord;
+function TOSMTileBox.GetHeight(): LongWord;
 begin
   Result := MaxTile.Y - MinTile.Y + 1;
 end;
 
-function TOSMTileIdBox.GetCount(): LongWord;
+function TOSMTileBox.GetCount(): LongWord;
 begin
   Result := GetWidth() * GetHeight();
 end;
 
-function TOSMTileIdBox.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
+function TOSMTileBox.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
 begin
   Result.MinCoord := MinTile.GetTopLeftCoord(AMagnification);
-  Result.MaxCoord := OSMTileId(MaxTile.X+1, MaxTile.Y+1).GetTopLeftCoord(AMagnification);
+  Result.MaxCoord := OSMTileXY(MaxTile.X+1, MaxTile.Y+1).GetTopLeftCoord(AMagnification);
 end;
 
-function TOSMTileIdBox.GetDisplayText(): string;
+function TOSMTileBox.GetDisplayText(): string;
 begin
   Result := '[' + MinTile.GetDisplayText() + ' - ' + MaxTile.GetDisplayText() + ']';
 end;

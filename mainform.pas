@@ -32,6 +32,8 @@ type
     fseLat: TFloatSpinEdit;
     fseLon: TFloatSpinEdit;
     lbState: TLabel;
+    MenuItem1: TMenuItem;
+    miOsmTileTest: TMenuItem;
     miLoadMapFiles: TMenuItem;
     miSaveMapFiles: TMenuItem;
     panBottom: TPanel;
@@ -48,11 +50,13 @@ type
     procedure FormCreate(Sender: TObject);
     procedure FormMouseWheel(Sender: TObject; Shift: TShiftState;
       WheelDelta: Integer; MousePos: TPoint; var Handled: Boolean);
+    procedure miOsmTileTestClick(Sender: TObject);
     procedure miLoadMapFilesClick(Sender: TObject);
     procedure miSaveMapFilesClick(Sender: TObject);
     procedure Timer100msTimer(Sender: TObject);
   private
     FMapProjection: TMercatorProjection;
+    FMapProjectionTile: TTileProjection;
     FMapManager: TMapManager;
 
     {$ifdef AggPainter}
@@ -133,6 +137,7 @@ begin
   FPainterForm.Visible := True;
 
   FMapProjection := TMercatorProjection.Create();
+  FMapProjectionTile := TTileProjection.Create();
 
   FMapManager := TMapManager.Create(Self);
   FMapManager.MapProjection := FMapProjection;
@@ -161,6 +166,34 @@ begin
     seMagLevel.Value := seMagLevel.Value + 1
   else
     seMagLevel.Value := seMagLevel.Value - 1;
+end;
+
+procedure TForm1.miOsmTileTestClick(Sender: TObject);
+var
+  //Coord: TGeoPoint;
+  MagLev: Byte;
+  TileXY: TOSMTileXY;
+begin
+  // OSM Tile test
+  //Coord.Lat := fseLat.Value; // 53.89579
+  //Coord.Lon := fseLon.Value; // 27.54783
+  //Maglev := MAG_LEVEL_DETAIL;
+  //Maglev := Byte(seMagLevel.Value);
+
+  Maglev := 16;
+  TileXY.Init(37780, 21069);
+  FMapProjectionTile.Setup(TileXY, Magnification(MagLev), Screen.PixelsPerInch,
+    256, 256);
+  //{$ifdef AggPainter}
+  //(FMapManager.MapProjection as TMercatorProjection).Setup(Coord, 0, Magnification(MagLev), Screen.PixelsPerInch,
+  //  FPainterForm.Width, FPainterForm.Height);
+  //{$endif}
+
+  FMapManager.MapProjection := FMapProjectionTile;
+  FMapManager.Render();
+
+  //Agg2DControl1.Invalidate();
+
 end;
 
 procedure TForm1.miLoadMapFilesClick(Sender: TObject);
@@ -239,10 +272,11 @@ begin
   //Maglev := MAG_LEVEL_DETAIL;
   Maglev := Byte(seMagLevel.Value);
   //{$ifdef AggPainter}
-  FMapManager.MapProjection.Setup(Coord, 0, Magnification(MagLev), Screen.PixelsPerInch,
+  FMapProjection.Setup(Coord, 0, Magnification(MagLev), Screen.PixelsPerInch,
     FPainterForm.Width, FPainterForm.Height);
   //{$endif}
 
+  FMapManager.MapProjection := FMapProjection;
   FMapManager.Render();
 
   //Agg2DControl1.Invalidate();

@@ -1,0 +1,407 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectSession>
+    <PathDelim Value="\"/>
+    <Version Value="11"/>
+    <BuildModes Active="Default"/>
+    <Units Count="29">
+      <Unit0>
+        <Filename Value="TileServer.lpr"/>
+        <IsPartOfProject Value="True"/>
+        <EditorIndex Value="-1"/>
+        <WindowIndex Value="-1"/>
+        <TopLine Value="-1"/>
+        <CursorPos X="-1" Y="-1"/>
+        <UsageCount Value="27"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="TileServerMainForm.pas"/>
+        <IsPartOfProject Value="True"/>
+        <ComponentName Value="FormMain"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <TopLine Value="82"/>
+        <CursorPos Y="95"/>
+        <UsageCount Value="27"/>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="mainform.pas"/>
+        <UnitName Value="MainForm"/>
+        <EditorIndex Value="14"/>
+        <TopLine Value="82"/>
+        <CursorPos X="67" Y="183"/>
+        <UsageCount Value="13"/>
+        <Loaded Value="True"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="painteraggform.pas"/>
+        <ComponentName Value="FormPainterAgg"/>
+        <HasResources Value="True"/>
+        <ResourceBaseClass Value="Form"/>
+        <UnitName Value="PainterAggForm"/>
+        <EditorIndex Value="15"/>
+        <CursorPos X="20" Y="18"/>
+        <UsageCount Value="13"/>
+        <Loaded Value="True"/>
+        <LoadedDesigner Value="True"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\Agg2D.pas"/>
+        <EditorIndex Value="16"/>
+        <TopLine Value="888"/>
+        <CursorPos Y="901"/>
+        <UsageCount Value="13"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="C:\lazarus\lcl\graphics.pp"/>
+        <UnitName Value="Graphics"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="1275"/>
+        <CursorPos X="37" Y="1283"/>
+        <UsageCount Value="11"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\AggBasics.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="415"/>
+        <CursorPos X="103" Y="329"/>
+        <UsageCount Value="10"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\Platform\win\AggWin32Bmp.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="36"/>
+        <CursorPos X="12" Y="43"/>
+        <UsageCount Value="11"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\Agg2DGraphics.pas"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="19"/>
+        <CursorPos X="17" Y="35"/>
+        <UsageCount Value="10"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\httpdefs.pp"/>
+        <UnitName Value="HTTPDefs"/>
+        <EditorIndex Value="3"/>
+        <TopLine Value="1714"/>
+        <CursorPos Y="1713"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="Agg2DGraphics.pas"/>
+        <EditorIndex Value="4"/>
+        <TopLine Value="23"/>
+        <CursorPos X="59" Y="49"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="osmapobjects.pas"/>
+        <UnitName Value="OsMapObjects"/>
+        <EditorIndex Value="7"/>
+        <TopLine Value="697"/>
+        <CursorPos Y="711"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="osmappainter.pas"/>
+        <UnitName Value="OsMapPainter"/>
+        <EditorIndex Value="13"/>
+        <TopLine Value="2995"/>
+        <CursorPos Y="3009"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit12>
+      <Unit13>
+        <Filename Value="osmapmanager.pas"/>
+        <UnitName Value="OsMapManager"/>
+        <EditorIndex Value="11"/>
+        <TopLine Value="329"/>
+        <CursorPos Y="344"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit13>
+      <Unit14>
+        <Filename Value="osmappainteragg.pas"/>
+        <UnitName Value="OsMapPainterAgg"/>
+        <EditorIndex Value="12"/>
+        <TopLine Value="829"/>
+        <CursorPos X="5" Y="841"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit14>
+      <Unit15>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\rtl\objpas\fgl.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="915"/>
+        <CursorPos Y="930"/>
+        <UsageCount Value="10"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="osmapgeometry.pas"/>
+        <UnitName Value="OsMapGeometry"/>
+        <EditorIndex Value="10"/>
+        <TopLine Value="1492"/>
+        <CursorPos Y="1506"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="osmapprojection.pas"/>
+        <UnitName Value="OsMapProjection"/>
+        <EditorIndex Value="9"/>
+        <TopLine Value="343"/>
+        <CursorPos Y="361"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="osmapformatmp.pas"/>
+        <UnitName Value="OsMapFormatMp"/>
+        <EditorIndex Value="6"/>
+        <TopLine Value="462"/>
+        <CursorPos Y="464"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="osmapobjtypes.pas"/>
+        <UnitName Value="OsMapObjTypes"/>
+        <EditorIndex Value="8"/>
+        <TopLine Value="359"/>
+        <CursorPos X="15" Y="454"/>
+        <UsageCount Value="12"/>
+        <Loaded Value="True"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="osmaptypes.pas"/>
+        <UnitName Value="OsMapTypes"/>
+        <EditorIndex Value="5"/>
+        <TopLine Value="256"/>
+        <CursorPos Y="272"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+      </Unit20>
+      <Unit21>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\AggRendererBase.pas"/>
+        <EditorIndex Value="17"/>
+        <TopLine Value="184"/>
+        <CursorPos Y="198"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\AggPixelFormat.pas"/>
+        <EditorIndex Value="18"/>
+        <TopLine Value="282"/>
+        <CursorPos Y="292"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="..\..\pas-components\AggPasMod\Source\AggRenderingBuffer.pas"/>
+        <EditorIndex Value="19"/>
+        <CursorPos X="37" Y="78"/>
+        <UsageCount Value="11"/>
+        <Loaded Value="True"/>
+        <DefaultSyntaxHighlighter Value="Delphi"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="C:\lazarus\lcl\include\graphic.inc"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="36"/>
+        <CursorPos Y="50"/>
+        <UsageCount Value="10"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <IsVisibleTab Value="True"/>
+        <EditorIndex Value="1"/>
+        <TopLine Value="818"/>
+        <CursorPos X="97" Y="837"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="C:\Users\s.bodrov\AppData\Local\lazarus\onlinepackagemanager\packages\lnet\lazaruspackage\lnetcomponents.pas"/>
+        <UnitName Value="lNetComponents"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="145"/>
+        <CursorPos X="3" Y="153"/>
+        <UsageCount Value="10"/>
+      </Unit26>
+      <Unit27>
+        <Filename Value="C:\Users\s.bodrov\AppData\Local\lazarus\onlinepackagemanager\packages\lnet\lib\lhttp.pp"/>
+        <EditorIndex Value="-1"/>
+        <TopLine Value="491"/>
+        <CursorPos X="19" Y="511"/>
+        <UsageCount Value="10"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-net\src\ssockets.pp"/>
+        <EditorIndex Value="2"/>
+        <TopLine Value="767"/>
+        <CursorPos Y="781"/>
+        <UsageCount Value="10"/>
+        <Loaded Value="True"/>
+      </Unit28>
+    </Units>
+    <JumpHistory Count="30" HistoryIndex="29">
+      <Position1>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="13" Column="57"/>
+      </Position1>
+      <Position2>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="11" Column="37"/>
+      </Position2>
+      <Position3>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="41" Column="17" TopLine="20"/>
+      </Position3>
+      <Position4>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="75" Column="3" TopLine="57"/>
+      </Position4>
+      <Position5>
+        <Filename Value="Agg2DGraphics.pas"/>
+        <Caret Line="49" Column="59" TopLine="23"/>
+      </Position5>
+      <Position6>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="14" Column="56" TopLine="2"/>
+      </Position6>
+      <Position7>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="173" Column="3" TopLine="153"/>
+      </Position7>
+      <Position8>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="137" TopLine="129"/>
+      </Position8>
+      <Position9>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="151" Column="3" TopLine="72"/>
+      </Position9>
+      <Position10>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="95" Column="3" TopLine="70"/>
+      </Position10>
+      <Position11>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="137" Column="19" TopLine="119"/>
+      </Position11>
+      <Position12>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\httpdefs.pp"/>
+        <Caret Line="492" Column="21" TopLine="477"/>
+      </Position12>
+      <Position13>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="137" Column="21" TopLine="103"/>
+      </Position13>
+      <Position14>
+        <Filename Value="TileServerMainForm.pas"/>
+        <Caret Line="95" TopLine="82"/>
+      </Position14>
+      <Position15>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="323" TopLine="308"/>
+      </Position15>
+      <Position16>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="629" Column="36" TopLine="612"/>
+      </Position16>
+      <Position17>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="323" TopLine="308"/>
+      </Position17>
+      <Position18>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="601" TopLine="587"/>
+      </Position18>
+      <Position19>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="823" TopLine="809"/>
+      </Position19>
+      <Position20>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="601" TopLine="587"/>
+      </Position20>
+      <Position21>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="323" TopLine="309"/>
+      </Position21>
+      <Position22>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="601" TopLine="587"/>
+      </Position22>
+      <Position23>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-net\src\ssockets.pp"/>
+        <Caret Line="781" TopLine="767"/>
+      </Position23>
+      <Position24>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-net\src\ssockets.pp"/>
+        <Caret Line="678" TopLine="664"/>
+      </Position24>
+      <Position25>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-net\src\ssockets.pp"/>
+        <Caret Line="781" TopLine="767"/>
+      </Position25>
+      <Position26>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="823" TopLine="809"/>
+      </Position26>
+      <Position27>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="601" TopLine="587"/>
+      </Position27>
+      <Position28>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="323" TopLine="309"/>
+      </Position28>
+      <Position29>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\httpdefs.pp"/>
+        <Caret Line="1713" TopLine="1714"/>
+      </Position29>
+      <Position30>
+        <Filename Value="C:\lazarus\fpc\3.2.0\source\packages\fcl-web\src\base\fphttpserver.pp"/>
+        <Caret Line="605" Column="37" TopLine="605"/>
+      </Position30>
+    </JumpHistory>
+    <RunParams>
+      <FormatVersion Value="2"/>
+      <Modes Count="0" ActiveMode=""/>
+    </RunParams>
+  </ProjectSession>
+  <Debugging>
+    <BreakPoints Count="2">
+      <Item1>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmapobjects.pas"/>
+        <Line Value="742"/>
+      </Item1>
+      <Item2>
+        <Kind Value="bpkSource"/>
+        <WatchScope Value="wpsLocal"/>
+        <WatchKind Value="wpkWrite"/>
+        <Source Value="osmappainter.pas"/>
+        <Line Value="3009"/>
+      </Item2>
+    </BreakPoints>
+  </Debugging>
+</CONFIG>

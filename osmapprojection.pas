@@ -101,7 +101,7 @@ type
     { Returns True, if the given geo coordinate is in the bounding box }
     function GeoCoordIsIn(ALat: TLatitude; ALon: TLongitude): Boolean;
     { Returns true, if the given bounding box is completely within the projection bounding box }
-    function GeoBoxIsIn(const AGeoBox: TGeoBox): Boolean; overload;
+    function GeoBoxIsIn(const AGeoBox: TGeoBox): Boolean;
     { Returns True if pixel with given X.Y is in visible area with ATolerance }
     function IsPixelValid(AX, AY, ATolerance: TReal): Boolean;
 
@@ -264,12 +264,12 @@ type
     function PixelToGeo(X, Y: TReal; out ACoord: TGeoPoint): Boolean; override;
     function GeoToPixel(const ACoord: TGeoPoint; out X, Y: TReal): Boolean; override;
 
-    function Setup(const ATile: TOsmTileId;
+    function Setup(const ATile: TOSMTileXY;
                    const AMagnification: TMagnification;
                    ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean; overload;
 
-    function Setup(const ATileBox: TOsmTileIdBox;
+    function Setup(const ATileBox: TOSMTileBox;
                    const AMagnification: TMagnification;
                    ADpi: TReal;
                    AWidth, AHeight: Integer): Boolean; overload;
@@ -777,7 +777,7 @@ begin
   {$endif}
 end;
 
-function TTileProjection.Setup(const ATile: TOsmTileId;
+function TTileProjection.Setup(const ATile: TOsmTileXY;
   const AMagnification: TMagnification; ADpi: TReal; AWidth, AHeight: Integer): Boolean;
 var
   BoundingBox: TGeoBox;
@@ -792,7 +792,7 @@ begin
                           AWidth, AHeight);
 end;
 
-function TTileProjection.Setup(const ATileBox: TOsmTileIdBox;
+function TTileProjection.Setup(const ATileBox: TOsmTileBox;
   const AMagnification: TMagnification; ADpi: TReal; AWidth, AHeight: Integer): Boolean;
 var
   BoundingBox: TGeoBox;

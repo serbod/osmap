@@ -461,9 +461,9 @@ begin
   begin
     if AreaCircleNo > 0 then
     begin
-      SetLength(TmpArea.Rings, Length(TmpArea.Rings)+1);
+      SetLength(TmpArea.Rings, AreaCircleNo+1);
       TmpArea.Rings[AreaCircleNo].Ring := 2;
-      TmpArea.Rings[AreaCircleNo].SetType(TmpArea.Rings[AreaCircleNo-1].GetType());
+      TmpArea.Rings[AreaCircleNo].SetType(TmpArea.Rings[0].GetType());
     end;
 
     Offs := 1;

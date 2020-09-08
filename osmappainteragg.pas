@@ -839,9 +839,11 @@ end;
 function TMapPainterAgg.DrawMap(AProjection: TProjection;
   AParameter: TMapParameter; AData: TMapData): Boolean;
 begin
+  CheckDebug(AData);
   EnterCriticalsection(FMutex);
   try
     FAgg2D.ClearAll(255, 255, 255);
+    CheckDebug(AData);
 
     if FFontSize = 0 then
       SetFont(AProjection, AParameter, AParameter.FontSize);

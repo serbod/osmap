@@ -117,5 +117,12 @@ object Form1: TForm1
       Caption = 'Load map files'
       OnClick = miLoadMapFilesClick
     end
+    object MenuItem1: TMenuItem
+      Caption = '-'
+    end
+    object miOsmTileTest: TMenuItem
+      Caption = 'OSM Tile test'
+      OnClick = miOsmTileTestClick
+    end
   end
 end
