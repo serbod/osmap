@@ -37,6 +37,8 @@ unit OsMapTransform;
 {$mode objfpc}{$H+}
 {$endif}
 
+{//$define DEBUG_POLYLABEL}
+
 interface
 
 uses
@@ -100,13 +102,10 @@ type
   private
     FItems: array of TPolyCell;
     FCount: Integer;
-    FStartIndex: Integer;
-    FEndIndex: Integer;
-    FMaxDistMax: TReal;
   public
     procedure Init();
     procedure Push(const AItem: TPolyCell);
-    function Pull(out AItem: TPolyCell): Boolean;
+    function PullMaxDist(out AItem: TPolyCell): Boolean;
 
     property Count: Integer read FCount;
   end;
@@ -188,6 +187,8 @@ type
     property EndIndex: Integer read FEnd;
   end;
 
+  TDebugPolyCellEvent = procedure(const ACell: TPolyCell; ANum: Integer) of object;
+
   { TTransBuffer }
   { List of all screen points for every visible area and way vertex }
   { TODO : replace by TMapTransform }
@@ -195,6 +196,8 @@ type
   private
     FCount: Integer; // used points
     FPolyCellQueue: TPolyCellQueue;
+    // debug
+    FOnDebugPolyCell: TDebugPolyCellEvent;
   public
     TransPolygon: TTransPolygon;
     Buffer: array of TVertex2D;
@@ -232,6 +235,7 @@ type
     procedure FillVertex2DArray(out APolyArr: TVertex2DArray; AStart, AEnd: Integer);
 
     property Count: Integer read FCount;
+    property OnDebugPolyCell: TDebugPolyCellEvent read FOnDebugPolyCell write FOnDebugPolyCell;
   end;
 
 type
@@ -1264,6 +1268,9 @@ begin
 
   // take centroid as the first best guess
   BestCell.InitCentroid(PolyPoints);
+  {$ifdef DEBUG_POLYLABEL}
+  if Assigned(OnDebugPolyCell) then OnDebugPolyCell(BestCell, 2);
+  {$endif}
 
   // special case for rectangular polygons
   BBoxCell.Init(MinX + width / 2, MinY + height / 2, 0, PolyPoints);
@@ -1275,7 +1282,10 @@ begin
   while (FPolyCellQueue.Count > 0) do
   begin
     // pick the most promising cell from the queue
-    FPolyCellQueue.Pull(TmpCell);
+    FPolyCellQueue.PullMaxDist(TmpCell);
+    {$ifdef DEBUG_POLYLABEL}
+    if Assigned(OnDebugPolyCell) then OnDebugPolyCell(TmpCell, 3);
+    {$endif}
 
     // update the best cell if we found a better one
     if (TmpCell.Dist > BestCell.Dist) then
@@ -1320,6 +1330,8 @@ begin
   SetLength(APolyArr, AEnd-AStart+1);
   for i := AStart to AEnd do
     APolyArr[i-AStart] := Buffer[i];
+
+  //APolyArr[AEnd-AStart+1] := Buffer[AStart]; // last point
 end;
 
 procedure TTransBuffer.TransformArea(const AProjection: TProjection;
@@ -1518,41 +1530,44 @@ end;
 
 procedure TPolyCellQueue.Init();
 begin
-  SetLength(FItems, 32);
+  SetLength(FItems, 128);
   FCount := 0;
-  FStartIndex := 15;
-  FEndIndex := FStartIndex-1;
-  FMaxDistMax := 0;
 end;
 
 procedure TPolyCellQueue.Push(const AItem: TPolyCell);
 begin
   Inc(FCount);
-  // items with great MaxDist go to head of queue
-  if (AItem.MaxDist >= FMaxDistMax) and (FStartIndex > 0) then
-  begin
-    FMaxDistMax := AItem.MaxDist;
-    Dec(FStartIndex);
-    FItems[FStartIndex] := AItem;
-  end
-  else
-  begin
-    Inc(FEndIndex);
-    if FEndIndex >= Length(FItems)-1 then
-      SetLength(FItems, ((FEndIndex * 3) div 2) + 1);
+  if FCount >= Length(FItems)-1 then
+    SetLength(FItems, ((FCount * 3) div 2) + 1);
 
-    FItems[FEndIndex] := AItem;
-  end;
+  FItems[FCount-1] := AItem;
 end;
 
-function TPolyCellQueue.Pull(out AItem: TPolyCell): Boolean;
+function TPolyCellQueue.PullMaxDist(out AItem: TPolyCell): Boolean;
+var
+  i, iMax: Integer;
+  TmpMaxDist: TReal;
 begin
   Result := (FCount <> 0);
   if Result then
   begin
+    TmpMaxDist := NegInfinity;
+    iMax := 0;
+
+    for i := 0 to FCount-1 do
+    begin
+      if FItems[i].MaxDist > TmpMaxDist then
+      begin
+        TmpMaxDist := FItems[i].MaxDist;
+        iMax := i;
+      end;
+    end;
+
+    AItem := FItems[iMax];
+
+    for i := iMax to FCount-2 do
+      FItems[i] := FItems[i+1];
     Dec(FCount);
-    Inc(FStartIndex);
-    AItem := FItems[FStartIndex];
   end;
 end;
 

@@ -63,6 +63,7 @@ type
     procedure DrawFillStyle(AProjection: TProjection; AParameter: TMapParameter;
       AFillStyle: TFillStyle; ABorderStyle: TBorderStyle);
 
+    procedure DebugPolyCellHandler(const ACell: TPolyCell; ANum: Integer);
   protected
     function HasIcon(AStyleConfig: TStyleConfig; AProjection: TProjection;
       AParameter: TMapParameter; AStyle: TIconStyle): Boolean; override;
@@ -320,6 +321,29 @@ begin
       end;
     end;
   end;
+end;
+
+procedure TMapPainterAgg.DebugPolyCellHandler(const ACell: TPolyCell;
+  ANum: Integer);
+var
+  X, Y, hs: TReal;
+begin
+  X := ACell.CellCenter.X;
+  Y := ACell.CellCenter.Y;
+  hs := ACell.HalfSize;
+
+  FAgg2D.ResetPath();
+  FAgg2D.LineColor.Black;
+  FAgg2D.LineWidth := 0.5;
+
+  FAgg2D.MoveTo(X - hs, Y - hs);
+  FAgg2D.LineTo(X + hs, Y - hs);
+  FAgg2D.LineTo(X + hs, Y + hs);
+  FAgg2D.LineTo(X - hs, Y + hs);
+  FAgg2D.ClosePolygon();
+  FAgg2D.DrawPath(dpfStrokeOnly);
+
+  FAgg2D.Circle(X, Y, 0.5);
 end;
 
 function TMapPainterAgg.HasIcon(AStyleConfig: TStyleConfig;
@@ -717,8 +741,9 @@ begin
   FAgg2D.DrawPath(dpfFillAndStroke);
 
   // center point
+  {FTransBuffer.OnDebugPolyCell := @DebugPolyCellHandler;
   Pixel := FTransBuffer.Polylabel(AAreaData.TransStart, AAreaData.TransEnd);
-  FAgg2D.Circle(Pixel.X, Pixel.Y, 2);
+  FAgg2D.Circle(Pixel.X, Pixel.Y, 2); }
 end;
 
 {procedure TMapPainterAgg.DrawLabelNative(AProjection: TProjection;

@@ -89,7 +89,7 @@ uses Math;
 procedure TForm1.btnStartClick(Sender: TObject);
 var
   Bitmap: TBitmap;
-
+  gp: TGeoPoint;
 begin
   ImportFromMpFile(FMapManager, 'minsk.mp');   // 26212 ways
   ImportFromMpFile(FMapManager, 'minsk_obl.mp');
@@ -107,6 +107,15 @@ begin
   FMapPainter.Agg2D.Attach(Bitmap.ScanLine[Bitmap.Height - 1], Bitmap.Width, Bitmap.Height,
     -Bitmap.Width * 4); }
 
+  // position to first object
+  if FMapManager.MapData.AreaList.Count > 0 then
+  begin
+    if FMapManager.MapData.AreaList[0].GetCenter(gp) then
+    begin
+      fseLat.Value := gp.Lat;
+      fseLon.Value := gp.Lon;
+    end;
+  end;
   btnStart.Enabled := False;
   btnShow.Enabled := True;
 end;

@@ -672,7 +672,7 @@ begin
   Assert(Length(Rings) > 0);
   MinCoord.Init(0.0, 0.0);
   MaxCoord.Init(0.0, 0.0);
-  IsStart := False;
+  IsStart := True;
   for i := 0 to Length(Rings)-1 do
   begin
     if Rings[i].IsOuterRing() then
