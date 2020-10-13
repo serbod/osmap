@@ -311,6 +311,13 @@ type
     function GetDisplayText(): string;
   end;
 
+  TCellDimension = record
+    Width: TReal;
+    Height: TReal;
+  end;
+
+  TCellDimensionArray = array of TCellDimension;
+
 { Return TGeoCoord for given Latitude and Longitude }
 function GeoCoord(ALat: TLatitude; ALon: TLongitude): TGeoPoint;
 
@@ -355,6 +362,27 @@ function Det(X1, Y1, X2, Y2: TReal): TReal; inline;
   B - angle in radians in range -M_PI .. +M_PI }
 function AngleDiff(A, B: TReal): TReal;
 
+{ Return the distance of the point (px,py) to the segment [(p1x,p1y),(p2x,p2y)],
+  r the abscissa on the line of (qx,qy) the orthogonal projected point from (px,py).
+  0 <= r <= 1 if q is between p1 and p2. }
+function DistanceToSegment(px, py, p1x, p1y, p2x, p2y: TReal;
+  var r, qx, qy: TReal): TReal; overload;
+
+function DistanceToSegment(const APoint, ASegmentStart, ASegmentEnd: TGeoPoint;
+  var r: TReal;
+  var AIntersection: TGeoPoint): TReal; overload;
+
+{ return the minimum distance from the APoints to the line segment [p1,p2]
+  ALocation - closest point }
+function DistanceToSegment(const APoints: TGeoPointArray;
+  ASegmentStart, ASegmentEnd: TGeoPoint;
+  var ALocation: TGeoPoint;
+  var AIntersection: TGeoPoint): TReal; overload;
+
+function DistanceToSegment(const ABoundingBox: TGeoBox;
+  ASegmentStart, ASegmentEnd: TGeoPoint;
+  var ALocation: TGeoPoint;
+  var AIntersection: TGeoPoint): TReal; overload;
 
 var
   { Coordinates will be stored as unsigned long values in file.
@@ -754,6 +782,107 @@ begin
   if Result > M_PI then
     Result := (2 * M_PI) - Result;
 end;
+
+function DistanceToSegment(px, py, p1x, p1y, p2x, p2y: TReal;
+  var r, qx, qy: TReal): TReal; overload;
+var
+  rn, rd, ppx, ppy, s: TReal;
+  dist1, dist2: TReal;
+begin
+  Result := NaN;
+  if (p1x = p2x) and (p1y = p2y) then
+    Exit;
+
+  rn := (px-p1x)*(p2x-p1x) + (py-p1y)*(p2y-p1y);
+  rd := (p2x-p1x)*(p2x-p1x) + (p2y-p1y)*(p2y-p1y);
+  r := rn / rd;
+  ppx := p1x + r*(p2x-p1x);
+  ppy := p1y + r*(p2y-p1y);
+  s := ((p1y-py)*(p2x-p1x) - (p1x-px)*(p2y-p1y)) / rd;
+
+  if ((r >= 0) and (r <= 1)) then
+  begin
+    qx := ppx;
+    qy := ppy;
+
+    Result := abs(s) * sqrt(rd);
+  end
+  else
+  begin
+    dist1 := (px-p1x)*(px-p1x) + (py-p1y)*(py-p1y);
+    dist2 := (px-p2x)*(px-p2x) + (py-p2y)*(py-p2y);
+
+    if (dist1 < dist2) then
+    begin
+      qx := p1x;
+      qy := p1y;
+
+      Result := sqrt(dist1);
+    end
+    else
+    begin
+      qx := p2x;
+      qy := p2y;
+
+      Result := sqrt(dist2);
+    end;
+  end;
+end;
+
+function DistanceToSegment(const APoint, ASegmentStart, ASegmentEnd: TGeoPoint;
+  var r: TReal;
+  var AIntersection: TGeoPoint): TReal; overload;
+var
+  qx, qy: TReal;
+begin
+  Result := DistanceToSegment(APoint.Lon, APoint.Lat,
+    ASegmentStart.Lon, ASegmentStart.Lat,
+    ASegmentEnd.Lon, ASegmentEnd.Lat,
+    r, qx, qy);
+  AIntersection.Init(qy, qx);
+end;
+
+function DistanceToSegment(const APoints: TGeoPointArray;
+  ASegmentStart, ASegmentEnd: TGeoPoint;
+  var ALocation: TGeoPoint;
+  var AIntersection: TGeoPoint): TReal; overload;
+var
+  i: Integer;
+  pointR, pointDistance: TReal;
+begin
+  Result := Infinity;
+
+  for i := Low(APoints) to High(APoints) do
+  begin
+    pointDistance := DistanceToSegment(APoints[i],
+      ASegmentStart, ASegmentEnd,
+      pointR, AIntersection);
+
+    if (pointDistance < Result) then
+    begin
+      Result := pointDistance;
+      ALocation := APoints[i];
+    end;
+  end;
+end;
+
+function DistanceToSegment(const ABoundingBox: TGeoBox;
+  ASegmentStart, ASegmentEnd: TGeoPoint;
+  var ALocation: TGeoPoint;
+  var AIntersection: TGeoPoint): TReal; overload;
+var
+  Points: TGeoPointArray;
+begin
+  SetLength(Points, 4);
+  Points[0] := ABoundingBox.GetTopLeft();
+  Points[1] := ABoundingBox.GetTopRight();
+  Points[2] := ABoundingBox.GetBottomLeft();
+  Points[3] := ABoundingBox.GetBottomRight();
+
+  Result := DistanceToSegment(Points, ASegmentStart, ASegmentEnd,
+    ALocation, AIntersection);
+end;
+
 
 { TGeoPoint }
 

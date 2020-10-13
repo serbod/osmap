@@ -34,7 +34,7 @@ TypeConfig:
   TypeInfo  -> TTypeInfo
   TypeCondition -> TTypeCondition
   FeatureValueBuffer -> TFeatureValueBuffer
-  TypeConfig ...
+  TypeConfig -> TTypeConfig
 
 TypeInfoSet:
   TypeInfoSet ...

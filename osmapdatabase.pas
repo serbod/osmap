@@ -210,6 +210,10 @@ type
     property NodeDataFile: TNodeDataFile read FNodeDataFile;
     property AreaDataFile: TAreaDataFile read FAreaDataFile;
     property WayDataFile: TWayDataFile read FWayDataFile;
+
+    property AreaNodeIndex: TAreaNodeIndex read FAreaNodeIndex;
+    property AreaWayIndex: TAreaWayIndex read FAreaWayIndex;
+    property AreaAreaIndex: TAreaAreaIndex read FAreaAreaIndex;
   end;
 
 implementation

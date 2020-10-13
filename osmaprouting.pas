@@ -143,6 +143,7 @@ type
   end;
 
   TIntersectionArray = array of TIntersection;
+  TIntersectionMapById = specialize TFPGMap<TId, TIntersection>; // Id : JunctionRef
 
 { Description of a route, enhanced with information that are required to
   give a human textual (or narrative) drive instructions;

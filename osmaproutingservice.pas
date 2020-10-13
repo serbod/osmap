@@ -84,6 +84,10 @@ type
     function IsValid(): Boolean; // Obj.IsValid
   end;
 
+  function RoutePosition(const AObj: TObjectFileRef; ANodeIndex: Integer;
+     ADatabaseId: TMapDatabaseId): TRoutePosition;
+
+type
   { Database instance initialization parameter to influence the behavior of the database
     instance.
     The following groups attributes are currently available:
@@ -501,6 +505,7 @@ type
 
   function CompareRNodes(const A, B: TRNode): Integer;
 
+
 implementation
 
 uses Math;
@@ -545,6 +550,14 @@ begin
     Result := -1
   else
     Result := 0;
+end;
+
+function RoutePosition(const AObj: TObjectFileRef; ANodeIndex: Integer;
+   ADatabaseId: TMapDatabaseId): TRoutePosition;
+begin
+  Result.Obj.Assign(AObj);
+  Result.NodeIndex := ANodeIndex;
+  Result.DatabaseId := ADatabaseId;
 end;
 
 { TRoutePosition }

@@ -129,6 +129,8 @@ type
     Count: Integer;
   end;
 
+  TDataBlockSpanArray = array of TDataBlockSpan;
+
   { Access to standard format data files.
     Allows to load data objects by offset using various standard library data structures. }
 
@@ -315,6 +317,8 @@ type
       var AOffsets: TFileOffsetArray;
       var ALoadedTypes: TTypeInfoSet): Boolean; virtual; abstract;
 
+    procedure DumpStatistics(); virtual;
+
     property FileName: string read FDataFileName;
   end;
 
@@ -379,9 +383,74 @@ type
     FNodeTypeData: array of TTypeData;
   end;
 
-  TAreaAreaIndex = class(TAreaIndexFile)
+  { AreaAreaIndex allows you to find areas in
+    a given region.
 
+    For areas result can be limited by the maximum level (which in turn
+    defines the minimum size of the resulting areas since an area in a given
+    level must fit into the cell size (but can cross cell borders)) and the
+    maximum number of areas found.
+
+    Internally the index is implemented as quadtree. As a result each index entry
+    has 4 children (besides entries in the lowest level). }
+  TAreaAreaIndex = class(TAreaIndexFile)
+  private
+    { Data structure for every index cell of our index. }
+    type
+      TIndexCell = record
+        // File index of each of the four children, or 0 if there is no child
+        children: array[0..3] of TFileOffset;
+        // The file index at which the data payload starts
+        data: TFileOffset;
+      end;
+
+      //TIndexCache = TCache<TFileOffset, TIndexCell>;
+
+      TCell = record
+        offset: TFileOffset;
+        x: Integer;
+        y: Integer;
+      end;
+      TCellArray = array of TCell;
+
+  private
+    FMaxLevel: Cardinal;       // Maximum level in index
+    FTopLevelOffset: TFileOffset; // File offset of the top level index entry
+
+    //FIdexCache: TIndexCache;     // Cached map of all index entries by file offset
+    //function GetIndexCacheValueSize(): Integer; // SizeOf(TIndexCell)
+    function Cell(AOffset: TFileOffset; AX, AY: Integer): TCell;
+
+    function GetIndexCell(ALevel: Cardinal;
+      AOffset: TFileOffset;
+      var AIndexCell: TIndexCell;
+      var ADataOffset: TFileOffset): Boolean;
+
+    function ReadCellData(ATypeConfig: TTypeConfig;
+      const ATypes: TTypeInfoSet;
+      ADataOffset: TFileOffset;
+      var ASpans: TDataBlockSpan): Boolean;
+
+    procedure PushCellsForNextLevel(
+      AMinLon, AMinLat, AMaxLon, AMaxLat: TReal;
+      const ACellIndexData: TIndexCell;
+      const ACellDimension: TCellDimensionArray;
+      Acx, Acy: Integer;
+      var ANextCellRefs: TCellArray);
+
+  public
+    function GetAreasInArea(ATypeConfig: TTypeConfig;
+      const ABoundingBox: TGeoBox;
+      AMaxLevel: Integer;
+      const ATypes: TTypeInfoSet;
+      var ASpans: TDataBlockSpanArray;
+      var ALoadedTypes: TTypeInfoSet): Boolean;
+
+    procedure DumpStatistics(); override;
   end;
+
+const
+  AREA_AREA_IDX = '';
 
 implementation
 
@@ -1156,6 +1225,11 @@ begin
       Result := False;
     end;
   end;
+end;
+
+procedure TAreaIndexFile.DumpStatistics();
+begin
+  // todo..
 end;
 
 end.
