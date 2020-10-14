@@ -63,6 +63,7 @@ type
     procedure Stop();
     function IsSignificant(): Boolean;
     function ResultString(): string;
+    function GetMilliseconds(): Int64;
   end;
 
   //PPHashItem = ^PHashItem;
@@ -93,9 +94,41 @@ type
 
   TCompareFunc = function (const elem1, elem2): Integer;
 
-  {TCache = object
+  PSimpleCacheItem = ^TSimpleCacheItem;
+  TSimpleCacheItem = record
+    Next: Integer;
+    Prev: Integer;
+    Key: string;
+    //Value: Integer;
+  end;
 
-  end; }
+  { Simple string-to-index cache with FIFO semantics and limited count }
+
+  { TSimpleCache }
+
+  TSimpleCache = object
+  private
+    Hash: TSimpleStringHash;
+    Items: array of TSimpleCacheItem;
+    Head: Integer;
+    Tail: Integer;
+    Count: Integer;
+    { Move item to head of queue }
+    procedure Promote(AIndex: Integer);
+  public
+    procedure Init(AMaxSize: Integer);
+
+    { Return True if item AKey is found, AIndex is set to found item's index }
+    function GetEntry(const AKey: string; out AIndex: Integer): Boolean;
+    { Put item AKey to cache, AIndex is set to found/added item index.
+      If cache grows to MaxSize, added item replaces less used item }
+    procedure SetEntry(const AKey: string; out AIndex: Integer);
+
+    function GetMaxSize(): Integer;
+    function GetCount(): Integer;
+
+    procedure Clear();
+  end;
 
 { Sort any array }
 procedure AnySort(const Arr; Count: Integer; ItemSize: Integer; CompareFunc: TCompareFunc);
@@ -425,6 +458,19 @@ begin
   Result := FormatDateTime('S.Z', (StopTime - StartTime));
 end;
 
+function TStopClock.GetMilliseconds(): Int64;
+var
+  diff: TDateTime;
+begin
+  diff := StopTime - StartTime;
+  if (StopTime > 0) and (StartTime < 0) then
+    diff := diff - 0.5
+  else if (StopTime < -1.0) and (StartTime > -1.0) then
+    diff := diff + 0.5;
+
+  Result := Trunc((Abs(diff) + ((TDateTime(1) / MSecsPerDay) / 2)) * MSecsPerDay);
+end;
+
 { TSimpleStringHash }
 
 function TSimpleStringHash.Find(const Key: string): PHashItem;
@@ -572,6 +618,108 @@ var
 begin
   SetLength(buf, ItemSize);
   AnyQuickSort(Arr, 0, Count-1, ItemSize, compareFunc, buf[0]);
+end;
+
+{ TSimpleCache }
+
+procedure TSimpleCache.Promote(AIndex: Integer);
+var
+  iNext, iPrev: Integer;
+begin
+  Assert(AIndex < Length(Items));
+  Assert(Items[AIndex].Key <> '');
+
+  iNext := Items[AIndex].Next;
+  iPrev := Items[AIndex].Prev;
+
+  if iPrev <> -1 then
+  begin
+    // link prev and next items
+    Items[iPrev].Next := iNext;
+    if iNext <> -1 then
+    begin
+      Items[iNext].Prev := iPrev;
+    end;
+    if (Tail = AIndex) then
+      Tail := iPrev;
+
+    // update old head item
+    if Head <> -1 then
+    begin
+      Items[Head].Prev := AIndex;
+      Items[AIndex].Next := Head;
+    end;
+
+    // set new head item
+    Head := AIndex;
+    Items[Head].Prev := -1;
+  end;
+end;
+
+procedure TSimpleCache.Init(AMaxSize: Integer);
+begin
+  Assert(AMaxSize > GetMaxSize());
+  SetLength(Items, AMaxSize);
+  Hash.Init(AMaxSize);
+  Clear();
+end;
+
+function TSimpleCache.GetEntry(const AKey: string; out AIndex: Integer): Boolean;
+begin
+  Result := Hash.FindValue(AKey, AIndex);
+  if Result then
+    Promote(AIndex);
+end;
+
+procedure TSimpleCache.SetEntry(const AKey: string; out AIndex: Integer);
+begin
+  if not Hash.FindValue(AKey, AIndex) then
+  begin
+    AIndex := -1;
+    if Count < Length(Items) then
+    begin
+      // find empty item
+      AIndex := Count;
+      Inc(Count);
+
+      if (Tail = -1) then
+        Tail := AIndex;
+      if (Head = -1) then
+        Head := AIndex;
+    end
+    else
+      AIndex := Tail;
+
+    Assert(AIndex <> -1);
+
+    Items[AIndex].Key := AKey;
+  end;
+
+  Promote(AIndex);
+end;
+
+function TSimpleCache.GetMaxSize(): Integer;
+begin
+  Result := Length(Items);
+end;
+
+function TSimpleCache.GetCount(): Integer;
+begin
+  Result := Count;
+end;
+
+procedure TSimpleCache.Clear();
+var
+  i: Integer;
+begin
+  for i := Low(Items) to High(Items) do
+  begin
+    Items[i].Next := -1;
+    Items[i].Prev := -1;
+    Items[i].Key := '';
+  end;
+  Hash.Clear();
+  Count := 0;
 end;
 
 end.

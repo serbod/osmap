@@ -493,7 +493,7 @@ var
   ways: array of TMapWay; // TMapWayList
   way: TMapWay;
   minDistance, distance: TReal;
-  intersectPoint: TGeoPoint;
+  TmpPoint: TGeoPoint;
   r, intersectLon, intersectLat: TReal;
   i: Integer;
 begin
@@ -536,7 +536,7 @@ begin
     WriteLn(log, 'Error: Error getting areas from area area index!');
   end;
 
-  //!!! Sort(wayWayOffsets);
+  Sort(wayWayOffsets);
 
   if (not FDatabase.WayDataFile.GetByOffset(wayWayOffsets, ways)) then
   begin
@@ -562,10 +562,9 @@ begin
 
     for i := 0 to Length(area.Rings[0].Nodes)-1 do
     begin
-      distance = Sqrt((area.Rings[0].Nodes[i].Lat - ACoord.Lat)
-                    * (area.Rings[0].Nodes[i].Lat - ACoord.Lat)
-                    + (area.Rings[0].Nodes[i].Lon - ACoord.Lon)
-                    * (area.Rings[0].Nodes[i].Lon - ACoord.Lon));
+      TmpPoint := area.Rings[0].Nodes[i];
+      distance = Sqrt((TmpPoint.Lat - ACoord.Lat) * (TmpPoint.Lat - ACoord.Lat)
+                    + (TmpPoint.Lon - ACoord.Lon) * (TmpPoint.Lon - ACoord.Lon));
 
       if (minDistance > distance) then
       begin
@@ -585,7 +584,7 @@ begin
 
     for i := 0 to Length(way.Nodes)-2 do
     begin
-      distance := DistanceToSegment(coord, way.Nodes[i], way.Nodes[i+1], r, intersectPoint);
+      distance := DistanceToSegment(ACoord, way.Nodes[i], way.Nodes[i+1], r, TmpPoint);
       if (distance < minDistance) then
       begin
         minDistance := distance;
@@ -609,6 +608,9 @@ var
   routeableWayTypes: TTypeInfoSet;
   routeableAreaTypes: TTypeInfoSet;
   TypeInfo: TTypeInfo;
+  closestDistance: TDistance;
+  closestWay: TMapWay;
+  closestArea: TMapArea;
 begin
 
   for (TypeInfo in FDatabase.TypeConfig.Types) do
@@ -620,13 +622,9 @@ begin
       routeableAreaTypes.Add(TypeInfo);
   end;
 
-  ывпварапопа
+  closestDistance := Infinity;
 
-  Distance closestDistance=Distance::Max();
-  WayRef   closestWay;
-  AreaRef  closestArea;
-
-  if (!routeableWayTypes.Empty()) {
+  if (not routeableWayTypes.Empty()) {
     WayRegionSearchResult waySearchResult=database->LoadWaysInRadius(location,
                                                                      routeableWayTypes,
                                                                      maxRadius);

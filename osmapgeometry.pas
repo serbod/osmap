@@ -315,8 +315,7 @@ type
     Width: TReal;
     Height: TReal;
   end;
-
-  TCellDimensionArray = array of TCellDimension;
+  TCellDimensionArray = array [0..25] of TCellDimension;
 
 { Return TGeoCoord for given Latitude and Longitude }
 function GeoCoord(ALat: TLatitude; ALon: TLongitude): TGeoPoint;
@@ -383,6 +382,8 @@ function DistanceToSegment(const ABoundingBox: TGeoBox;
   ASegmentStart, ASegmentEnd: TGeoPoint;
   var ALocation: TGeoPoint;
   var AIntersection: TGeoPoint): TReal; overload;
+
+function GetCellDimension(ALevel: Integer): TCellDimension;
 
 var
   { Coordinates will be stored as unsigned long values in file.
@@ -883,6 +884,39 @@ begin
     ALocation, AIntersection);
 end;
 
+function GetCellDimension(ALevel: Integer): TCellDimension;
+const
+  CellDimensions: TCellDimensionArray = (
+  (Width: 360.0;                      Height: 180.0                      ), //  0
+  (Width: 180.0;                      Height:  90.0                      ), //  1
+  (Width:  90.0;                      Height:  45.0                      ), //  2
+  (Width:  45.0;                      Height:  22.5                      ), //  3
+  (Width:  22.5;                      Height:  11.25                     ), //  4
+  (Width:  11.25;                     Height:   5.625                    ), //  5
+  (Width:   5.625;                    Height:   2.8125                   ), //  6
+  (Width:   2.8125;                   Height:   1.40625                  ), //  7
+  (Width:   1.40625;                  Height:   0.703125                 ), //  8
+  (Width:   0.703125;                 Height:   0.3515625                ), //  9
+  (Width:   0.3515625;                Height:   0.17578125               ), // 10
+  (Width:   0.17578125;               Height:   0.087890625              ), // 11
+  (Width:   0.087890625;              Height:   0.0439453125             ), // 12
+  (Width:   0.0439453125;             Height:   0.02197265625            ), // 13
+  (Width:   0.02197265625;            Height:   0.010986328125           ), // 14
+  (Width:   0.010986328125;           Height:   0.0054931640625          ), // 15
+  (Width:   0.0054931640625;          Height:   0.00274658203125         ), // 16
+  (Width:   0.00274658203125;         Height:   0.001373291015625        ), // 17
+  (Width:   0.001373291015625;        Height:   0.0006866455078125       ), // 18
+  (Width:   0.0006866455078125;       Height:   0.00034332275390625      ), // 19
+  (Width:   0.00034332275390625;      Height:   0.000171661376953125     ), // 20
+  (Width:   0.000171661376953125;     Height:   0.0000858306884765625    ), // 21
+  (Width:   0.0000858306884765625;    Height:   0.00004291534423828125   ), // 22
+  (Width:   0.00004291534423828125;   Height:   0.000021457672119140625  ), // 23
+  (Width:   0.000021457672119140625;  Height:   0.0000107288360595703125 ), // 24
+  (Width:   0.0000107288360595703125; Height:   0.0000107288360595703125 )  // 25
+  );
+begin
+  Result := CellDimensions[ALevel];
+end;
 
 { TGeoPoint }
 

@@ -723,13 +723,14 @@ type
 
   TTypeInfoSet = object
     Types: array of TTypeInfo;
+    Count: Integer;
 
     procedure Init(ATypeConfig: TTypeConfig); overload;
     procedure Init(ATypes: TTypeInfoList); overload;
     procedure Init(const AOther: TTypeInfoSet); overload;
 
     procedure Adapt(ATypeConfig: TTypeConfig);
-    procedure Clear();
+    procedure Clear(ACount: Integer = 0);
 
     procedure Add(AType: TTypeInfo); overload;
     procedure Add(ATypes: TTypeInfoList); overload;
@@ -741,7 +742,10 @@ type
     procedure Intersection(const AOther: TTypeInfoSet);
 
     function IsSet(AType: TTypeInfo): Boolean;
+    function IsEmpty(): Boolean;
+    function GetSize(): Integer;
 
+    { Returns 'true' if at least one type is set in both Sets. }
     function Intersects(const AOther: TTypeInfoSet): Boolean;
   end;
 
@@ -2522,32 +2526,37 @@ end;
 
 procedure TTypeInfoSet.Init(ATypeConfig: TTypeConfig);
 begin
-  SetLength(Types, ATypeConfig.GetTypeCount());
+  Clear(ATypeConfig.GetTypeCount());
 end;
 
 procedure TTypeInfoSet.Init(ATypes: TTypeInfoList);
 var
   i: Integer;
 begin
-  Clear();
+  Clear(ATypes.Count);
   for i := 0 to ATypes.Count-1 do
     Add(ATypes[i]);
 end;
 
 procedure TTypeInfoSet.Init(const AOther: TTypeInfoSet);
 begin
-  Clear();
+  Clear(AOther.GetSize());
   Add(AOther);
 end;
 
 procedure TTypeInfoSet.Adapt(ATypeConfig: TTypeConfig);
 begin
-
+  SetLength(Types, ATypeConfig.GetTypeCount());
 end;
 
-procedure TTypeInfoSet.Clear();
+procedure TTypeInfoSet.Clear(ACount: Integer);
+var
+  i: Integer;
 begin
-  SetLength(Types, 0);
+  SetLength(Types, ACount);
+  Count := 0;
+  for i := Low(Types) to High(Types) do
+    Types[i] := nil;
 end;
 
 procedure TTypeInfoSet.Add(AType: TTypeInfo);
@@ -2563,6 +2572,8 @@ begin
       Types[AType.Index] := nil;
   end;
 
+  if Types[AType.Index] = nil then
+    Inc(Count);
   Types[AType.Index] := AType;
 end;
 
@@ -2575,24 +2586,43 @@ begin
 end;
 
 procedure TTypeInfoSet.Add(const AOther: TTypeInfoSet);
+var
+  i: Integer;
 begin
-
+  for i := 0 to Length(AOther.Types)-1 do
+    Add(AOther.Types[i]);
 end;
 
 procedure TTypeInfoSet.Remove(AType: TTypeInfo);
 begin
   if (AType.Index < Length(Types)) and (Types[AType.Index] <> nil) then
+  begin
     Types[AType.Index] := nil;
+    Dec(Count);
+  end;
 end;
 
 procedure TTypeInfoSet.Remove(const AOther: TTypeInfoSet);
+var
+  i: Integer;
 begin
-
+  for i := 0 to Length(AOther.Types)-1 do
+    Remove(AOther.Types[i]);
 end;
 
 procedure TTypeInfoSet.Intersection(const AOther: TTypeInfoSet);
+var
+  i: Integer;
 begin
-
+  for i := Low(Types) to High(Types) do
+  begin
+    if (Types[i] <> nil)
+    and ((i >= AOther.GetSize()) or (AOther.Types[i] = nil)) then
+    begin
+      Types[i] := nil;
+      Dec(Count);
+    end;
+  end;
 end;
 
 function TTypeInfoSet.IsSet(AType: TTypeInfo): Boolean;
@@ -2601,9 +2631,33 @@ begin
   Result := (AType.Index < Length(Types)) and (Types[AType.Index] <> nil);
 end;
 
-function TTypeInfoSet.Intersects(const AOther: TTypeInfoSet): Boolean;
+function TTypeInfoSet.IsEmpty(): Boolean;
 begin
+  Result := (Count = 0);
+end;
 
+function TTypeInfoSet.GetSize(): Integer;
+begin
+  Result := Length(Types);
+end;
+
+function TTypeInfoSet.Intersects(const AOther: TTypeInfoSet): Boolean;
+var
+  i, minSize: Integer;
+begin
+  Result := False;
+  minSize := AOther.GetSize();
+  if minSize > GetSize() then
+    minSize := GetSize();
+
+  for i := 0 to minSize-1 do
+  begin
+    if (Types[i] <> nil) and (AOther.Types[i] <> nil) then
+    begin
+      Result := True;
+      Break;
+    end;
+  end;
 end;
 
 initialization

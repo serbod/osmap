@@ -383,6 +383,38 @@ type
     FNodeTypeData: array of TTypeData;
   end;
 
+  { Data structure for every index cell of our index. }
+  TAreaIndexCell = record
+    // File index of each of the four children, or 0 if there is no child
+    children: array[0..3] of TFileOffset;
+    // The file index at which the data payload starts
+    data: TFileOffset;
+  end;
+
+  { TAreaIndexCache }
+
+  TAreaIndexCache = object
+  private
+    Items: array of TAreaIndexCell;
+    Cache: TSimpleCache;
+
+  public
+    procedure Init(AMaxSize: Integer);
+    procedure Clear();
+
+    function GetEntry(const AKey: TFileOffset; var AValue: TAreaIndexCell): Boolean;
+    procedure SetEntry(const AKey: TFileOffset; const AValue: TAreaIndexCell);
+
+    procedure DumpStatistics(ACacheName: string);
+  end;
+
+  TAreaCell = record
+    Offset: TFileOffset;
+    X: Integer;
+    Y: Integer;
+  end;
+  TAreaCellArray = array of TAreaCell;
+
   { AreaAreaIndex allows you to find areas in
     a given region.
 
@@ -393,52 +425,48 @@ type
 
     Internally the index is implemented as quadtree. As a result each index entry
     has 4 children (besides entries in the lowest level). }
+
+  { TAreaAreaIndex }
+
   TAreaAreaIndex = class(TAreaIndexFile)
-  private
-    { Data structure for every index cell of our index. }
-    type
-      TIndexCell = record
-        // File index of each of the four children, or 0 if there is no child
-        children: array[0..3] of TFileOffset;
-        // The file index at which the data payload starts
-        data: TFileOffset;
-      end;
-
-      //TIndexCache = TCache<TFileOffset, TIndexCell>;
-
-      TCell = record
-        offset: TFileOffset;
-        x: Integer;
-        y: Integer;
-      end;
-      TCellArray = array of TCell;
-
   private
     FMaxLevel: Cardinal;       // Maximum level in index
     FTopLevelOffset: TFileOffset; // File offset of the top level index entry
 
-    //FIdexCache: TIndexCache;     // Cached map of all index entries by file offset
+    FIndexCache: TAreaIndexCache;     // Cached map of all index entries by file offset
     //function GetIndexCacheValueSize(): Integer; // SizeOf(TIndexCell)
-    function Cell(AOffset: TFileOffset; AX, AY: Integer): TCell;
+    function AreaCell(AOffset: TFileOffset; AX, AY: Integer): TAreaCell;
 
-    function GetIndexCell(ALevel: Cardinal;
+    function GetAreaIndexCell(ALevel: Cardinal;
       AOffset: TFileOffset;
-      var AIndexCell: TIndexCell;
-      var ADataOffset: TFileOffset): Boolean;
+      out AIndexCell: TAreaIndexCell;
+      out ADataOffset: TFileOffset): Boolean;
 
     function ReadCellData(ATypeConfig: TTypeConfig;
       const ATypes: TTypeInfoSet;
       ADataOffset: TFileOffset;
-      var ASpans: TDataBlockSpan): Boolean;
+      var ASpans: TDataBlockSpanArray): Boolean;
 
     procedure PushCellsForNextLevel(
       AMinLon, AMinLat, AMaxLon, AMaxLat: TReal;
-      const ACellIndexData: TIndexCell;
-      const ACellDimension: TCellDimensionArray;
+      const ACellIndexData: TAreaIndexCell;
+      const ACellDimension: TCellDimension;
       Acx, Acy: Integer;
-      var ANextCellRefs: TCellArray);
+      var ANextCellRefs: TAreaCellArray);
 
   public
+    constructor Create(ACacheSize: Integer);
+
+    function Open(ATypeConfig: TTypeConfig;
+      const APath: string;
+      AMemoryMappedData: Boolean): Boolean; override;
+
+    { Returns references in form of DataBlockSpans to all areas within the
+      given area,
+      ATypeConfig - Type configuration
+      AMaxLevel - The maximum index level to load areas from
+      ATypes - Set of types to load data for
+      ASpans - List of DataBlockSpans referencing the the found areas }
     function GetAreasInArea(ATypeConfig: TTypeConfig;
       const ABoundingBox: TGeoBox;
       AMaxLevel: Integer;
@@ -450,7 +478,7 @@ type
   end;
 
 const
-  AREA_AREA_IDX = '';
+  AREA_AREA_IDX = 'areaarea.idx';
 
 implementation
 
@@ -1230,6 +1258,311 @@ end;
 procedure TAreaIndexFile.DumpStatistics();
 begin
   // todo..
+end;
+
+{ TAreaAreaIndex }
+
+function TAreaAreaIndex.AreaCell(AOffset: TFileOffset; AX,
+  AY: Integer): TAreaCell;
+begin
+  Result.offset := AOffset;
+  Result.x := AX;
+  Result.y := AY;
+end;
+
+function TAreaAreaIndex.GetAreaIndexCell(ALevel: Cardinal;
+  AOffset: TFileOffset; out AIndexCell: TAreaIndexCell;
+  out ADataOffset: TFileOffset): Boolean;
+var
+  childOffset: TFileOffset;
+  i: Integer;
+begin
+  if (ALevel < FMaxLevel) then
+  begin
+    //std::lock_guard<std::mutex> guard(lookupMutex);
+
+{$ifdef ANALYZE_CACHE}
+    if (indexCache.GetSize()==indexCache.GetMaxSize()) {
+      log.Warn() << "areaarea.index cache of " << indexCache.GetSize() << "/" << indexCache.GetMaxSize()
+                 << " is too small";
+      indexCache.DumpStatistics("areaarea.idx",IndexCacheValueSizer());
+    }
+{$endif}
+
+    if (not FIndexCache.GetEntry(AOffset, AIndexCell)) then
+    begin
+      FScanner.Position := AOffset;
+
+      for i := Low(AIndexCell.children) to High(AIndexCell.children) do
+      begin
+        FScanner.ReadNumber(childOffset);
+
+        if (childOffset = 0) then
+          AIndexCell.children[i] := 0
+        else
+          AIndexCell.children[i] := AOffset - childOffset;
+      end;
+
+      AIndexCell.data := FScanner.Position;
+      FIndexCache.SetEntry(AOffset, AIndexCell)
+    end;
+  end
+  else
+  begin
+    AIndexCell.data := AOffset;
+    for i := Low(AIndexCell.children) to High(AIndexCell.children) do
+    begin
+      AIndexCell.children[i] := 0;
+    end;
+  end;
+
+  ADataOffset := AIndexCell.data;
+
+  Result := True;
+end;
+
+function TAreaAreaIndex.ReadCellData(ATypeConfig: TTypeConfig;
+  const ATypes: TTypeInfoSet; ADataOffset: TFileOffset;
+  var ASpans: TDataBlockSpanArray): Boolean;
+var
+  typeCount, dataCount: UInt32;
+  typeId: TTypeId;
+  dataFileOffset, prevDataFileOffset: TFileOffset;
+  t: Integer;
+  TypeInfo: TTypeInfo;
+  span: TDataBlockSpan;
+begin
+  //std::lock_guard<std::mutex> guard(lookupMutex);
+
+  FScanner.Position := ADataOffset;
+  FScanner.ReadNumber(typeCount);
+  prevDataFileOffset := 0;
+
+  for t := 0 to typeCount-1 do
+  begin
+    FScanner.ReadTypeId(typeId, ATypeConfig.AreaTypeIdBytes);
+    FScanner.ReadNumber(dataCount);
+    FScanner.ReadNumber(dataFileOffset);
+
+    Inc(dataFileOffset, prevDataFileOffset);
+    prevDataFileOffset := dataFileOffset;
+
+    if (dataFileOffset = 0) then
+      Continue;
+
+    TypeInfo := ATypeConfig.GetAreaTypeInfo(typeId);
+
+    if ATypes.IsSet(TypeInfo) then
+    begin
+      span.StartOffset := dataFileOffset;
+      span.Count := dataCount;
+
+      ASpans := Concat(ASpans, [span]);
+    end;
+  end;
+
+  Result := True;
+end;
+
+procedure TAreaAreaIndex.PushCellsForNextLevel(AMinLon, AMinLat, AMaxLon,
+  AMaxLat: TReal; const ACellIndexData: TAreaIndexCell;
+  const ACellDimension: TCellDimension; Acx, Acy: Integer;
+  var ANextCellRefs: TAreaCellArray);
+
+  procedure _AddCell(AChildIndex: Integer; cx, cy: Integer);
+  var
+    x, y: TReal;
+  begin
+    if (ACellIndexData.children[AChildIndex] <> 0) then
+    begin
+      // top left
+      x := cx * ACellDimension.Width;
+      y := cy * ACellDimension.Height;
+
+      if not ((x > AMaxLon + ACellDimension.Width/2)
+           or (y > AMaxLat + ACellDimension.Height/2)
+           or (x + ACellDimension.Width < AMinLon - ACellDimension.Width/2)
+           or (y + ACellDimension.Height < AMinLat - ACellDimension.Height/2))
+      then
+        ANextCellRefs := Concat(ANextCellRefs, [AreaCell(ACellIndexData.children[AChildIndex], cx, cy)]);
+    end;
+  end;
+
+begin
+  _AddCell(0, Acx,   Acy+1);  // top left
+  _AddCell(1, Acx+1, Acy+1);  // top right
+  _AddCell(2, Acx,   Acy);    // bottom left
+  _AddCell(3, Acx+1, Acy);    // bottom left
+end;
+
+constructor TAreaAreaIndex.Create(ACacheSize: Integer);
+begin
+  inherited Create;
+  FIndexCache.Init(ACacheSize);
+
+  FMaxLevel := 0;
+  FTopLevelOffset := 0;
+end;
+
+function TAreaAreaIndex.Open(ATypeConfig: TTypeConfig; const APath: string;
+  AMemoryMappedData: Boolean): Boolean;
+begin
+  FFileName := AREA_AREA_IDX;
+  Result := inherited Open(ATypeConfig, APath, AMemoryMappedData);
+
+  if Result then
+  begin
+    FScanner.ReadNumber(FMaxLevel);
+    FScanner.ReadFileOffsetValue(FTopLevelOffset);
+    Result := (not FScanner.HasError);
+  end;
+end;
+
+function TAreaAreaIndex.GetAreasInArea(ATypeConfig: TTypeConfig;
+  const ABoundingBox: TGeoBox; AMaxLevel: Integer; const ATypes: TTypeInfoSet;
+  var ASpans: TDataBlockSpanArray; var ALoadedTypes: TTypeInfoSet): Boolean;
+var
+  time: TStopClock;
+  cellRef: TAreaCell;
+  cellRefs: TAreaCellArray;     // cells to scan in this level
+  nextCellRefs: TAreaCellArray; // cells to scan for the next level
+  MinLon, MaxLon, MinLat, MaxLat: TReal;
+  i, level: Integer;
+  cellIndexData: TAreaIndexCell;
+  cellDataOffset: TFileOffset;
+  cx, cy: Integer;
+begin
+  Result := False;
+
+  MinLon := ABoundingBox.MinCoord.Lon + 180.0;
+  MaxLon := ABoundingBox.MaxCoord.Lon + 180.0;
+  MinLat := ABoundingBox.MinCoord.Lat + 90.0;
+  MaxLat := ABoundingBox.MaxCoord.Lat + 90.0;
+
+  // Clear result data structures
+  //ASpansCount := 0;
+  SetLength(ASpans, 0);
+  SetLength(cellRefs, 0);
+  ALoadedTypes.Init(ATypeConfig);
+
+  // Make the vector preallocate memory for the expected data size
+  // This should void reallocation
+  //SetLength(ASpans, 1000);
+
+  //cellRefs.reserve(2000);
+  //nextCellRefs.reserve(2000);
+
+  cellRefs := Concat(cellRefs, [AreaCell(FTopLevelOffset, 0, 0)]);
+
+  try
+    // For all levels:
+    // * Take the tiles and offsets of the last level
+    // * Calculate the new tiles and offsets that still interfere with given area
+    // * Add the new offsets to the list of offsets and finish if we have
+    //   reached maxLevel or maxAreaCount.
+    // * copy no, ntx, nty to ctx, cty, co and go to next iteration
+    level := 0;
+    while (level <= FMaxLevel) and (level <= AMaxLevel) and (Length(cellRefs) > 0) do
+    begin
+      SetLength(nextCellRefs, 0);
+
+      for i := Low(cellRefs) to High(cellRefs) do
+      begin
+        cellRef := cellRefs[i];
+        if (not GetAreaIndexCell(level, cellRef.Offset, cellIndexData, cellDataOffset)) then
+        begin
+          WriteLn(LogFile, 'Error: Cannot find offset ', cellRef.Offset,
+                        ' in level ', level,
+                        ' in file "', FScanner.Filename, '"');
+          Exit;
+        end;
+
+        // Now read the area offsets by type in this index entry
+
+        if (not ReadCellData(ATypeConfig, ATypes, cellDataOffset, ASpans)) then
+        begin
+          WriteLn(LogFile, 'Error: Cannot read index data for level ', level,
+                       ' at offset ', cellDataOffset,
+                       ' in file "', FScanner.Filename, '"');
+
+          Exit;
+        end;
+
+        if (level < FMaxLevel) then
+        begin
+          cx := cellRef.X * 2;
+          cy := cellRef.Y * 2;
+
+          PushCellsForNextLevel(MinLon, MinLat, MaxLon, MaxLat,
+            cellIndexData, GetCellDimension(level+1), cx, cy, nextCellRefs);
+        end;
+      end;
+
+      //std::swap(cellRefs, nextCellRefs);
+      cellRefs := nextCellRefs;
+
+      Inc(level);
+    end;
+  except
+    on E: Exception do
+      WriteLn(LogFile, 'Error: ', E.ToString());
+  end;
+
+  time.Stop();
+
+  if (time.GetMilliseconds() > 100) then
+  begin
+    WriteLn(LogFile, 'Warn: Retrieving ', Length(ASpans), ' spans from area index for ',
+      ABoundingBox.GetDisplayText(), ' took ', time.ResultString());
+  end;
+
+  ALoadedTypes := ATypes;
+
+  Result := True;
+end;
+
+procedure TAreaAreaIndex.DumpStatistics();
+begin
+  inherited DumpStatistics();
+  FIndexCache.DumpStatistics(AREA_AREA_IDX);
+end;
+
+{ TAreaIndexCache }
+
+procedure TAreaIndexCache.Init(AMaxSize: Integer);
+begin
+  SetLength(Items, AMaxSize);
+  Cache.Init(AMaxSize);
+end;
+
+procedure TAreaIndexCache.Clear();
+begin
+  Cache.Clear();
+end;
+
+function TAreaIndexCache.GetEntry(const AKey: TFileOffset;
+  var AValue: TAreaIndexCell): Boolean;
+var
+  n: Integer;
+begin
+  Result := Cache.GetEntry(IntToStr(AKey), n);
+  if Result then
+    AValue := Items[n];
+end;
+
+procedure TAreaIndexCache.SetEntry(const AKey: TFileOffset;
+  const AValue: TAreaIndexCell);
+var
+  n: Integer;
+begin
+  Cache.SetEntry(IntToStr(AKey), n);
+  Items[n] := AValue;
+end;
+
+procedure TAreaIndexCache.DumpStatistics(ACacheName: string);
+begin
+  WriteLn(LogFile, 'Debug: ', ACacheName, ' entries=', Cache.GetCount(),
+    ', memory=', (Cache.GetMaxSize() * SizeOf(TAreaIndexCell)) );
 end;
 
 end.
