@@ -611,6 +611,10 @@ var
   closestDistance: TDistance;
   closestWay: TMapWay;
   closestArea: TMapArea;
+  waySearchResult: TWayRegionSearchResult;
+  WayResultEntry: TWayRegionSearchResultEntry;
+  areaSearchResult: TAreaRegionSearchResult;
+  AreaResultEntry: TAreaRegionSearchResultEntry;
 begin
 
   for (TypeInfo in FDatabase.TypeConfig.Types) do
@@ -624,32 +628,34 @@ begin
 
   closestDistance := Infinity;
 
-  if (not routeableWayTypes.Empty()) {
-    WayRegionSearchResult waySearchResult=database->LoadWaysInRadius(location,
-                                                                     routeableWayTypes,
-                                                                     maxRadius);
+  if (not routeableWayTypes.IsEmpty()) then
+  begin
+    waySearchResult := FDatabase.LoadWaysInRadius(ALocation, routeableWayTypes, AMaxRadius);
 
-    for (const auto& entry : waySearchResult.GetWayResults()) {
-      if (entry.GetDistance()<closestDistance) {
-        closestDistance=entry.GetDistance();
-        closestWay=entry.GetWay();
-        closestArea.reset();
-      }
-    }
-  }
+    for (WayResultEntry in waySearchResult) do // GetWayResults()
+    begin
+      if (WayResultEntry.Distance < closestDistance) then
+      begin
+        closestDistance := WayResultEntry.Distance;
+        closestWay := WayResultEntry.Way;
+        closestArea := nil;
+      end;
+    end;
+  end;
 
-  if (!routeableAreaTypes.Empty()) {
-    AreaRegionSearchResult areaSearchResult=database->LoadAreasInRadius(location,
-                                                                        routeableAreaTypes,
-                                                                        maxRadius);
-    for (const auto& entry : areaSearchResult.GetAreaResults()) {
-      if (entry.GetDistance()<closestDistance) {
-        closestDistance=entry.GetDistance();
-        closestWay.reset();
-        closestArea=entry.GetArea();
-      }
-    }
-  }
+  if (not routeableAreaTypes.IsEmpty()) then
+  begin
+    areaSearchResult := FDatabase.LoadAreasInRadius(ALocation, routeableAreaTypes, AMaxRadius);
+    for (AreaResultEntry in areaSearchResult) do // GetAreaResults()
+    begin
+      if (AreaResultEntry.Distance < closestDistance) then
+      begin
+        closestDistance := AreaResultEntry.Distance;
+        closestWay := nil; // closestWay.reset();
+        closestArea := AreaResultEntry.Area;
+      end;
+    end;
+  end;
 
   if (!closestWay && !closestArea) {
     result.distance=Distance::Max();

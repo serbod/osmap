@@ -134,8 +134,8 @@ type
     //procedure ReadCoord(out ACoord: TGeoCoord);
     //procedure ReadConditionalCoord(out ACoord: TGeoCoord; out AIsSet: Boolean);
 
-    { read UInt64 }
-    procedure ReadFileOffsetValue(out AValue: TFileOffset);
+    { read raw UInt64 }
+    procedure ReadFileOffsetValue(out AValue: TFileOffset; ABytes: Integer = 8);
 
 
     { Reads vector of Point and pre-compute segments and bounding box for it }
@@ -1059,9 +1059,23 @@ begin
   AValue := ReadEncodedUnsignedNumber();
 end;
 
-procedure TFileScanner.ReadFileOffsetValue(out AValue: TFileOffset);
+procedure TFileScanner.ReadFileOffsetValue(out AValue: TFileOffset; ABytes: Integer);
+var
+  buffer: array[0..7] of Byte;
+  i: Integer;
 begin
-  AValue := TFileOffset(ReadEncodedUnsignedNumber());
+  //AValue := TFileOffset(ReadEncodedUnsignedNumber());
+  Assert(ABytes <= SizeOf(buffer));
+  AValue := 0;
+  FHasError := not (Stream.Read(buffer, ABytes) = ABytes);
+  if not FHasError then
+  begin
+    for i := ABytes-1 downto 0 do
+    begin
+      AValue := AValue or buffer[i];
+      AValue := AValue shl 8;
+    end;
+  end;
 end;
 
 function TFileScanner.ReadMapPoints(var ANodes: TGeoPointArray;

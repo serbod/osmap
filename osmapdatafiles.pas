@@ -43,6 +43,8 @@ AreaNodeIndex:
 AreaWayIndex:
   AreaWayIndex
 
+AreaAreaIndex:
+  AreaAreaIndex
 *)
 
 unit OsMapDataFiles;
@@ -52,8 +54,9 @@ unit OsMapDataFiles;
 interface
 
 uses
-  Classes, SysUtils,
-  OsMapTypes, OsMapFiles, OsMapObjTypes, OsMapObjects, OsMapGeometry, OsMapUtils;
+  Classes, SysUtils, Math,
+  OsMapTypes, OsMapFiles, OsMapObjTypes, OsMapObjects, OsMapGeometry,
+  OsMapDataTile, OsMapUtils;
 
 type
 
@@ -326,22 +329,26 @@ type
     a given area.
 
     Ways can be limited by type and result count. }
+
+  { TAreaNodeIndex }
+
   TAreaNodeIndex = class(TAreaIndexFile)
   private
     type
-      TListTile = packed record
+      TListTile = record
         FileOffset: TFileOffset;
         EntryCount: Word;
         StoreGeoCoord: Boolean;
       end;
 
-      TBitmapTile = packed record
+      TBitmapTile = record
         FileOffset: TFileOffset;
         DataOffsetBytes: Byte;
         Magnification: TMagnificationLevel;
       end;
 
-      TTypeData = packed record
+      { todo: initialize TTypeData }
+      TTypeData = record
         IsComplex: Boolean;
         BoundingBox: TGeoBox;
         IndexOffset: TFileOffset;
@@ -349,11 +356,48 @@ type
 
         ListTiles: array of TListTile;
         BitmapTiles: array of TBitmapTile;
+
+        ListTilesHash: TSimpleStringHash;
+        BitmapTilesHash: TSimpleStringHash;
       end;
 
   private
     FGridMag: TMagnificationLevel;
     FNodeTypeData: array of TTypeData;
+
+    { emulate hashmap TTileId : TListTile for TTypeData }
+    procedure SetTypeDataListTilesItem(var ATypeData: TTypeData;
+        const AItemKey: TTileId; const AItemValue: TListTile);
+    function GetTypeDataListTilesItem(const ATypeData: TTypeData;
+        const AItemKey: TTileId; var AItemValue: TListTile): Boolean;
+
+    { emulate hashmap TTileId : TBitmapTile for TTypeData }
+    procedure SetTypeDataBitmapTilesItem(var ATypeData: TTypeData;
+        const AItemKey: TTileId; const AItemValue: TBitmapTile);
+    function GetTypeDataBitmapTilesItem(const ATypeData: TTypeData;
+        const AItemKey: TTileId; var AItemValue: TBitmapTile): Boolean;
+
+    function GetOffsetsList(const ATypeData: TTypeData;
+      const ABoundingBox: TGeoBox;
+      var AOffsets: TFileOffsetArray): Boolean;
+
+    function GetOffsetsTileList(const ATypeData: TTypeData;
+      const ABoundingBox: TGeoBox;
+      var AOffsets: TFileOffsetArray): Boolean;
+
+    function GetOffsetsBitmap(const ATypeData: TTypeData;
+      const ABoundingBox: TGeoBox;
+      var AOffsets: TFileOffsetArray): Boolean;
+
+  public
+    function Open(ATypeConfig: TTypeConfig;
+      const APath: string;
+      AMemoryMappedData: Boolean): Boolean; override;
+
+    function GetOffsets(const ABoundingBox: TGeoBox;
+      const ARequestedTypes: TTypeInfoSet;
+      var AOffsets: TFileOffsetArray;
+      var ALoadedTypes: TTypeInfoSet): Boolean; override;
   end;
 
   TAreaWayIndex = class(TAreaIndexFile)
@@ -478,6 +522,7 @@ type
   end;
 
 const
+  AREA_NODE_IDX = 'areanode.idx';
   AREA_AREA_IDX = 'areaarea.idx';
 
 implementation
@@ -1258,6 +1303,420 @@ end;
 procedure TAreaIndexFile.DumpStatistics();
 begin
   // todo..
+end;
+
+{ TAreaNodeIndex }
+
+function TAreaNodeIndex.Open(ATypeConfig: TTypeConfig; const APath: string;
+  AMemoryMappedData: Boolean): Boolean;
+var
+  gridMag, tileEntryCount, bitmapEntryCount: UInt32;
+  indexEntryCount: UInt16;
+  i: Integer;
+  typeId: TTypeId;
+  minCoord, maxCoord: TGeoPoint;
+  x, y: UInt32;
+  TileEntry: TListTile;
+  BitmapEntry: TBitmapTile;
+  btMagnification: Byte;
+begin
+  FFileName := AREA_NODE_IDX;
+  Result := inherited Open(ATypeConfig, APath, AMemoryMappedData);
+
+  if not Result then Exit;
+
+  try
+    FScanner.Read(gridMag);
+    Self.FGridMag := gridMag;
+
+    FScanner.Read(indexEntryCount);
+    for i := 1 to indexEntryCount do
+    begin
+      FScanner.ReadNumber(typeId);
+      if (typeId >= Length(FNodeTypeData)) then
+        SetLength(FNodeTypeData, typeId+1);
+
+      FScanner.Read(FNodeTypeData[typeId].IsComplex);
+      minCoord.ReadFromStream(FScanner.Stream);
+      maxCoord.ReadFromStream(FScanner.Stream);
+
+      FNodeTypeData[typeId].BoundingBox.SetValue(minCoord, maxCoord);
+
+      if (not FNodeTypeData[typeId].IsComplex) then
+      begin
+        FScanner.ReadFileOffsetValue(FNodeTypeData[typeId].IndexOffset);
+        FScanner.Read(FNodeTypeData[typeId].EntryCount);
+      end
+      else
+      begin
+        FNodeTypeData[typeId].IndexOffset := 0;
+        FNodeTypeData[typeId].EntryCount := 0;
+      end;
+    end;
+
+    { read tiles entry }
+    FScanner.Read(tileEntryCount);
+    for i := 1 to tileEntryCount do
+    begin
+      FScanner.ReadNumber(typeId);
+      if (typeId >= Length(FNodeTypeData)) then
+        SetLength(FNodeTypeData, typeId+1);
+
+      FScanner.Read(x);
+      FScanner.Read(y);
+
+      //TileEntry := FNodeTypeData[typeId].ListTiles[GetTileId(x, y)];
+
+      FScanner.ReadFileOffsetValue(TileEntry.FileOffset);
+      FScanner.Read(TileEntry.EntryCount);
+      FScanner.Read(TileEntry.StoreGeoCoord);
+
+      //FNodeTypeData[typeId].ListTiles := Concat(FNodeTypeData[typeId].ListTiles, [TileEntry]);
+      SetTypeDataListTilesItem(FNodeTypeData[typeId], GetTileId(x, y), TileEntry);
+    end;
+
+    FScanner.Read(bitmapEntryCount);
+
+    for i := 1 to bitmapEntryCount do
+    begin
+      FScanner.ReadNumber(typeId);
+      if (typeId >= Length(FNodeTypeData)) then
+        SetLength(FNodeTypeData, typeId+1);
+
+      FScanner.Read(x);
+      FScanner.Read(y);
+
+      //BitmapTile& entry=nodeTypeData[typeId].bitmapTiles[TileId(x,y)];
+
+      FScanner.ReadFileOffsetValue(BitmapEntry.FileOffset);
+      FScanner.Read(BitmapEntry.DataOffsetBytes);
+      FScanner.Read(btMagnification);
+      BitmapEntry.Magnification := btMagnification;
+
+      FNodeTypeData[typeId].BitmapTiles := Concat(FNodeTypeData[typeId].BitmapTiles, [BitmapEntry]);
+    end;
+
+    Result := (not FScanner.HasError);
+  except
+    on E: Exception do
+    begin
+      WriteLn(LogFile, 'Error: ', E.ToString());
+      Result := False;
+    end;
+  end;
+end;
+
+procedure TAreaNodeIndex.SetTypeDataListTilesItem(var ATypeData: TTypeData;
+  const AItemKey: TTileId; const AItemValue: TListTile);
+var
+  s: string;
+  n: Integer;
+begin
+  s := AItemKey.GetDisplayText();
+  if not ATypeData.ListTilesHash.FindValue(s, n) then
+  begin
+    n := Length(ATypeData.ListTiles);
+    SetLength(ATypeData.ListTiles, n+1);
+    ATypeData.ListTilesHash.Add(s, n);
+  end;
+  ATypeData.ListTiles[n] := AItemValue;
+end;
+
+function TAreaNodeIndex.GetTypeDataListTilesItem(const ATypeData: TTypeData;
+  const AItemKey: TTileId; var AItemValue: TListTile): Boolean;
+var
+  s: string;
+  n: Integer;
+begin
+  s := AItemKey.GetDisplayText();
+  Result := ATypeData.ListTilesHash.FindValue(s, n);
+  if Result then
+    AItemValue := ATypeData.ListTiles[n];
+end;
+
+procedure TAreaNodeIndex.SetTypeDataBitmapTilesItem(var ATypeData: TTypeData;
+  const AItemKey: TTileId; const AItemValue: TBitmapTile);
+var
+  s: string;
+  n: Integer;
+begin
+  s := AItemKey.GetDisplayText();
+  if not ATypeData.BitmapTilesHash.FindValue(s, n) then
+  begin
+    n := Length(ATypeData.BitmapTiles);
+    SetLength(ATypeData.BitmapTiles, n+1);
+    ATypeData.BitmapTilesHash.Add(s, n);
+  end;
+  ATypeData.BitmapTiles[n] := AItemValue;
+end;
+
+function TAreaNodeIndex.GetTypeDataBitmapTilesItem(const ATypeData: TTypeData;
+  const AItemKey: TTileId; var AItemValue: TBitmapTile): Boolean;
+var
+  s: string;
+  n: Integer;
+begin
+  s := AItemKey.GetDisplayText();
+  Result := ATypeData.BitmapTilesHash.FindValue(s, n);
+  if Result then
+    AItemValue := ATypeData.BitmapTiles[n];
+end;
+
+function TAreaNodeIndex.GetOffsetsList(const ATypeData: TTypeData;
+  const ABoundingBox: TGeoBox; var AOffsets: TFileOffsetArray): Boolean;
+var
+  previousOffset, fileOffset: TFileOffset;
+  i: Integer;
+  coord: TGeoPoint;
+begin
+  FScanner.Position := ATypeData.IndexOffset;
+
+  previousOffset := 0;
+
+  for i := 1 to ATypeData.EntryCount do
+  begin
+    coord.ReadFromStream(FScanner.Stream);
+    FScanner.ReadNumber(fileOffset);
+
+    fileOffset := fileOffset + previousOffset;
+
+    previousOffset := fileOffset;
+
+    if ABoundingBox.IsIncludes(coord) then
+      AOffsets := Concat(AOffsets, [fileOffset]);
+  end;
+
+  Result := True;
+end;
+
+function TAreaNodeIndex.GetOffsetsTileList(const ATypeData: TTypeData;
+  const ABoundingBox: TGeoBox; var AOffsets: TFileOffsetArray): Boolean;
+var
+  tileBox: TTileIdBox;
+  tileIdIterator: TTileIdBoxConstIterator;
+  tileId: TTileId;
+  tile: TListTile;
+  previousOffset, fileOffset: TFileOffset;
+  i: Integer;
+  coord: TGeoPoint;
+begin
+  tileBox := GetTileIdBox(GetTileId(FGridMag, ABoundingBox.MinCoord),
+                          GetTileId(FGridMag, ABoundingBox.MaxCoord));
+
+
+  tileIdIterator.Init(tileBox.MinTile, tileBox.MinTile, tileBox.MaxTile);
+  while tileIdIterator.GetNext(tileId) do
+  begin
+    if GetTypeDataListTilesItem(ATypeData, tileId, tile) then
+    begin
+      FScanner.Position := (tile.fileOffset);
+
+      previousOffset := 0;
+
+      if tile.StoreGeoCoord then
+      begin
+        for i := 1 to tile.EntryCount do
+        begin
+          coord.ReadFromStream(FScanner.Stream);
+          FScanner.ReadNumber(fileOffset);
+          fileOffset := fileOffset + previousOffset;
+          previousOffset := fileOffset;
+
+          if ABoundingBox.IsIncludes(coord) then
+            AOffsets := Concat(AOffsets, [fileOffset]);
+        end;
+      end
+      else
+      begin
+        for i := 1 to tile.EntryCount do
+        begin
+          FScanner.ReadNumber(fileOffset);
+          fileOffset := fileOffset + previousOffset;
+          previousOffset := fileOffset;
+
+          AOffsets := Concat(AOffsets, [fileOffset]);
+        end;
+      end;
+    end;
+  end;
+
+  Result := True;
+
+end;
+
+function TAreaNodeIndex.GetOffsetsBitmap(const ATypeData: TTypeData;
+  const ABoundingBox: TGeoBox; var AOffsets: TFileOffsetArray): Boolean;
+var
+  searchTileBox: TTileIdBox;
+  tileIdIterator: TTileIdBoxConstIterator;
+  tileId: TTileId;
+  tileBitmap: TBitmapTile;
+  box: TGeoBox;
+  MagLev: TMagnificationLevel; // magnification
+  bitmapTileBox, boundingBoxTileBox: TTileIdBox;
+  dataOffset, initialCellDataOffset, cellIndexOffset: TFileOffset;
+  cellDataOffset, previousOffset, fileOffset: TFileOffset;
+  minxc, maxxc, minyc, maxyc, y, x, dataCount: UInt32;
+  i, d, cellDataOffsetCount: Integer;
+begin
+  searchTileBox := GetTileIdBox(GetTileId(FGridMag, ABoundingBox.MinCoord),
+                                GetTileId(FGridMag, ABoundingBox.MaxCoord));
+
+  tileIdIterator.Init(searchTileBox.MinTile, searchTileBox.MinTile, searchTileBox.MaxTile);
+  while tileIdIterator.GetNext(tileId) do
+  begin
+    if GetTypeDataBitmapTilesItem(ATypeData, tileId, tileBitmap) then
+    begin
+      MagLev := tileBitmap.Magnification;
+      box := tileId.GetBoundingBox(FGridMag);
+      bitmapTileBox := GetTileIdBox(GetTileId(MagLev, box.MinCoord),
+                                    GetTileId(MagLev, box.MaxCoord));
+      boundingBoxTileBox := GetTileIdBox(GetTileId(MagLev, ABoundingBox.MinCoord),
+                                         GetTileId(MagLev, ABoundingBox.MaxCoord));
+
+      // Offset of the data behind the bitmap
+      dataOffset := tileBitmap.FileOffset + (bitmapTileBox.GetCount() * tileBitmap.DataOffsetBytes);
+
+      minxc := Max(bitmapTileBox.MinX, boundingBoxTileBox.MinX);
+      maxxc := Min(bitmapTileBox.MaxX, boundingBoxTileBox.MaxX);
+
+      minyc := Max(bitmapTileBox.MinY, boundingBoxTileBox.MinY);
+      maxyc := Min(bitmapTileBox.MaxY, boundingBoxTileBox.MaxY);
+
+      // For each row
+      for y := minyc to maxyc do
+      begin
+        //std::lock_guard<std::mutex> guard(lookupMutex);
+        initialCellDataOffset := 0;
+        cellDataOffsetCount := 0;
+        cellIndexOffset := tileBitmap.FileOffset
+          + ((y - bitmapTileBox.MinY) * bitmapTileBox.GetWidth() + minxc - bitmapTileBox.MinX)
+          * tileBitmap.DataOffsetBytes;
+
+        FScanner.Position := cellIndexOffset;
+
+        // For each column in row
+        for x := minxc  to maxxc do
+        begin
+          FScanner.ReadFileOffsetValue(cellDataOffset, tileBitmap.DataOffsetBytes);
+
+          if (cellDataOffset = 0) then
+            Continue;
+
+
+          // We added +1 during import and now substract it again
+          Dec(cellDataOffset);
+
+          if (initialCellDataOffset = 0) then
+            initialCellDataOffset := dataOffset + cellDataOffset;
+
+          Inc(cellDataOffsetCount);
+        end;
+
+        if (cellDataOffsetCount = 0) then
+          Continue;
+
+        Assert(initialCellDataOffset >= cellIndexOffset);
+
+        FScanner.Position := initialCellDataOffset;
+
+        // For each data cell in row found
+        for i := 0 to cellDataOffsetCount-1 do
+        begin
+          previousOffset := 0;
+
+          FScanner.ReadNumber(dataCount);
+
+          for d := 1 to dataCount do
+          begin
+            FScanner.ReadNumber(fileOffset);
+
+            fileOffset := fileOffset + previousOffset;
+
+            AOffsets := Concat(AOffsets, [fileOffset]);
+
+            previousOffset := fileOffset;
+          end;
+        end;
+      end;
+    end;
+  end;
+
+  Result := True;
+
+end;
+
+function TAreaNodeIndex.GetOffsets(const ABoundingBox: TGeoBox;
+  const ARequestedTypes: TTypeInfoSet; var AOffsets: TFileOffsetArray;
+  var ALoadedTypes: TTypeInfoSet): Boolean;
+var
+  time: TStopClock;
+  TypeInfo: TTypeInfo;
+  i: Integer;
+  index: TTypeId;
+begin
+  Result := False;
+  ALoadedTypes.Clear();
+
+  //offsets.reserve(std::min((size_t)10000,offsets.capacity()));
+
+  try
+    //for (TypeInfo in ARequestedTypes) do
+    for i := Low(ARequestedTypes.Types) to High(ARequestedTypes.Types) do
+    begin
+      TypeInfo := ARequestedTypes.Types[i];
+      if TypeInfo = nil then
+        Continue;
+
+      if TypeInfo.IsInternal then
+        Continue;
+
+      index := TypeInfo.NodeId;
+      if (index < Length(FNodeTypeData)) then
+      begin
+        if (not FNodeTypeData[index].BoundingBox.IsIntersects(ABoundingBox)) then
+          // No data available in given bounding box
+          Continue;
+
+        if (not FNodeTypeData[index].IsComplex)
+        and (FNodeTypeData[index].IndexOffset <> 0)
+        and (FNodeTypeData[index].EntryCount <> 0) then
+        begin
+          if (not GetOffsetsList(FNodeTypeData[index], ABoundingBox, AOffsets)) then
+            Exit;
+        end
+        else if FNodeTypeData[index].IsComplex then
+        begin
+          if (not GetOffsetsTileList(FNodeTypeData[index], ABoundingBox, AOffsets)) then
+            Exit;
+          if (not GetOffsetsBitmap(FNodeTypeData[index], ABoundingBox, AOffsets)) then
+            Exit;
+        end
+        else
+          Continue;
+      end;
+
+      ALoadedTypes.Add(TypeInfo);
+    end;
+  except
+    on E: Exception do
+    begin
+      WriteLn(LogFile, 'Error: ', E.ToString());
+
+      Result := False;
+    end;
+  end;
+
+  time.Stop();
+
+  if (time.GetMilliseconds() > 100) then
+  begin
+    WriteLn(LogFile, 'Warn: Retrieving ', Length(AOffsets),
+               ' node offsets from area index for ', ABoundingBox.GetDisplayText(),
+               ' took ', time.ResultString());
+  end;
+
+  Result := True;
 end;
 
 { TAreaAreaIndex }
