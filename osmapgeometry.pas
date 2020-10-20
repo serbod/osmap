@@ -147,6 +147,8 @@ type
       ABearing: Target course in degree
       ADistance: Target distance }
     function Add(ABearing: TReal; ADistance: TDistance): TGeoPoint;
+
+    property Id: TId read GetId;
   end;
 
   TGeoPointArray = array of TGeoPoint;
@@ -171,7 +173,8 @@ type
       do not need to be close in location. }
     function GetId(): TId;
 
-    function GetCoordFromId(AId: TId): TGeoPoint;
+    // see below
+    //function GetCoordFromId(AId: TId): TGeoPoint;
     { True if Serial is not 0 }
     function IsRelevant(): Boolean;
 
@@ -185,6 +188,7 @@ type
   { Appends item to array }
   //function AppendGeoPointToArray(var Arr: TGeoPointArray; const AItem: TGeoPoint): Integer;
 
+function GetCoordFromId(AId: TId): TGeoPoint;
 
 type
   { Anonymous geographic rectangular bounding box.
@@ -919,6 +923,25 @@ begin
   Result := CellDimensions[ALevel];
 end;
 
+function GetCoordFromId(AId: TId): TGeoPoint;
+var
+  LatValue, LonValue: Int64;
+begin
+  AId := AId shr 8;
+
+  LatValue := ((AId shr 8) and $ff)
+            + (((AId shr 24) and $ff) shl 8)
+            + (((AId shr 40) and $ff) shl 16)
+            + (((AId shr 51) and $07) shl 24);
+  LonValue := ((AId shr 0) and $ff)
+            + (((AId shr 16) and $ff) shl 8)
+            + (((AId shr 32) and $ff) shl 16)
+            + (((AId shr 48) and $07) shl 24);
+
+  Result.Init(LatValue / GlobalLatConversionFactor - 90.0,
+              LonValue / GlobalLonConversionFactor - 180.0);
+end;
+
 { TGeoPoint }
 
 procedure TGeoPoint.Init(ALat: TLatitude; ALon: TLongitude);
@@ -1393,25 +1416,6 @@ begin
   Result := Coord.GetId();
   Result := Result shl 8;
   Result := Result or Serial;
-end;
-
-function TGeoPointItem.GetCoordFromId(AId: TId): TGeoPoint;
-var
-  LatValue, LonValue: Int64;
-begin
-  AId := AId shr 8;
-
-  LatValue := ((AId shr 8) and $ff)
-            + (((AId shr 24) and $ff) shl 8)
-            + (((AId shr 40) and $ff) shl 16)
-            + (((AId shr 51) and $07) shl 24);
-  LonValue := ((AId shr 0) and $ff)
-            + (((AId shr 16) and $ff) shl 8)
-            + (((AId shr 32) and $ff) shl 16)
-            + (((AId shr 48) and $07) shl 24);
-
-  Result.Init(LatValue / GlobalLatConversionFactor - 90.0,
-              LonValue / GlobalLonConversionFactor - 180.0);
 end;
 
 function TGeoPointItem.IsRelevant(): Boolean;

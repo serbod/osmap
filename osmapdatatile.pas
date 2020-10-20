@@ -27,7 +27,7 @@ Classes and functions for storing and indexing of OSM sets of data
 of the same type in a tile.
 
 TileId:
-  TileId -> TTileId, GetTileId()
+  TileId -> TIndexTile, GetIndexTile()
   TileIdBoxConstIterator -> TTileIdBoxConstIterator
   TileIdBox -> TTileIdBox
 
@@ -44,7 +44,7 @@ interface
 
 uses
   Classes, SysUtils, Math,
-  OsMapTypes,  OsMapGeometry;
+  OsMapTypes,  OsMapGeometry, OsMapUtils;
 
 type
   { A Tile id, uniquely identifing a tile by its level and (unique for the given level) tile coordinates.
@@ -54,14 +54,20 @@ type
 
     Classic OSM tiles are calculated differently. }
 
-  { TTileId }
+  { TIndexTile }
 
-  TTileId = object
+  TIndexTile = object
     X: UInt32;  // The x coordinate of the tile in relation to the zoom level
     Y: UInt32;  // The y coordinate of the tile in relation to the zoom level
+    Level: UInt32; // zoom level
 
     function AsPixel(): TPixel;
-    function IsEqual(AOther: TTileId): Boolean;
+    { Returns a unique number based on the coordinates of the tile. The bits of the coordinates
+      are projected onto one number by interleaving the bits of the coordinates. Coordinates close
+      in 2D space are thus likely clos ein one dimensional space, too. }
+    function GetId(): TId;
+
+    function IsEqual(AOther: TIndexTile): Boolean;
 
     { Return a short human readable description of the tile id }
     function GetDisplayText(): string;
@@ -76,41 +82,41 @@ type
     function GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
   end;
 
-function GetTileId(AX, AY: UInt32): TTileId;
+function GetIndexTile(AX, AY: UInt32): TIndexTile;
 
 { Return the libosmscout-specific tile id for the given magnification that contains the given
   coordinates.
   AMagnification - Magnification to use
   ACoord - Coordinate that should be covered by the tile }
-function GetTileId(const AMagnification: TMagnification; const ACoord: TGeoPoint): TTileId;
+function GetIndexTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TIndexTile;
 { Return the libosmscout-specific tile id for the given magnification that contains the given
   coordinates.
   ALevel - Level to use (magnification.GetLevel())
   ACoord - Coordinate that should be covered by the tile }
-function GetTileId(const ALevel: TMagnificationLevel; const ACoord: TGeoPoint): TTileId;
+function GetIndexTile(const ALevel: TMagnificationLevel; const ACoord: TGeoPoint): TIndexTile;
 
 
 type
 
   { TTileIdBoxConstIterator }
 
-  TTileIdBoxConstIterator = object
-    CurrentTile: TTileId;
-    MinTile: TTileId;
-    MaxTile: TTileId;
+  TIndexTileBoxConstIterator = object
+    CurrentTile: TIndexTile;
+    MinTile: TIndexTile;
+    MaxTile: TIndexTile;
 
-    procedure Init(const ACur, AMin, AMax: TTileId);
+    procedure Init(const ACur, AMin, AMax: TIndexTile);
     { Set next tile as CurrentTile, return False if there is no next tile }
     function Next(): Boolean;
     { Return CurrentTile and set next tile as CurrentTile, return False if there is no next tile }
-    function GetNext(var ACurrentTile: TTileId): Boolean;
+    function GetNext(var ACurrentTile: TIndexTile): Boolean;
   end;
 
   { A bounding box defined by two tile ids that span a rectangular region (in
     tile coordinate system) }
-  TTileIdBox = object
-    MinTile: TTileId;
-    MaxTile: TTileId;
+  TIndexTileBox = object
+    MinTile: TIndexTile;
+    MaxTile: TIndexTile;
 
     property MinX: UInt32 read MinTile.X;
     property MinY: UInt32 read MinTile.Y;
@@ -125,29 +131,32 @@ type
   end;
 
 
-function GetTileIdBox(const A, B: TTileId): TTileIdBox;
+function GetIndexTileBox(const A, B: TIndexTile): TIndexTileBox;
 
 implementation
 
-function GetTileId(AX, AY: UInt32): TTileId;
+function GetIndexTile(AX, AY: UInt32): TIndexTile;
 begin
   Result.X := AX;
   Result.Y := AY;
+  Result.Level := 0;
 end;
 
-function GetTileId(const AMagnification: TMagnification; const ACoord: TGeoPoint): TTileId;
+function GetIndexTile(const AMagnification: TMagnification; const ACoord: TGeoPoint): TIndexTile;
 begin
   Result.X := Trunc((ACoord.Lon + 180.0) / CellDimensions[AMagnification.Level].Width);
   Result.Y := Trunc((ACoord.Lat + 90.0) / CellDimensions[AMagnification.Level].Height);
+  Result.Level := AMagnification.Level;
 end;
 
-function GetTileId(const ALevel: TMagnificationLevel; const ACoord: TGeoPoint): TTileId;
+function GetIndexTile(const ALevel: TMagnificationLevel; const ACoord: TGeoPoint): TIndexTile;
 begin
   Result.X := Trunc((ACoord.Lon + 180.0) / CellDimensions[ALevel].Width);
   Result.Y := Trunc((ACoord.Lat + 90.0) / CellDimensions[ALevel].Height);
+  Result.Level := ALevel;
 end;
 
-function GetTileIdBox(const A, B: TTileId): TTileIdBox;
+function GetIndexTileBox(const A, B: TIndexTile): TIndexTileBox;
 begin
   Result.MinTile.X := Min(A.X, B.X);
   Result.MinTile.Y := Min(A.Y, B.Y);
@@ -155,31 +164,36 @@ begin
   Result.MaxTile.Y := Max(A.Y, B.Y);
 end;
 
-{ TTileId }
+{ TIndexTile }
 
-function TTileId.AsPixel(): TPixel;
+function TIndexTile.AsPixel(): TPixel;
 begin
   Result.X := X;
   Result.Y := Y;
 end;
 
-function TTileId.IsEqual(AOther: TTileId): Boolean;
+function TIndexTile.GetId(): TId;
+begin
+  Result := InterleaveNumbers(X, Y);
+end;
+
+function TIndexTile.IsEqual(AOther: TIndexTile): Boolean;
 begin
   Result := (X = AOther.X) and (Y = AOther.Y);
 end;
 
-function TTileId.GetDisplayText(): string;
+function TIndexTile.GetDisplayText(): string;
 begin
   Result := Format('%d.%d', [y, x]);
 end;
 
-function TTileId.GetTopLeftCoord(const AMagnification: TMagnification): TGeoPoint;
+function TIndexTile.GetTopLeftCoord(const AMagnification: TMagnification): TGeoPoint;
 begin
   Result.Lat := y * CellDimensions[AMagnification.Level].Height - 90.0;
   Result.Lon := x * CellDimensions[AMagnification.Level].Width - 180.0;
 end;
 
-function TTileId.GetBoundingBox(const ALevel: TMagnificationLevel): TGeoBox;
+function TIndexTile.GetBoundingBox(const ALevel: TMagnificationLevel): TGeoBox;
 begin
   Result.MinCoord.Lat := y * CellDimensions[ALevel].Height - 90.0;
   Result.MinCoord.Lon := x * CellDimensions[ALevel].Width - 180.0;
@@ -188,54 +202,54 @@ begin
   Result.MaxCoord.Lon := (x+1) * CellDimensions[ALevel].Width - 180.0;
 end;
 
-function TTileId.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
+function TIndexTile.GetBoundingBox(const AMagnification: TMagnification): TGeoBox;
 begin
   Result := GetBoundingBox(AMagnification.Level);
 end;
 
-{ TTileIdBoxConstIterator }
+{ TIndexTileBoxConstIterator }
 
-procedure TTileIdBoxConstIterator.Init(const ACur, AMin, AMax: TTileId);
+procedure TIndexTileBoxConstIterator.Init(const ACur, AMin, AMax: TIndexTile);
 begin
   CurrentTile := ACur;
   MinTile := AMin;
   MaxTile := AMax;
 end;
 
-function TTileIdBoxConstIterator.Next(): Boolean;
+function TIndexTileBoxConstIterator.Next(): Boolean;
 begin
   Result := (not CurrentTile.IsEqual(MaxTile));
   if Result then
   begin
     if (CurrentTile.X >= MaxTile.X) then
-      CurrentTile := GetTileId(minTile.X, CurrentTile.Y+1)
+      CurrentTile := GetIndexTile(minTile.X, CurrentTile.Y+1)
     else
-      CurrentTile := GetTileId(CurrentTile.X+1, CurrentTile.Y);
+      CurrentTile := GetIndexTile(CurrentTile.X+1, CurrentTile.Y);
   end;
 end;
 
-function TTileIdBoxConstIterator.GetNext(var ACurrentTile: TTileId): Boolean;
+function TIndexTileBoxConstIterator.GetNext(var ACurrentTile: TIndexTile): Boolean;
 begin
   ACurrentTile := CurrentTile;
   Result := Next();
 end;
 
-function TTileIdBox.GetWidth(): Integer;
+function TIndexTileBox.GetWidth(): Integer;
 begin
   Result := MaxTile.X - MinTile.X + 1;
 end;
 
-function TTileIdBox.GetHeight(): Integer;
+function TIndexTileBox.GetHeight(): Integer;
 begin
   Result := MaxTile.Y - MinTile.Y + 1;
 end;
 
-function TTileIdBox.GetCount(): Integer;
+function TIndexTileBox.GetCount(): Integer;
 begin
   Result := GetWidth() * GetHeight();
 end;
 
-function TTileIdBox.GetDisplayText(): string;
+function TIndexTileBox.GetDisplayText(): string;
 begin
   Result := Format('[%s - %s]', [MinTile.GetDisplayText(), MaxTile.GetDisplayText]);
 end;

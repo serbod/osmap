@@ -38,7 +38,7 @@ interface
 uses
   Classes, SysUtils,
   OsMapTypes, OsMapGeometry, OsMapRouting, OsMapFiles, OsMapDataFiles,
-  OsMapObjTypes;
+  OsMapObjTypes, OsMapRoutingDatabaseFiles;
 
 type
 
@@ -47,6 +47,7 @@ type
   protected
     FTypeConfig: TTypeConfig;
     FPath: string;
+    FRouteNodeDataFile: TRouteNodeDataFile;
   public
     constructor Create();
 

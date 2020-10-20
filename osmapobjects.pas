@@ -230,6 +230,7 @@ type
     procedure WriteOptimized(ATypeConfig: TTypeConfig; AWriter: TFileWriter);
 
     property TypeInfo: TTypeInfo read GetType;
+    property FeatureValueBuffer: TFeatureValueBuffer read GetFeatureValueBuffer;
   end;
 
   {$ifdef FPC}

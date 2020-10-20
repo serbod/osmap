@@ -378,7 +378,8 @@ type
 
   { TRouteNode }
 
-  TRouteNode = class
+  PRouteNode = ^TRouteNode;
+  TRouteNode = object
   private
     FFileOffset: TFileOffset;
     FPoint: TGeoPoint;
@@ -388,7 +389,8 @@ type
     Paths: array of TRouteNodePath;
     Excludes: array of TRouteNodeExclude;
 
-    procedure Create(const AFileOffset: TFileOffset; const APoint: TGeoPoint);
+    procedure Init(); overload;
+    procedure Init(const AFileOffset: TFileOffset; const APoint: TGeoPoint); overload;
 
     function AddObject(const AObj: TObjectFileRef; AObjVariantIndex: Integer): Integer;
     function GetId(): TId; // Point.GetId()
@@ -406,8 +408,8 @@ type
     property Serial: Byte read FSerial;
   end;
 
-  TRouteNodeList =  specialize TFPGList<TRouteNode>;
-  TRouteNodeMapById = specialize TFPGMap<TId, TRouteNode>; // Id : RouteNode
+  TRouteNodeArray =  array of TRouteNode;
+  //TRouteNodeMapById = specialize TFPGMap<TId, TRouteNode>; // Id : RouteNode
 
   { TRouteEntry }
 
@@ -1054,12 +1056,20 @@ end;
 
 { TRouteNode }
 
-procedure TRouteNode.Create(const AFileOffset: TFileOffset;
+procedure TRouteNode.Init();
+begin
+  Init(0, GeoCoord(0, 0));
+end;
+
+procedure TRouteNode.Init(const AFileOffset: TFileOffset;
   const APoint: TGeoPoint);
 begin
-  inherited Create();
   FFileOffset := AFileOffset;
   FPoint.Assign(APoint);
+  FSerial := 0;
+  SetLength(Objects, 0);
+  SetLength(Paths, 0);
+  SetLength(Excludes, 0);
 end;
 
 function TRouteNode.AddObject(const AObj: TObjectFileRef;

@@ -46,8 +46,8 @@ type
   TClosestRoutableObjectResult = record
     ObjectFileRef: TObjectFileRef;
     Distance: TDistance;
-    WayRef: TMapWay;
-    AreaRef: TMapArea;
+    Way: TMapWay;
+    Area: TMapArea;
     Name: string;
   end;
 
@@ -220,7 +220,7 @@ begin
   Assert(False);
   for (TmpNode in ANodes) do
   begin
-    { !!!
+    { todo: !!!
     if TmpNode.IsRelevant() then // TmpNode.Serial <> 0
     begin
       Result := True;
@@ -616,6 +616,11 @@ var
   areaSearchResult: TAreaRegionSearchResult;
   AreaResultEntry: TAreaRegionSearchResultEntry;
 begin
+  Result.Area := nil;
+  Result.Way := nil;
+  Result.ObjectFileRef.Invalidate();
+  Result.Distance := Infinity;
+  Result.Name := '';
 
   for (TypeInfo in FDatabase.TypeConfig.Types) do
   begin
@@ -657,27 +662,26 @@ begin
     end;
   end;
 
-  if (!closestWay && !closestArea) {
-    result.distance=Distance::Max();
-    return result;
-  }
-  else {
-    NameFeatureLabelReader nameFeatureLabelReader(*database->GetTypeConfig());
-
-    result.distance=closestDistance;
-    if (closestWay) {
-      result.way=closestWay;
-      result.object=result.way->GetObjectFileRef();
-      result.name=nameFeatureLabelReader.GetLabel(result.way->GetFeatureValueBuffer());
-    }
-    else {
-      result.area=closestArea;
-      result.object=result.area->GetObjectFileRef();
-      result.name=nameFeatureLabelReader.GetLabel(result.area->GetFeatureValueBuffer());
-    }
-  }
-
-  return result;
+  if (not Assigned(closestWay)) and (not Assigned(closestArea)) then
+  begin
+    Result.Distance := Infinity;
+  end
+  else
+  begin
+    Result.Distance := closestDistance;
+    if Assigned(closestWay) then
+    begin
+      Result.Way := closestWay;
+      Result.ObjectFileRef := Result.Way.GetObjectFileRef();
+      Result.Name := Result.Way.FeatureValueBuffer.GetFeatureLabel(ftName);
+    end
+    else
+    begin
+      Result.Area := closestArea;
+      Result.ObjectFileRef := Result.Area.GetObjectFileRef();
+      Result.Name := Result.Area.FeatureValueBuffer.GetFeatureLabel(ftName);
+    end;
+  end;
 end;
 
 function TSimpleRoutingService.GetDatabaseMapping(): TMapDatabaseIdMap;
