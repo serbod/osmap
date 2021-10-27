@@ -11,10 +11,10 @@ Based on libosmscout - https://github.com/Framstag/libosmscout
 * use style.ini to change visible objects style
 * AggPas painter by default (for Lazarus or Delphi VCL)
 * Canvas painter for Delphi FMX
-* OpenStreetMap-compatible tile server
 
 # experimental features
 
+* OpenStreetMap-compatible tile server
 * BGRA painter (for Lazarus)
 * geocoder (search location of city/street/building by names)
 * routing
