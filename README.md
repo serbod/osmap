@@ -1,7 +1,7 @@
 # osmap
 Vector maps engine written on Pascal (Delphi/Lazarus), for OSM maps
 
-![osmap_example](https://github.com/serbod/osmap/releases/download/untagged-3184a650c7cbefda7f2f/osmap_example.png)
+![osmap_example](../assets/osmap_example.png)
 
 Based on libosmscout - https://github.com/Framstag/libosmscout
 
