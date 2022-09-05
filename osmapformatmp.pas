@@ -30,6 +30,7 @@ type
 
     TmpArea: TMapArea;
     TmpWay: TMapWay;
+    TmpData: array of string; // for data before item type
     procedure ParseLine(AText: string);
     procedure ParseKeyValue(const AKey, AValue: string);
     procedure ParseAreaType(const TypeId: Integer);
@@ -72,7 +73,7 @@ end;
 procedure TMpFileImporter.ParseLine(AText: string);
 var
   s, sKey, sValue: string;
-  n: Integer;
+  n, i: Integer;
 begin
   s := Copy(AText, 1, 1);
   if s = '[' then
@@ -95,6 +96,12 @@ begin
     else
     if AText = '[END]' then
     begin
+      for i:=0 to Length(TmpData)-1 do
+      begin
+        ParseData0(TmpData[i]);
+      end;
+      TmpData := [];
+
       if IsPoint then
       begin
         IsPoint := False;
@@ -161,7 +168,7 @@ begin
     end;
   end
   else
-  if AKey = 'Data0' then
+  if (AKey = 'Data0') or (AKey = 'Data1') or (AKey = 'Data2') then
   begin
     ParseData0(AValue);
   end
@@ -445,6 +452,14 @@ var
   GeoPoint: TGeoPoint;
   n: Integer;
 begin
+  if (not Assigned(TmpWay)) and (not Assigned(TmpArea)) then
+  begin
+    n := Length(TmpData);
+    SetLength(TmpData, n+1);
+    TmpData[n] := AValue;
+    Exit;
+  end;
+
   if Assigned(TmpWay) then
   begin
     Offs := 1;
@@ -498,8 +513,8 @@ begin
     if not FileExists(AFileName) then
       Exit;
 
-    //ResStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
-    ResStream := TFileStream.Create(AFileName, fmOpenRead);
+    ResStream := TFileStream.Create(AFileName, fmOpenRead or fmShareDenyNone);
+    //ResStream := TFileStream.Create(AFileName, fmOpenRead);
   end;
   sr := TStreamReader.Create(ResStream);
 
@@ -547,4 +562,3 @@ begin
 end;
 
 end.
-
