@@ -23,7 +23,7 @@ type
 
   TMpFileImporter = object
   private
-    IsWay, IsPoint, IsArea: Boolean;
+    IsWay, IsPoint, IsArea, IsTypeParsed: Boolean;
     FManager: TMapManager;
     LineNo: Integer;
     AreaCircleNo: Integer;
@@ -35,7 +35,7 @@ type
     procedure ParseKeyValue(const AKey, AValue: string);
     procedure ParseAreaType(const TypeId: Integer);
     procedure ParseWayType(const TypeId: Integer);
-    procedure ParseLabel(const AValue: string);
+    procedure ParseLabel(AValue: string);
     procedure ParseData0(AValue: string);
   public
     procedure Init();
@@ -65,6 +65,7 @@ begin
   IsArea := False;
   IsPoint := False;
   IsWay := False;
+  IsTypeParsed := False;
 
   TmpArea := nil;
   TmpWay := nil;
@@ -98,9 +99,11 @@ begin
     begin
       for i:=0 to Length(TmpData)-1 do
       begin
-        ParseData0(TmpData[i]);
+        if IsTypeParsed then
+          ParseLine(TmpData[i]);
       end;
       TmpData := [];
+      IsTypeParsed := False;
 
       if IsPoint then
       begin
@@ -144,9 +147,18 @@ begin
     // key=value
     n := Pos('=', AText);
     sKey := Copy(AText, 1, n-1);
-    sValue := Copy(AText, n+1, MaxInt);
-
-    ParseKeyValue(sKey, sValue);
+    if IsTypeParsed or (sKey = 'Type') then
+    begin
+      sValue := Copy(AText, n+1, MaxInt);
+      ParseKeyValue(sKey, sValue);
+    end
+    else if IsPoint or IsWay or IsArea then
+    begin
+      // parse later
+      n := Length(TmpData);
+      SetLength(TmpData, n+1);
+      TmpData[n] := AText;
+    end;
   end;
 end;
 
@@ -166,6 +178,7 @@ begin
     begin
       ParseWayType(TypeId);
     end;
+    IsTypeParsed := True;
   end
   else
   if (AKey = 'Data0') or (AKey = 'Data1') or (AKey = 'Data2') then
@@ -215,7 +228,8 @@ begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('city'));
     end;
-    $03: // landuse = residential
+    $03, // landuse = residential
+    $10f02: // landuse = residential
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_residential'));
@@ -233,7 +247,7 @@ begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_industrial'));
     end;
-    $05: // landuse = garages
+    $05: // landuse = garages; amenity = parking
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('landuse_parking'));
@@ -264,6 +278,7 @@ begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('forest'));
     end;
+    $18, // leisure = pitch, sport = soccer
     $19, // leisure = pitch, sports
     $4D: // sport = ice_hockey
     begin
@@ -273,6 +288,7 @@ begin
     $40, // natural = water
     $41, // natural = water
     $81, // natural = wetland
+    $45, // leisure = swimming_pool
     $47: // waterway = riverbank
     begin
       TmpArea := TMapArea.Create();
@@ -294,13 +310,15 @@ begin
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('building_apartments'));
     end;
     $88, // landuse = farmland
-    $89: // natural = beach
+    $89, // natural = beach
+    $11006: // landuse = farmland
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('farmland'));
     end;
     $95, // natural = grassland
-    $98: // landuse = grass
+    $98, // landuse = grass
+    $11001: // landuse = meadow
     begin
       TmpArea := TMapArea.Create();
       TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('grass'));
@@ -312,10 +330,10 @@ begin
       // area = yes, highway = footway, highway = pedestrian
     end
   else
-    {begin
-      TmpArea := TMapArea.Create();
-      TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('grass'));
-    end;}
+    begin
+      //TmpArea := TMapArea.Create();
+      //TmpArea.Rings[0].SetType(FManager.MapTypeConfig.GetTypeInfo('grass'));
+    end;
   end;
 end;
 
@@ -379,6 +397,11 @@ begin
       TmpWay := TMapWay.Create();
       TmpWay.SetType(FManager.MapTypeConfig.GetTypeInfo('railway_rail'));
     end;
+    $15: // natural = coastline
+    begin
+      TmpWay := TMapWay.Create();
+      TmpWay.SetType(FManager.MapTypeConfig.GetTypeInfo('coastline'));
+    end;
     $18, // waterway = stream
     $1F: // waterway = river
     begin
@@ -413,8 +436,19 @@ begin
   end;
 end;
 
-procedure TMpFileImporter.ParseLabel(const AValue: string);
+procedure TMpFileImporter.ParseLabel(AValue: string);
+var
+  n: Integer;
 begin
+  if Pos('~[', AValue) > 0 then
+  begin
+    // remove ~[0x05]11
+    n := Pos(' ', AValue);
+    if n > 0 then
+      AValue := Copy(AValue, n+1, MaxInt)
+    else
+      Exit;
+  end;
   if IsArea and Assigned(TmpArea) then
   begin
     // номер дома, название участка
@@ -452,14 +486,6 @@ var
   GeoPoint: TGeoPoint;
   n: Integer;
 begin
-  if (not Assigned(TmpWay)) and (not Assigned(TmpArea)) then
-  begin
-    n := Length(TmpData);
-    SetLength(TmpData, n+1);
-    TmpData[n] := AValue;
-    Exit;
-  end;
-
   if Assigned(TmpWay) then
   begin
     Offs := 1;
