@@ -267,6 +267,8 @@ begin
     //layoutGlyph := AGlyphs[i];
     // contour labels should always use outline rendering
     //Assert(TNativeGlyph(layoutGlyph.Glyph).AggGlyph.DataType = gdOutline);
+    if Bitmap.FontHeight <> Round(layoutGlyph.Height) then
+      Bitmap.FontHeight := Round(layoutGlyph.Height);
 
     Angle := -Round(radtodeg(layoutGlyph.Angle) * 10);
     Bitmap.TextOutAngle(
@@ -275,7 +277,8 @@ begin
       Angle,
       layoutGlyph.TextChar,
       cPen,
-      taCenter);
+      taLeftJustify
+      );
   end;
 end;
 
@@ -783,6 +786,7 @@ procedure TMapPainterBGRA.OnTextLayoutHandler(out ALabel: TMapLabel;
   AContourLabel: Boolean);
 var
   x, y, w, h, cw: TReal;
+  sz: TSize;
   i: Integer;
   ws: WideString;
 begin
@@ -810,12 +814,16 @@ begin
     for i := 1 to Length(ws) do
     begin
       // get single character glyph bounds
-      cw := Bitmap.TextSize(ws[i]).cx;
+      sz := Bitmap.TextSize(ws[i]);
+      cw := sz.cx;
+      if cw < 1 then
+        cw := 1;
+      //ALabel.Glyphs[i-1].Angle:=;
 
       ALabel.Glyphs[i-1].Position.X := x;
       ALabel.Glyphs[i-1].Position.Y := y;
       ALabel.Glyphs[i-1].Width := cw;
-      ALabel.Glyphs[i-1].Height := h;
+      ALabel.Glyphs[i-1].Height := sz.cy; // h;
       ALabel.Glyphs[i-1].TextChar := ws[i];
 
       w := w + cw;
@@ -890,4 +898,3 @@ end;
 
 
 end.
-
