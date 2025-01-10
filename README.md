@@ -19,3 +19,10 @@ Based on libosmscout - https://github.com/Framstag/libosmscout
 * geocoder (search location of city/street/building by names)
 * routing
 * libosmscout database files 
+
+# dependences
+
+* AggPasMod - https://github.com/CWBudde/AggPasMod
+* OSM Maps (.mp) - https://garmin.gis-lab.info
+* LNet (for tile server) - https://github.com/almindor/lnet
+* BGRABitmap (optional for Lazarus) - https://github.com/bgrabitmap 
